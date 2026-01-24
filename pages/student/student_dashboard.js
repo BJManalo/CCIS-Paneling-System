@@ -1,6 +1,10 @@
-// Initialize Supabase client
-// Note: PROJECT_URL, PUBLIC_KEY, and supabaseClient are already defined in ../../assets/js/shared.js
-// We use the existing client to avoid "Identifier already declared" errors.
+// Global state to track grading
+let gradingStatus = {
+    titles: false,
+    preoral: false,
+    final: false
+};
+let currentTab = 'titles';
 
 document.addEventListener('DOMContentLoaded', () => {
     loadSubmissionData();
@@ -45,30 +49,36 @@ async function loadSubmissionData() {
                 return gradedCount === totalStudents;
             };
 
-            const isTitleGraded = checkGraded('Title');
-            const isPreOralGraded = checkGraded('Pre'); // Matches "Pre-Oral" or "Pre Oral"
+            gradingStatus.titles = checkGraded('Title');
+            gradingStatus.preoral = checkGraded('Pre');
+            gradingStatus.final = checkGraded('Final');
 
-            // Lock/Unlock Tabs
+            // Lock/Unlock Tab Buttons
             const preOralBtn = document.querySelector('button[onclick*="preoral"]');
             const finalBtn = document.querySelector('button[onclick*="final"]');
 
-            // Logic: Pre-Oral requires Title to be graded
-            if (!isTitleGraded) {
+            if (!gradingStatus.titles) {
                 preOralBtn.disabled = true;
                 preOralBtn.style.opacity = '0.5';
                 preOralBtn.style.cursor = 'not-allowed';
                 preOralBtn.title = "Locked: Title Defense grades pending.";
-                preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                if (!preOralBtn.innerHTML.includes('lock')) {
+                    preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                }
             }
 
-            // Logic: Final requires Pre-Oral to be graded
-            if (!isPreOralGraded) {
+            if (!gradingStatus.preoral) {
                 finalBtn.disabled = true;
                 finalBtn.style.opacity = '0.5';
                 finalBtn.style.cursor = 'not-allowed';
                 finalBtn.title = "Locked: Pre-Oral grades pending.";
-                finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                if (!finalBtn.innerHTML.includes('lock')) {
+                    finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                }
             }
+
+            // Sync Save Button State
+            updateSaveButtonStatus();
 
             // Function to safely parse JSON
             const safeParse = (str) => {
@@ -238,12 +248,47 @@ const showToast = (message, type = 'info') => {
 };
 
 // Add CSS for animation
-const style = document.createElement('style');
-style.innerHTML = `
-@keyframes fadeIn { from {opacity: 0;} to {opacity: 1;} }
-@keyframes fadeOut { from {opacity: 1;} to {opacity: 0;} }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.spin { display: inline - block; animation: spin 1s linear infinite; }
 `;
 document.head.appendChild(style);
+
+// Tab Switching with Button State Update
+window.switchSubmissionTab = function (tabId, btn) {
+    currentTab = tabId;
+    
+    // UI logic (formerly in HTML)
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Update the Save Button
+    updateSaveButtonStatus();
+};
+
+function updateSaveButtonStatus() {
+    const btn = document.querySelector('.save-btn');
+    if (!btn) return;
+
+    const isGraded = gradingStatus[currentTab];
+    
+    if (isGraded) {
+        btn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.style.cursor = 'not-allowed';
+        btn.title = "This stage has been graded and can no longer be modified.";
+    } else {
+        btn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.title = "";
+    }
+}
 
 window.saveSubmissions = async function () {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
@@ -292,6 +337,12 @@ window.saveSubmissions = async function () {
 
         showToast('Submissions saved successfully!', 'success');
 
+        // Immediate Visual Feedback: Lock as "Submitted"
+        btn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.style.cursor = 'not-allowed';
+
     } catch (err) {
         console.error('Submission error:', err);
 
@@ -300,7 +351,8 @@ window.saveSubmissions = async function () {
         } else {
             showToast('Failed to save: ' + err.message, 'error');
         }
-    } finally {
+        
+        // Restore button only on error
         btn.innerHTML = originalContent;
         btn.disabled = false;
     }
