@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCIS Paneling System - Accounts</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+
+<body class="dashboard-body">
+
+    <div class="dashboard-container">
+        <!-- Header with Logo -->
+        <header class="dashboard-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <span class="material-icons-round">logout</span>
+                Log Out
+            </button>
+        </header>
+
+        <!-- Title -->
+        <h2 class="page-title">Accounts</h2>
+
+        <!-- Search Bar -->
+        <div class="search-container" style="margin-bottom: 20px;">
+            <div class="search-bar">
+                <input type="text" placeholder="Search Accounts" id="searchInput">
+                <span class="material-icons-round search-icon-right">search</span>
+            </div>
+        </div>
+
+        <!-- Accounts Table -->
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Designation</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="accountsTableBody">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add User FAB -->
+        <button class="fab-btn" onclick="openAddUserModal()">
+            <span class="material-icons-round">add</span>
+        </button>
+
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="modal-title">Add User</h2>
+
+            <form id="addUserForm" onsubmit="saveUser(event)">
+                <div class="input-group">
+                    <label for="userFullName">Name</label>
+                    <input type="text" id="userFullName" required placeholder="Full Name">
+                </div>
+
+                <div class="input-group">
+                    <label for="userEmail">Email</label>
+                    <input type="email" id="userEmail" required placeholder="name@example.com">
+                </div>
+
+                <div class="input-group">
+                    <label for="userPassword">Password</label>
+                    <div style="position: relative;">
+                        <input type="password" id="userPassword" required style="width: 100%; padding-right: 40px;">
+                        <span class="material-icons-round" onclick="toggleGenericPassword('userPassword', this)"
+                            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #64748b; user-select: none;">visibility_off</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="userRole">Role</label>
+                    <div class="custom-select-wrapper">
+                        <select id="userRole" required>
+                            <option value="Admin">Admin</option>
+                            <option value="Instructor">Instructor</option>
+                            <option value="Panel/Adviser">Panel/Adviser</option>
+                        </select>
+                        <span class="material-icons-round select-arrow">expand_more</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="userDesignation">Designation</label>
+                    <div class="custom-select-wrapper">
+                        <select id="userDesignation">
+                            <option value="None">None</option>
+                            <option value="Program Head">Program Head</option>
+                            <option value="Dean">Dean</option>
+                        </select>
+                        <span class="material-icons-round select-arrow">expand_more</span>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeAddUserModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="admin.html" class="nav-item">
+            <span class="material-icons-round">dashboard</span>
+            <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="capstone.html" class="nav-item">
+            <span class="material-icons-round">folder_special</span>
+            <span class="nav-label">Capstone</span>
+        </a>
+        <a href="reports.html" class="nav-item">
+            <span class="material-icons-round">bar_chart</span>
+            <span class="nav-label">Reports</span>
+        </a>
+        <a href="schedule.html" class="nav-item">
+            <span class="material-icons-round">calendar_today</span>
+            <span class="nav-label">Schedule</span>
+        </a>
+        <a href="accounts.html" class="nav-item active">
+            <span class="material-icons-round">people</span>
+            <span class="nav-label">Accounts</span>
+        </a>
+    </nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="accounts.js"></script>
+</body>
+
+</html>

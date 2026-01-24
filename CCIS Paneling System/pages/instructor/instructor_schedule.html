@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCIS Paneling System - Schedule</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Expandable Row Styles */
+        tr.main-row {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        tr.main-row:hover {
+            background: #f8fafc;
+        }
+
+        tr.details-row {
+            display: none;
+            background: #f8fafc;
+        }
+
+        tr.details-row.active {
+            display: table-row;
+        }
+
+        .details-content {
+            padding: 20px 25px;
+            border-bottom: 1px solid #e2e8f0;
+            animation: slideDown 0.3s ease-out;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .details-column h4 {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 5px;
+        }
+
+        .details-column p {
+            margin: 0 0 8px 0;
+            color: #334155;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s;
+            color: var(--primary-color);
+            vertical-align: middle;
+        }
+
+        tr.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+    </style>
+
+<body class="dashboard-body">
+
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+                <div class="search-bar" style="width: 300px;">
+                    <span class="material-icons-round">search</span>
+                    <input type="text" placeholder="Search Schedule..." id="searchInput">
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <span class="material-icons-round">logout</span>
+                Log Out
+            </button>
+        </header>
+
+        <!-- Title -->
+        <h2 class="page-title">Defense Schedule</h2>
+
+        <!-- Schedule Table -->
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="padding-left: 25px;">Type</th>
+                        <th>Group Name</th>
+                        <th>Program</th>
+                        <th>Adviser</th>
+                        <th>Date & Time</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleTableBody">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add Schedule FAB -->
+        <button class="fab-btn" onclick="openScheduleModal()">
+            <span class="material-icons-round">add</span>
+        </button>
+
+    </div>
+
+    <!-- Schedule Modal -->
+    <div id="scheduleModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 650px;">
+            <h2 class="modal-title">Select Panel and Set Schedule</h2>
+            <form id="scheduleForm" onsubmit="saveSchedule(event)">
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="schedType">Defense Type</label>
+                        <select id="schedType" required>
+                            <option value="Title Defense">Title Defense</option>
+                            <option value="Pre Oral Defense">Pre Oral Defense</option>
+                            <option value="Final Defense">Final Defense</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="schedGroupId">Group Name</label>
+                        <select id="schedGroupId" required onchange="handleGroupChange()">
+                            <option value="">Select Group</option>
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label>Members</label>
+                    <div id="schedMembers" class="members-display">Select a group to see members</div>
+                </div>
+
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label for="schedAdviser">Adviser</label>
+                    <input type="text" id="schedAdviser" readonly placeholder="Auto-filled from group"
+                        style="background: #f1f5f9; cursor: not-allowed;">
+                </div>
+
+                <div class="panels-section">
+                    <label>Panel Members</label>
+                    <div class="panel-grid">
+                        <select id="schedPanel1" onchange="updatePanelOptions()">
+                            <option value="">Select Panel</option>
+                        </select>
+                        <select id="schedPanel2" onchange="updatePanelOptions()">
+                            <option value="">Select Panel</option>
+                        </select>
+                        <select id="schedPanel3" onchange="updatePanelOptions()">
+                            <option value="">Select Panel</option>
+                        </select>
+                        <select id="schedPanel4" onchange="updatePanelOptions()">
+                            <option value="">Select Panel</option>
+                        </select>
+                        <select id="schedPanel5" onchange="updatePanelOptions()">
+                            <option value="">Select Panel</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="schedDate">Date</label>
+                        <input type="date" id="schedDate" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="schedTime">Time</label>
+                        <input type="time" id="schedTime" required>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="schedVenue">Venue</label>
+                    <input type="text" id="schedVenue" placeholder="e.g. Lab 1" required style="width: 100%;">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeScheduleModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Save Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+
+    <nav class="bottom-nav">
+        <a href="instructor_dashboard.html" class="nav-item">
+            <span class="material-icons-round">dashboard</span>
+            <span class="nav-label">Dashboard</span>
+        </a>
+
+
+        <a href="instructor_evaluation.html" class="nav-item">
+            <span class="material-icons-round">rate_review</span>
+            <span class="nav-label">Evaluation</span>
+        </a>
+        <a href="instructor_grades.html" class="nav-item">
+            <span class="material-icons-round">grading</span>
+            <span class="nav-label">Grades</span>
+        </a>
+        <a href="instructor_payers.html" class="nav-item">
+            <span class="material-icons-round">payments</span>
+            <span class="nav-label">Payers</span>
+        </a>
+        <a href="instructor_schedule.html" class="nav-item active">
+            <span class="material-icons-round">calendar_today</span>
+            <span class="nav-label">Schedule</span>
+        </a>
+        <a href="instructor_accounts.html" class="nav-item">
+            <span class="material-icons-round">people</span>
+            <span class="nav-label">Accounts</span>
+        </a>
+    </nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="instructor_schedule.js"></script>
+</body>
+
+</html>
