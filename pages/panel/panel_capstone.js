@@ -294,9 +294,17 @@ function renderTable() {
 }
 
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
+// Global functions for Modal (Reusing existing logic roughly, but checking context)
 window.openFileModal = (groupId) => {
-    const group = allData.find(g => g.id === groupId);
-    if (!group) return;
+    // FIX: Find group matching ID AND the current active tab (Defense Type)
+    // This ensures we get the correct object (Title, Pre, or Final) from allData
+    const normTab = normalizeType(currentTab);
+    const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+
+    if (!group) {
+        console.error('Group not found for this tab context');
+        return;
+    }
 
     document.getElementById('modalGroupName').innerText = group.groupName;
     const fileList = document.getElementById('fileList');
@@ -457,9 +465,6 @@ window.openFileModal = (groupId) => {
     // I will show ALL for context, but maybe collapse others?
     // For simplicity, showing all is safer so they can reference previous docs.
 
-    // Filter which sections to show based on currentTab
-    const normTab = normalizeType(currentTab);
-
     if (normTab.includes('title')) {
         createSection('Title Defense', group.files.titles, 'article', 'titles');
     } else if (normTab.includes('preoral')) {
@@ -476,26 +481,53 @@ window.openFileModal = (groupId) => {
 // NOTE: I am keeping them as defined in previous file version but ensuring they use the new data structure.
 
 window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
-    // ... (Existing logic compliant)
-    // Same implementation as before
     if (newStatus === 'Pending') return;
     try {
-        const group = allData.find(g => g.id === groupId);
-        if (!group) return;
-        let column = '';
-        let localMap = {};
-        if (categoryKey === 'titles') { column = 'title_status'; if (!group.titleStatus) group.titleStatus = {}; localMap = group.titleStatus; }
-        else if (categoryKey === 'pre_oral') { column = 'pre_oral_status'; if (!group.preOralStatus) group.preOralStatus = {}; localMap = group.preOralStatus; }
-        else if (categoryKey === 'final') { column = 'final_status'; if (!group.finalStatus) group.finalStatus = {}; localMap = group.finalStatus; }
+        const normTab = normalizeType(currentTab);
+        const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+        if (!group) {
+            console.error('Group not found for status update in this tab context.');
+            return;
+        }
+
+        let defenseType = group.type;
+
+        let localMap = group.currentStatusJson || {};
         localMap[fileKey] = newStatus;
-        const { error } = await supabaseClient.from('student_groups').update({ [column]: JSON.stringify(localMap) }).eq('id', groupId);
+
+        const payload = {
+            group_id: groupId,
+            defense_type: defenseType,
+            statuses: localMap,
+            remarks: group.currentRemarksJson || {}
+        };
+
+        let error;
+        if (group.defenseStatusId) {
+            const result = await supabaseClient.from('defense_statuses')
+                .update({ statuses: localMap, updated_at: new Date() })
+                .eq('id', group.defenseStatusId);
+            error = result.error;
+        } else {
+            const result = await supabaseClient.from('defense_statuses')
+                .insert([payload])
+                .select();
+            error = result.error;
+            if (result.data) group.defenseStatusId = result.data[0].id;
+        }
+
         if (error) throw error;
+
+        group.currentStatusJson = localMap;
+        if (categoryKey === 'titles') group.titleStatus = localMap;
+        else if (categoryKey === 'pre_oral') group.preOralStatus = localMap;
+        else if (categoryKey === 'final') group.finalStatus = localMap;
+
         openFileModal(groupId);
-    } catch (err) { console.error(err); alert('Failed to update status.'); }
+    } catch (err) { console.error(err); alert('Failed to update status: ' + (err.message || err)); }
 };
 
 window.saveRemarks = async (groupId, categoryKey, fileKey) => {
-    // ... (Existing logic)
     const userJson = localStorage.getItem('loginUser');
     if (!userJson) return;
     const user = JSON.parse(userJson);
@@ -503,44 +535,60 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     const textarea = document.getElementById(`remarks-${categoryKey}-${fileKey}`);
     const newText = textarea.value.trim();
     if (!newText) return;
+
     let formattedText = newText;
     const prefix = `${userName}:`;
     if (!formattedText.startsWith(prefix)) { formattedText = `${prefix} ${newText}`; }
 
-    const group = allData.find(g => g.id === groupId);
-    let column = '';
-    let localMap = {};
-    if (categoryKey === 'titles') { column = 'title_remarks'; localMap = group.titleRemarks || {}; }
-    else if (categoryKey === 'pre_oral') { column = 'pre_oral_remarks'; localMap = group.preOralRemarks || {}; }
-    else if (categoryKey === 'final') { column = 'final_remarks'; localMap = group.finalRemarks || {}; }
+    // FIX: Look up using currentTab context same as other functions
+    const normTab = normalizeType(currentTab);
+    const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
 
+    // Note: If tab is somehow mismatching code flow, we might need a fallback,
+    // but the modal content (input) shouldn't exist if we aren't in that tab's context.
+
+    let localMap = group.currentRemarksJson || {};
     localMap[fileKey] = formattedText;
+
+    let defenseType = group.type;
+
     try {
-        const { error } = await supabaseClient.from('student_groups').update({ [column]: JSON.stringify(localMap) }).eq('id', groupId);
+        let error;
+        if (group.defenseStatusId) {
+            const result = await supabaseClient.from('defense_statuses')
+                .update({ remarks: localMap, updated_at: new Date() })
+                .eq('id', group.defenseStatusId);
+            error = result.error;
+        } else {
+            const payload = {
+                group_id: groupId,
+                defense_type: defenseType,
+                statuses: group.currentStatusJson || {},
+                remarks: localMap
+            };
+            const result = await supabaseClient.from('defense_statuses')
+                .insert([payload])
+                .select();
+            error = result.error;
+            if (result.data) group.defenseStatusId = result.data[0].id;
+        }
+
         if (error) throw error;
 
         // Update local data
-        if (categoryKey === 'titles') {
-            if (!group.titleRemarks) group.titleRemarks = {};
-            group.titleRemarks[fileKey] = formattedText;
-        } else if (categoryKey === 'pre_oral') {
-            if (!group.preOralRemarks) group.preOralRemarks = {};
-            group.preOralRemarks[fileKey] = formattedText;
-        } else if (categoryKey === 'final') {
-            if (!group.finalRemarks) group.finalRemarks = {};
-            group.finalRemarks[fileKey] = formattedText;
-        }
+        group.currentRemarksJson = localMap;
+        if (categoryKey === 'titles') group.titleRemarks = localMap;
+        else if (categoryKey === 'pre_oral') group.preOralRemarks = localMap;
+        else if (categoryKey === 'final') group.finalRemarks = localMap;
 
         // Persistent visual feedback
-        const textarea = document.getElementById(`remarks-${categoryKey}-${fileKey}`);
         if (textarea) {
             const btn = textarea.nextElementSibling;
             btn.innerText = 'Saved';
             btn.style.background = '#dcfce7';
             btn.style.color = '#166534';
-            // We do NOT set a timeout to revert it, per user request.
         }
-    } catch (e) { console.error(e); alert('Error saving remarks'); }
+    } catch (e) { console.error(e); alert('Error saving remarks: ' + (e.message || e)); }
 };
 
 window.closeFileModal = () => {
