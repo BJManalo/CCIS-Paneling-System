@@ -94,6 +94,10 @@
     }
 
     @media print {
+        @page {
+            size: portrait;
+            margin: 10mm 15mm 10mm 15mm;
+        }
 
         .bottom-nav,
         .dashboard-header,
@@ -111,6 +115,7 @@
         .table-container {
             box-shadow: none;
             border: none;
+            margin-top: 20px;
         }
 
         .data-table th {
@@ -118,6 +123,11 @@
             color: black !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            border: 1px solid #e2e8f0;
+        }
+
+        .data-table td {
+            border: 1px solid #e2e8f0;
         }
 
         body {
@@ -125,30 +135,13 @@
         }
 
         .print-header {
-            display: block !important;
+            display: block;
+            margin-bottom: 30px;
         }
     }
 
     .print-header {
         display: none;
-        margin-bottom: 40px;
-    }
-
-    .print-header-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-top: 20px;
-    }
-
-    .print-header-details {
-        display: flex;
-        justify-content: space-between;
-        font-size: 11px;
-        color: #64748b;
-        padding-bottom: 8px;
-        border-bottom: 2px solid #1e293b;
-        font-weight: 500;
     }
 </style>
 </head>
@@ -158,21 +151,24 @@
     <div class="dashboard-container">
         <!-- Print Only Header -->
         <div class="print-header">
-            <div class="print-header-details">
-                <span id="printDate"></span>
-                <span>CCIS Paneling System - Reports</span>
-            </div>
-            <div class="print-header-top">
-                <img src="../../assets/images/logo.png" style="height: 80px;" alt="Logo Left">
-                <div style="text-align: center; flex: 1; padding: 0 20px;">
-                    <h1 style="margin: 0; font-size: 24px; color: #1e293b; letter-spacing: 1px;">UNIVERSITY OF ANTIQUE
-                    </h1>
-                    <h2 style="margin: 2px 0; font-size: 18px; color: #334155;">College of Computer Studies</h2>
-                    <h3 style="margin: 8px 0 0; font-size: 15px; color: var(--primary-color);" id="printReportTitle">
-                        Capstone Project Academic Report</h3>
+            <div id="printDate" style="font-size: 10px; color: #64748b; margin-bottom: 20px; text-align: left;"></div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <img src="../../assets/images/logo.png" alt="Logo"
+                    style="width: 80px; height: 80px; object-fit: contain;">
+                <div style="text-align: center; flex: 1;">
+                    <h1
+                        style="font-size: 24px; color: #1e293b; margin: 0; font-weight: 700; text-transform: uppercase;">
+                        UNIVERSITY OF ANTIQUE</h1>
+                    <h2 style="font-size: 18px; color: #334155; margin: 4px 0; font-weight: 600;">College of Computer
+                        Studies</h2>
+                    <h3 id="printReportTitle"
+                        style="font-size: 14px; color: #2563eb; margin: 8px 0 0; font-weight: 700;"></h3>
                 </div>
-                <img src="../../assets/images/logo.png" style="height: 80px;" alt="Logo Right">
+                <img src="../../assets/images/logo.png" alt="Logo"
+                    style="width: 80px; height: 80px; object-fit: contain;">
             </div>
+            <div style="height: 3px; background: #000; margin: 15px 0;"></div>
         </div>
 
         <!-- Header -->
