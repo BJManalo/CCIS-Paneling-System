@@ -106,18 +106,21 @@ window.applyFilters = () => {
         // Find schedule for specific phase
         const phaseSchedule = allSchedules.find(s => s.group_id === group.id && s.schedule_type === phase);
 
-        // Find individual grade for this student in this phase
-        const gradeRecord = phaseSchedule ? allGrades.find(g => g.student_id === student.id && g.schedule_id === phaseSchedule.id) : null;
-        const studentGrade = gradeRecord ? parseFloat(gradeRecord.final_grade).toFixed(2) : '-';
+        // Find individual grade for this student in this phase (match by student_id and grade_type)
+        const gradeRecord = allGrades.find(gr => gr.student_id === student.id && gr.grade_type === phase);
+        const studentGrade = (gradeRecord && (gradeRecord.grade || gradeRecord.grade === 0)) ? parseFloat(gradeRecord.grade).toFixed(2) : '-';
 
-        // Status logic for the specific phase
+        // Phase Status Logic
         let phaseStatus = 'Pending';
         let statusHtml = '<span class="status-badge pending">Pending</span>';
 
         if (phase === 'Title Defense') {
             const isApproved = Object.values(tMap).some(v => v.toLowerCase().includes('approved'));
             const isRejected = Object.values(tMap).some(v => v.toLowerCase().includes('rejected'));
-            if (isApproved) {
+            if (studentGrade !== '-') {
+                phaseStatus = 'Passed';
+                statusHtml = '<span class="status-badge approved">Graded</span>';
+            } else if (isApproved) {
                 phaseStatus = 'Passed';
                 statusHtml = '<span class="status-badge approved">Passed</span>';
             } else if (isRejected) {
@@ -126,17 +129,14 @@ window.applyFilters = () => {
             }
         } else {
             // Pre-Oral or Final Defense
-            if (phaseSchedule) {
-                if (phaseSchedule.status === 'Completed' && studentGrade !== '-') {
-                    const gradeVal = parseFloat(studentGrade);
-                    if (gradeVal >= 3.0) { // Assuming 3.0 is failing in 1.0-5.0 scale, adjust if 75 is passing
-                        // In many systems 3.0 is passing. Let's assume > 0 is completed/graded
-                        phaseStatus = 'Passed';
-                        statusHtml = '<span class="status-badge approved">Graded</span>';
-                    } else {
-                        phaseStatus = 'Incomplete';
-                        statusHtml = '<span class="status-badge rejected">Failing/Inc</span>';
-                    }
+            const phaseSchedule = allSchedules.find(s => s.group_id === group.id && s.schedule_type === phase);
+            if (studentGrade !== '-') {
+                phaseStatus = 'Passed';
+                statusHtml = '<span class="status-badge approved">Graded</span>';
+            } else if (phaseSchedule) {
+                if (phaseSchedule.status === 'Completed') {
+                    phaseStatus = 'Incomplete';
+                    statusHtml = '<span class="status-badge rejected">No Grade</span>';
                 } else {
                     phaseStatus = 'Scheduled';
                     statusHtml = '<span class="status-badge pending" style="background:#e0f2fe; color:#0369a1;">Scheduled</span>';
