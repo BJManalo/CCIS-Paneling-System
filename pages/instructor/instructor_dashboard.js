@@ -152,9 +152,7 @@ window.applyDashboardFilters = () => {
         } else if (currentCategory === 'APPROVED') {
             return tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
         } else if (currentCategory === 'REJECTED') {
-            const hasApp = tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
-            const hasRej = tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('rejected'));
-            return hasRej && !hasApp;
+            return tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('rejected'));
         }
         return true;
     });
@@ -174,35 +172,30 @@ function updateCounts(groups) {
         return Object.values(s);
     };
 
-    // 1. Approved Titles
-    const approvedCount = groups.filter(g => {
-        const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
-        return getVals(titleRow).some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
-    }).length;
+    let approvedTotal = 0;
+    let rejectedTotal = 0;
+    let completedTotal = 0;
 
-    // 2. Rejected Titles
-    const rejectedCount = groups.filter(g => {
-        const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
-        const vals = getVals(titleRow);
-        const hasRej = vals.some(v => typeof v === 'string' && v.toLowerCase().includes('rejected'));
-        const hasApp = vals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
-        return hasRej && !hasApp;
-    }).length;
+    groupIds.forEach(id => {
+        const titleRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Title Defense');
+        const finalRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Final Defense');
 
-    // 3. Completed Titles
-    const completedCount = groups.filter(g => {
-        const finalRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
-        return getVals(finalRow).some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
-    }).length;
+        const tVals = getVals(titleRow);
+        const fVals = getVals(finalRow);
+
+        approvedTotal += tVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('approved')).length;
+        rejectedTotal += tVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('rejected')).length;
+        completedTotal += fVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('approved')).length;
+    });
 
     // Display Counts
     const titleEl = document.getElementById('countTitle');
     const preOralEl = document.getElementById('countPreOral');
     const finalEl = document.getElementById('countFinal');
 
-    if (titleEl) titleEl.innerText = approvedCount;
-    if (preOralEl) preOralEl.innerText = rejectedCount;
-    if (finalEl) finalEl.innerText = completedCount;
+    if (titleEl) titleEl.innerText = approvedTotal;
+    if (preOralEl) preOralEl.innerText = rejectedTotal;
+    if (finalEl) finalEl.innerText = completedTotal;
 }
 
 function countDefenseStatus(allStatuses, defenseType, passValues) {
