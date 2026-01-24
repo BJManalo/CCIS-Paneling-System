@@ -294,12 +294,27 @@ function handleGroupChange() {
         const p2Select = document.getElementById('schedPanel2');
 
         // Defaults
-        if (p1Select) p1Select.value = "May Lynn Farren";
+        if (p1Select) {
+            p1Select.value = "May Lynn Farren";
+            p1Select.disabled = true;
+            p1Select.style.backgroundColor = "#f1f5f9";
+            p1Select.style.cursor = "not-allowed";
+        }
         if (p2Select) {
             if (program.includes('BSIT')) p2Select.value = "Nolan Yumen";
             else if (program.includes('BSIS')) p2Select.value = "Apolinario Ballenas Jr.";
             else if (program.includes('BSCS')) p2Select.value = "Irene Robles";
             else p2Select.value = "";
+
+            if (p2Select.value) {
+                p2Select.disabled = true;
+                p2Select.style.backgroundColor = "#f1f5f9";
+                p2Select.style.cursor = "not-allowed";
+            } else {
+                p2Select.disabled = false;
+                p2Select.style.backgroundColor = "";
+                p2Select.style.cursor = "";
+            }
         }
         updatePanelOptions();
     }
@@ -335,7 +350,12 @@ function resetPanels() {
     const ids = ['schedPanel1', 'schedPanel2', 'schedPanel3', 'schedPanel4', 'schedPanel5'];
     ids.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.value = "";
+        if (el) {
+            el.value = "";
+            el.disabled = false;
+            el.style.backgroundColor = "";
+            el.style.cursor = "";
+        }
     });
     updatePanelOptions();
 }
