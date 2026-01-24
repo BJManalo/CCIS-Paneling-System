@@ -13,8 +13,20 @@ async function loadGrades() {
     }
 
     let groupId = loginUser.id;
+    let studentId = loginUser.id;
 
     try {
+        // First, check if the loginUser is actually a student (to get their group_id)
+        let { data: studentRecord, error: studentError } = await supabaseClient
+            .from('students')
+            .select('group_id')
+            .eq('id', studentId)
+            .single();
+
+        if (studentRecord && studentRecord.group_id) {
+            groupId = studentRecord.group_id;
+        }
+
         // Fetch group members and their grades
         const { data: group, error } = await supabaseClient
             .from('student_groups')
@@ -60,7 +72,7 @@ async function loadGrades() {
 
 function processAndRenderGrades(students) {
     // 1. Collect all unique grade types present across all students
-    const preferredOrder = ['Title Defense', 'Pre-Oral Defense', 'Final Defense'];
+    const preferredOrder = ['Title Defense', 'Pre Oral Defense', 'Final Defense'];
     const foundTypes = new Set();
 
     // Structure: { 'Title Defense': [ { studentName: '...', grade: '...' }, ... ], ... }

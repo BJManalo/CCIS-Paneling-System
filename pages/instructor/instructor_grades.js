@@ -8,13 +8,18 @@ const PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
 const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
 // State
+let allGradesData = [];
 let fetchedGroups = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadGrades();
+
+    // Search and Filter Listeners
+    document.getElementById('searchInput').addEventListener('input', renderGrades);
+    document.getElementById('typeFilter').addEventListener('change', renderGrades);
 });
 
-// --- Load Grades List ---
+// --- Load Grades Data ---
 async function loadGrades() {
     const tableBody = document.getElementById('gradesTableBody');
     tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Loading grades...</td></tr>';
@@ -35,100 +40,147 @@ async function loadGrades() {
 
         if (error) throw error;
 
-        tableBody.innerHTML = '';
-
-        if (!groups || groups.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No scheduled groups found.</td></tr>';
-            return;
-        }
-
-        let hasData = false;
-
-        groups.forEach(group => {
-            if (!group.schedules || group.schedules.length === 0) return;
-
-            group.schedules.forEach(schedule => {
-                const schedType = schedule.schedule_type;
-
-                // Get students/grades for THIS schedule type
-                const gradedStudents = group.students.map(s => {
-                    const g = (s.grades || []).find(gr => gr.grade_type === schedType);
-                    return {
-                        name: s.full_name,
-                        grade: g ? g.grade : null,
-                        hasGrade: !!(g && (g.grade || g.grade === 0))
-                    };
-                });
-
-                // Check strict "Show only if graded" rule
-                const gradedCount = gradedStudents.filter(s => s.hasGrade).length;
-                if (gradedCount === 0) return;
-
-                hasData = true;
-
-                const totalStudents = group.students.length;
-                const status = (gradedCount === totalStudents) ? 'Completed' : 'Partial';
-                const statusColor = status === 'Completed' ? '#4CAF50' : '#FF9800';
-
-                // Create unique ID for collapse
-                const collapseId = `collapse-${group.id}-${schedType.replace(/\s+/g, '')}`;
-
-                // --- PARENT ROW ---
-                const row = document.createElement('tr');
-                row.style.cursor = 'pointer';
-                row.onclick = () => toggleRow(collapseId);
-                row.innerHTML = `
-                    <td style="font-weight:600; color:var(--primary-color);">
-                        <span class="material-icons-round" style="vertical-align: middle; font-size: 16px; margin-right:5px; transition: transform 0.2s;" id="icon-${collapseId}">chevron_right</span>
-                        ${group.group_name}
-                    </td>
-                    <td><span style="color:var(--accent-color); font-weight:500;">${schedType}</span></td>
-                    <td>${group.program} ${group.year_level}-${group.section}</td>
-                    <td><span style="color: ${statusColor}; font-weight: 500;">${status} (${gradedCount}/${totalStudents})</span></td>
-                    <td>
-                        <button class="edit-btn" onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" style="background:none; border:none; cursor:pointer; color:var(--primary-color);" title="Edit Grades">
-                            <span class="material-icons-round">edit</span>
-                        </button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-
-                // --- CHILD ROW (DETAILS) ---
-                const detailRow = document.createElement('tr');
-                detailRow.id = collapseId;
-                detailRow.style.display = 'none'; // Hidden by default
-                detailRow.style.background = '#f9f9f9';
-
-                // Construct student list HTML
-                const studentListHtml = gradedStudents.map(s => `
-                    <div style="display:flex; justify-content:space-between; padding: 5px 0; border-bottom: 1px solid #eee;">
-                        <span>${s.name}</span>
-                        <span style="font-weight:bold;">${s.grade !== null ? s.grade : 'N/A'}</span>
-                    </div>
-                `).join('');
-
-                detailRow.innerHTML = `
-                    <td colspan="5" style="padding: 10px 20px;">
-                        <div style="font-size: 0.9em; color: #555;">
-                            <strong>Student Grades:</strong>
-                            <div style="margin-top: 5px; max-width: 400px;">
-                                ${studentListHtml}
-                            </div>
-                        </div>
-                    </td>
-                `;
-                tableBody.appendChild(detailRow);
-            });
-        });
-
-        if (!hasData) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No graded items found. Use the + button to start grading.</td></tr>';
-        }
+        allGradesData = groups || [];
+        renderGrades();
 
     } catch (err) {
         console.error('Error loading grades:', err);
         tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Error loading grades.</td></tr>';
     }
+}
+
+// --- Render Grades Table with Filters ---
+function renderGrades() {
+    const tableBody = document.getElementById('gradesTableBody');
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const typeFilter = document.getElementById('typeFilter').value;
+
+    tableBody.innerHTML = '';
+
+    if (!allGradesData || allGradesData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No scheduled groups found.</td></tr>';
+        updateStats(0, 0, 0);
+        return;
+    }
+
+    let hasVisibleData = false;
+    let statCompleted = 0;
+    let statPartial = 0;
+    let groupsSet = new Set();
+
+    allGradesData.forEach(group => {
+        // Search Filter (Group Name or Student Names)
+        const matchesSearch = group.group_name.toLowerCase().includes(searchTerm) ||
+            group.students.some(s => s.full_name.toLowerCase().includes(searchTerm));
+
+        if (!matchesSearch) return;
+
+        if (!group.schedules || group.schedules.length === 0) return;
+
+        group.schedules.forEach(schedule => {
+            const schedType = schedule.schedule_type;
+
+            // Type Filter
+            if (typeFilter !== 'All' && schedType !== typeFilter) return;
+
+            // Get students/grades for THIS schedule type
+            const gradedStudents = group.students.map(s => {
+                const g = (s.grades || []).find(gr => gr.grade_type === schedType);
+                return {
+                    name: s.full_name,
+                    grade: g ? g.grade : null,
+                    hasGrade: !!(g && (g.grade || g.grade === 0))
+                };
+            });
+
+            // Check strict "Show only if graded" rule
+            const gradedCount = gradedStudents.filter(s => s.hasGrade).length;
+            if (gradedCount === 0) return;
+
+            hasVisibleData = true;
+            groupsSet.add(group.id);
+
+            const totalStudents = group.students.length;
+            const status = (gradedCount === totalStudents) ? 'Completed' : 'Partial';
+            const statusClass = status === 'Completed' ? 'badge-completed' : 'badge-partial';
+            const statusIcon = status === 'Completed' ? 'check_circle' : 'pending';
+
+            if (status === 'Completed') statCompleted++;
+            else statPartial++;
+
+            // Create unique ID for collapse
+            const collapseId = `collapse-${group.id}-${schedType.replace(/\s+/g, '')}`;
+
+            // --- PARENT ROW ---
+            const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.onclick = () => toggleRow(collapseId);
+            row.innerHTML = `
+                <td style="font-weight:600; color:var(--primary-color);">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="material-icons-round" style="font-size: 18px; color:var(--text-light); transition: transform 0.2s;" id="icon-${collapseId}">chevron_right</span>
+                        ${group.group_name}
+                    </div>
+                </td>
+                <td><span class="badge badge-type">${schedType}</span></td>
+                <td><span class="badge badge-program">${group.program} ${group.year_level}-${group.section}</span></td>
+                <td>
+                    <span class="badge ${statusClass}">
+                        <span class="material-icons-round" style="font-size:14px;">${statusIcon}</span>
+                        ${status} (${gradedCount}/${totalStudents})
+                    </span>
+                </td>
+                <td>
+                    <button class="action-btn edit" onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" title="Edit Grades">
+                        <span class="material-icons-round">edit</span>
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+
+            // --- CHILD ROW (DETAILS) ---
+            const detailRow = document.createElement('tr');
+            detailRow.id = collapseId;
+            detailRow.className = 'detail-row';
+            detailRow.style.display = 'none'; // Hidden by default
+            detailRow.style.background = '#f8fafc';
+
+            // Construct student list HTML
+            const studentListHtml = gradedStudents.map(s => `
+                <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid #edf2f7;">
+                    <span style="font-weight:500; color:#4a5568;">${s.name}</span>
+                    <span style="font-weight:700; color:var(--primary-color); background:#ebf4ff; padding:2px 10px; border-radius:6px; min-width:50px; text-align:center;">${s.grade !== null ? s.grade : '-'}</span>
+                </div>
+            `).join('');
+
+            detailRow.innerHTML = `
+                <td colspan="5" style="padding: 20px 40px;">
+                    <div style="max-width: 500px; background:white; padding:20px; border-radius:15px; border:1px solid #e2e8f0; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px; color:var(--primary-dark);">
+                            <span class="material-icons-round">assignment_ind</span>
+                            <strong style="font-size:0.95rem;">Student Grades Summary</strong>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            ${studentListHtml}
+                        </div>
+                    </div>
+                </td>
+            `;
+            tableBody.appendChild(detailRow);
+        });
+    });
+
+    if (!hasVisibleData) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No grades found matching your criteria.</td></tr>';
+    }
+
+    updateStats(statCompleted, statPartial, groupsSet.size);
+}
+
+function updateStats(completed, partial, totalGroups) {
+    document.getElementById('totalCompleted').innerText = completed;
+    document.getElementById('totalPartial').innerText = partial;
+    document.getElementById('totalGroups').innerText = totalGroups;
 }
 
 // Helper to toggle rows
