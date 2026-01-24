@@ -9,6 +9,7 @@ let allGroups = [];
 let allDefenseStatuses = [];
 let allStudents = [];
 let filteredGroups = [];
+let currentCategory = 'ALL'; // 'ALL', 'APPROVED', 'REJECTED', 'COMPLETED'
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchDashboardData();
@@ -67,19 +68,72 @@ function populateSectionFilter() {
     });
 }
 
+window.setCategoryFilter = (category) => {
+    // Toggle functionality: clicking same category resets to ALL
+    if (currentCategory === category) {
+        currentCategory = 'ALL';
+    } else {
+        currentCategory = category;
+    }
+
+    // Visual feedback for cards
+    document.querySelectorAll('.chart-card').forEach(card => {
+        card.style.border = '1px solid #f0f0f0';
+        card.style.transform = 'none';
+        card.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
+    });
+
+    if (currentCategory !== 'ALL') {
+        const titleMap = { 'APPROVED': 'Approved Titles', 'REJECTED': 'Rejected Titles', 'COMPLETED': 'Completed Titles' };
+        const cards = document.querySelectorAll('.chart-card');
+        cards.forEach(card => {
+            if (card.querySelector('.chart-title').innerText === titleMap[currentCategory]) {
+                card.style.border = '2px solid var(--primary-color)';
+                card.style.transform = 'translateY(-5px)';
+                card.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+            }
+        });
+    }
+
+    applyDashboardFilters();
+};
+
 window.applyDashboardFilters = () => {
     const program = document.getElementById('programFilter').value;
     const section = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
     filteredGroups = allGroups.filter(g => {
+        // 1. Basic Filters
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
         const searchMatch = !searchTerm ||
             (g.group_name && g.group_name.toLowerCase().includes(searchTerm)) ||
             (g.program && g.program.toLowerCase().includes(searchTerm));
 
-        return progMatch && sectMatch && searchMatch;
+        if (!(progMatch && sectMatch && searchMatch)) return false;
+
+        // 2. Category Filter
+        if (currentCategory === 'ALL') return true;
+
+        const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
+        const titleStatus = titleRow ? Object.values(titleRow.statuses || {}).join(' ') : '';
+        const finalStatus = finalRow ? Object.values(finalRow.statuses || {}).join(' ') : '';
+
+        if (currentCategory === 'COMPLETED') {
+            return finalStatus.toLowerCase().includes('approved');
+        } else if (currentCategory === 'APPROVED') {
+            return titleStatus.toLowerCase().includes('approved');
+        } else if (currentCategory === 'REJECTED') {
+            // All submitted must be rejected if rejected count > 0 and no approved
+            const statusVals = Object.values(titleRow?.statuses || {});
+            const approved = statusVals.some(v => v.toLowerCase().includes('approved'));
+            const rejected = statusVals.some(v => v.toLowerCase().includes('rejected'));
+            return rejected && !approved;
+        }
+
+        return true;
     });
 
     updateCounts(filteredGroups);
@@ -147,18 +201,15 @@ async function renderTable() {
     }
     if (emptyState) emptyState.style.display = 'none';
 
-    // Fetch student members for each filtered group if possible
-    // For now, assume we just show the group info. 
-    // If members are in a separate table, we'd need another fetch.
-
     filteredGroups.forEach(g => {
-        // Get status for Title Defense
+        // Get status and titles
         const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
         const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
 
         let statusHtml = '<span class="status-badge pending">Pending</span>';
+        let projectTitle = '<span style="color: #94a3b8; font-style: italic;">No title approved</span>';
 
-        // Check Final First (Completed)
+        // 1. Determine Status Badge
         if (finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'))) {
             statusHtml = '<span class="status-badge approved">Completed</span>';
         } else if (titleRow) {
@@ -178,6 +229,20 @@ async function renderTable() {
             }
         }
 
+        // 2. Determine Project Title (Show Approved one if exists, otherwise show first submitted)
+        if (titleRow && titleRow.statuses) {
+            const approvedKey = Object.keys(titleRow.statuses).find(k => titleRow.statuses[k].toLowerCase().includes('approved'));
+            if (approvedKey) {
+                projectTitle = `<strong>${approvedKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</strong>`;
+            } else {
+                // Not approved yet, show first submitted title if any
+                const firstSubmitted = Object.keys(titleRow.statuses)[0];
+                if (firstSubmitted) {
+                    projectTitle = `<span style="color: #64748b;">${firstSubmitted.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>`;
+                }
+            }
+        }
+
         const members = allStudents
             .filter(s => s.group_id === g.id)
             .map(s => s.full_name)
@@ -185,6 +250,7 @@ async function renderTable() {
 
         const row = document.createElement('tr');
         row.innerHTML = `
+            <td>${projectTitle}</td>
             <td>${g.group_name || '-'}</td>
             <td style="font-size: 11px; color: #64748b;">${members || '-'}</td>
             <td>${g.program || '-'}</td>

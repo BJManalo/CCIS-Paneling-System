@@ -94,17 +94,17 @@
         <!-- Charts Row -->
         <!-- Status Summary Tabs (Instructor) -->
         <div class="charts-row">
-            <div class="chart-card">
+            <div class="chart-card" onclick="setCategoryFilter('APPROVED')" style="cursor: pointer;">
                 <div class="chart-title">Approved Titles</div>
                 <h1 style="font-size: 3rem; color: #3b82f6; margin: 0;" id="countTitle">0</h1>
                 <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Groups</div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" onclick="setCategoryFilter('REJECTED')" style="cursor: pointer;">
                 <div class="chart-title">Rejected Titles</div>
                 <h1 style="font-size: 3rem; color: #dc2626; margin: 0;" id="countPreOral">0</h1>
                 <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Groups</div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" onclick="setCategoryFilter('COMPLETED')" style="cursor: pointer;">
                 <div class="chart-title">Completed Titles</div>
                 <h1 style="font-size: 3rem; color: #16a34a; margin: 0;" id="countFinal">0</h1>
                 <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Groups</div>
@@ -181,7 +181,7 @@
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="instructor_dashboard.js"></script>
+    <script src="instructor_dashboard.js?v=2"></script>
 </body>
 
 </html>
