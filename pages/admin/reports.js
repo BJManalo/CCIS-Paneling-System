@@ -74,7 +74,23 @@ function getStatusMap(row) {
     if (!row || !row.statuses) return {};
     let s = row.statuses;
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
-    return s;
+
+    // Flatten for easy checking: if a key's value is an object (multi-panel), 
+    // we consider the "overall" status based on panel consensus.
+    const flat = {};
+    Object.keys(s).forEach(fileKey => {
+        const val = s[fileKey];
+        if (typeof val === 'object' && val !== null) {
+            const values = Object.values(val);
+            if (values.some(v => v.includes('Approved'))) flat[fileKey] = 'Approved';
+            else if (values.some(v => v.includes('Approve with Revisions'))) flat[fileKey] = 'Approve with Revisions';
+            else if (values.some(v => v.includes('Rejected') || v.includes('Redefense'))) flat[fileKey] = 'Rejected';
+            else flat[fileKey] = 'Pending';
+        } else {
+            flat[fileKey] = val || 'Pending';
+        }
+    });
+    return flat;
 }
 
 window.applyFilters = () => {

@@ -6,8 +6,12 @@ const PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
 // Initialize Supabase client
 const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
+// State
+let allAccounts = [];
+
 document.addEventListener('DOMContentLoaded', () => {
     loadAccounts();
+    setupSearch();
 });
 
 // --- Fetch Accounts from Supabase ---
@@ -37,7 +41,12 @@ async function loadAccounts() {
     const tableBody = document.getElementById('accountsTableBody');
     tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Loading accounts...</td></tr>';
 
-    const accounts = await getAccounts();
+    allAccounts = await getAccounts();
+    renderAccounts(allAccounts);
+}
+
+function renderAccounts(accounts) {
+    const tableBody = document.getElementById('accountsTableBody');
     tableBody.innerHTML = '';
 
     if (!accounts || accounts.length === 0) {
@@ -48,8 +57,8 @@ async function loadAccounts() {
     accounts.forEach(acc => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${acc.role}</td>
-            <td>${acc.name || 'No Name'}</td>
+            <td><span class="status-badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">${acc.role}</span></td>
+            <td style="font-weight: 600;">${acc.name || 'No Name'}</td>
             <td>${acc.email || '-'}</td>
             <td>${acc.designation !== 'None' ? acc.designation : '-'}</td>
             <td>
@@ -59,6 +68,21 @@ async function loadAccounts() {
             </td>
         `;
         tableBody.appendChild(row);
+    });
+}
+
+function setupSearch() {
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        const filtered = allAccounts.filter(acc =>
+            (acc.name || '').toLowerCase().includes(term) ||
+            (acc.email || '').toLowerCase().includes(term) ||
+            (acc.role || '').toLowerCase().includes(term)
+        );
+        renderAccounts(filtered);
     });
 }
 

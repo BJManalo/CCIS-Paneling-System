@@ -351,15 +351,51 @@ body {
     /* Allow wrapping on small screens */
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .dashboard-header {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 15px;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        padding: 5px 0;
     }
 
-    .dashboard-header>div:first-child {
-        width: 100%;
+    .admin-logo {
+        width: 35px !important;
+        height: 35px !important;
+        flex-shrink: 0;
+    }
+
+    .search-bar {
+        flex: 1;
+        width: auto !important;
+        min-width: 0 !important;
+        margin: 0 5px;
+        height: 38px !important;
+    }
+
+    .search-bar input {
+        padding: 8px 8px 8px 30px !important;
+        font-size: 13px !important;
+    }
+
+    .search-bar .material-icons-round {
+        font-size: 18px !important;
+        left: 8px !important;
+    }
+
+    .logout-btn {
+        padding: 8px !important;
+        min-width: 40px !important;
+        flex-shrink: 0;
+    }
+
+    .logout-btn span:not(.material-icons-round) {
+        display: none !important;
+    }
+
+    .logout-btn .material-icons-round {
+        margin: 0 !important;
     }
 }
 
@@ -397,9 +433,99 @@ body {
     box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
 }
 
+/* Defense Type Badges */
+.type-badge {
+    padding: 6px 14px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Program Badges */
+.prog-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.prog-bsis {
+    background: var(--bsis-bg);
+    color: var(--bsis-color);
+    border: 1px solid #f9a8d4;
+}
+
+.prog-bsit {
+    background: var(--bsit-bg);
+    color: var(--bsit-color);
+    border: 1px solid #93c5fd;
+}
+
+.prog-bscs {
+    background: var(--bscs-bg);
+    color: var(--bscs-color);
+    border: 1px solid #fca5a5;
+}
+
+.prog-unknown {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.type-title {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #dbeafe;
+}
+
+.type-pre-oral {
+    background: #fff7ed;
+    color: #ea580c;
+    border: 1px solid #ffedd5;
+}
+
+.type-final {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #d1fae5;
+}
+
+.type-unknown {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+/* Chip Styling (Panels, Members) */
+.chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 250px;
+    padding: 2px 0;
+}
+
+.chip {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .search-bar {
     position: relative;
     width: 100%;
+    max-width: 400px;
 }
 
 .search-bar .material-icons-round {
@@ -1231,22 +1357,44 @@ body {
 
 /* Mobile Devices (Under 768px) */
 @media (max-width: 768px) {
-    .dashboard-header {
-        flex-direction: column;
-        align-items: stretch;
-        margin-bottom: 20px;
+
+    /* Report Controls Fix */
+    .report-controls {
+        flex-direction: column !important;
+        gap: 15px !important;
+        padding: 15px !important;
+        align-items: stretch !important;
     }
 
-    .dashboard-header>div {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
+    .filter-group {
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 10px !important;
+        align-items: stretch !important;
     }
 
-    .search-bar {
-        width: 100%;
-        margin-top: 10px;
+    .filter-select {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .print-btn {
+        width: 100% !important;
+        justify-content: center;
+        margin-top: 5px;
+    }
+
+    .table-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -15px;
+        padding: 0 15px;
+        border-radius: 0;
+    }
+
+    .data-table {
+        min-width: 600px;
+        /* Force scroll */
     }
 
     /* Fix Modals with Sidebars (Capstone panels) */
@@ -1334,28 +1482,7 @@ body {
         font-size: 1.1rem;
     }
 
-    /* Report Controls Fix */
-    .report-controls {
-        flex-direction: column !important;
-        gap: 15px !important;
-        padding: 15px !important;
-    }
-
-    .filter-group {
-        flex-direction: column !important;
-        width: 100% !important;
-        gap: 10px !important;
-    }
-
-    .filter-select {
-        width: 100% !important;
-        min-width: 0 !important;
-    }
-
-    .print-btn {
-        width: 100% !important;
-        justify-content: center;
-    }
+    /* Redundant report control styles removed (moved to 768px) */
 
     /* Details content in flexible tables */
     .details-content {

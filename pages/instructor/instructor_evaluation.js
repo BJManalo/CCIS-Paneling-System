@@ -115,6 +115,7 @@ async function loadEvaluations() {
                         schedId: sched.id,
                         groupId: group.id,
                         groupName: group.group_name,
+                        program: group.program,
                         members: group.students || [],
                         title: group.title,
                         defenseType: dType,
@@ -163,21 +164,38 @@ function renderAccordions(evaluations) {
         const card = document.createElement('div');
         card.className = 'evaluation-card';
 
-        const dBadgeClass = evalItem.defenseType.toLowerCase().includes('title') ? 'title-defense' :
-            (evalItem.defenseType.toLowerCase().includes('pre-oral') || evalItem.defenseType.toLowerCase().includes('pre oral')) ? 'pre-oral' :
-                evalItem.defenseType.toLowerCase().includes('final') ? 'final-defense' : 'title-defense';
+        // Defense Type Badge
+        let typeClass = 'type-unknown';
+        const lowerType = evalItem.defenseType.toLowerCase();
+        if (lowerType.includes('title')) typeClass = 'type-title';
+        else if (lowerType.includes('pre-oral') || lowerType.includes('pre oral')) typeClass = 'type-pre-oral';
+        else if (lowerType.includes('final')) typeClass = 'type-final';
+
+        // Get Program from members if available, or assume from group (need to check data structure)
+        // Since we don't have program directly in evalItem, let's look at how it's loaded
+        // In loadEvaluations, we fetch *, which includes program.
+        const program = (evalItem.program || '').toUpperCase();
+        let progClass = 'prog-unknown';
+        if (program.includes('BSIS')) progClass = 'prog-bsis';
+        else if (program.includes('BSIT')) progClass = 'prog-bsit';
+        else if (program.includes('BSCS')) progClass = 'prog-bscs';
 
         card.innerHTML = `
              <div class="card-header" onclick="toggleAccordion('${evalItem.id}')">
                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div class="header-info">
-                        <span class="group-name">${evalItem.groupName}</span>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span class="group-name">${evalItem.groupName}</span>
+                            <span class="prog-badge ${progClass}">${program}</span>
+                        </div>
                         <div style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">
                             Rated by: <strong style="color: var(--primary-color);">${evalItem.panelistName}</strong>
                         </div>
-                        <span class="defense-badge ${dBadgeClass}">${evalItem.defenseType}</span>
+                        <div style="margin-top: 8px;">
+                            <span class="type-badge ${typeClass}">${evalItem.defenseType}</span>
+                        </div>
                     </div>
-                    <span class="material-icons-round expand-icon" id="icon-${evalItem.id}" style="color: #9ca3af; transition: transform 0.3s;">expand_more</span>
+                    <span class="material-icons-round expand-icon" id="icon-${evalItem.id}" style="color: #9ca3af; transition: transform 0.3s; font-size: 24px;">expand_more</span>
                  </div>
              </div>
              <div class="card-body" id="body-${evalItem.id}" style="display: none;">

@@ -67,16 +67,27 @@ function renderGroups(groups) {
     }
 
     groups.forEach(group => {
-        const memberNames = group.members.map(m => m.full_name).join(', ');
+        const program = (group.program || '').toUpperCase();
+        let progClass = 'prog-unknown';
+        if (program.includes('BSIS')) progClass = 'prog-bsis';
+        else if (program.includes('BSIT')) progClass = 'prog-bsit';
+        else if (program.includes('BSCS')) progClass = 'prog-bscs';
+
+        const members = group.members || [];
+        const membersHtml = members.map(m => `<span class="chip">${m.full_name}</span>`).join('');
 
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><span style="font-weight:600; color:var(--primary-color);">${group.group_name}</span></td>
-            <td>${group.program}</td>
+            <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>${group.year_level}</td>
             <td>${group.section}</td>
             <td>${group.adviser}</td>
-            <td><span style="font-size: 0.9em; line-height: 1.4;">${memberNames || 'None'}</span></td>
+            <td>
+                <div class="chips-container">
+                    ${membersHtml || '<span style="color:#94a3b8; font-style:italic; font-size:11px;">No Members</span>'}
+                </div>
+            </td>
             <td>
                 <div style="display: flex; gap: 8px;">
                     <button class="edit-btn" onclick="openEditGroupModal('${group.id}')" title="Edit Group Details" style="background:none; border:none; cursor:pointer; color:var(--primary-color);">

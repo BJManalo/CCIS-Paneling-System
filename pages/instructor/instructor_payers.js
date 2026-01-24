@@ -38,33 +38,46 @@ function renderPayers(payments) {
     }
 
     payments.forEach(p => {
-        // Use payment_date if available (Date Paid), else created_at
         const rawDate = p.payment_date || p.created_at;
         const date = new Date(rawDate).toLocaleDateString();
+        const program = (p.program || '').toUpperCase();
+
+        let progClass = 'prog-unknown';
+        if (program.includes('BSIS')) progClass = 'prog-bsis';
+        else if (program.includes('BSIT')) progClass = 'prog-bsit';
+        else if (program.includes('BSCS')) progClass = 'prog-bscs';
+
+        // Members chips
+        const memberList = (p.members || '').split(',').filter(m => m.trim());
+        const membersHtml = memberList.map(m => `<span class="chip">${m.trim()}</span>`).join('');
 
         // Main Row
         const row = document.createElement('tr');
         row.className = 'main-row';
         row.id = `row-${p.id}`;
         row.onclick = () => togglePayerRow(p.id);
-        row.style.borderBottom = '1px solid #f1f5f9';
 
         row.innerHTML = `
-            <td style="padding: 15px;">
+            <td style="padding: 16px;">
                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <span class="material-icons-round expand-icon" id="icon-${p.id}">expand_more</span>
-                    ${date}
+                    <span class="material-icons-round expand-icon" id="icon-${p.id}" style="font-size: 18px;">expand_more</span>
+                    <span style="font-weight: 600; color: #1e293b;">${date}</span>
                  </div>
             </td>
-            <td style="padding: 15px; font-weight: 500;">${p.group_name || 'Unknown'}</td>
-            <td style="padding: 15px;">
-                <span style="background: #eef2ff; color: #4338ca; padding: 4px 10px; border-radius: 6px; font-size: 0.85em; font-weight: 600;">
-                    ${p.defense_type || 'N/A'}
-                </span>
+            <td style="font-weight: 700; color: var(--primary-dark);">${p.group_name || 'Unknown'}</td>
+            <td>
+                <span class="prog-badge ${progClass}">${program || 'N/A'}</span>
             </td>
-            <td style="padding: 15px;">${p.section || '-'}</td>
-            <td style="padding: 15px;">
-                <span style="font-size: 0.85em; color: var(--primary-color); font-weight: 600;">View Details</span>
+            <td>
+                <div class="chips-container">
+                    ${membersHtml || '<span style="color:#94a3b8; font-style:italic; font-size:11px;">No Members</span>'}
+                </div>
+            </td>
+            <td>
+                <span style="font-size: 0.85em; color: var(--primary-color); font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <span class="material-icons-round" style="font-size: 16px;">visibility</span>
+                    Details
+                </span>
             </td>
         `;
         tableBody.appendChild(row);
@@ -76,35 +89,29 @@ function renderPayers(payments) {
 
         detailsRow.innerHTML = `
             <td colspan="5" style="padding: 0;">
-                <div class="details-content">
-                    <!-- Column 1: Members -->
-                    <div class="details-column">
-                        <h4>Group Members</h4>
-                        <ul class="members-list">
-                            ${p.members ? p.members.split(',').map(m => `<li>${m.trim()}</li>`).join('') : '<li>No members listed</li>'}
-                        </ul>
-                    </div>
-
-                    <!-- Column 2: Academic Details -->
-                    <div class="details-column">
-                        <h4>Academic Details</h4>
-                        <p><strong style="font-size: 0.8em; color: #64748b;">PROGRAM / YEAR / SECTION</strong><br>
-                        ${p.program || '-'} ${p.year_level || ''} - ${p.section || '-'}</p>
-                        
-                        <p style="margin-top: 15px;"><strong style="font-size: 0.8em; color: #64748b;">ADVISER</strong><br>
-                        ${p.adviser || '-'}</p>
-
-                        <p style="margin-top: 15px;"><strong style="font-size: 0.8em; color: #64748b;">PANELS</strong><br>
-                        ${p.panels || '-'}</p>
-                    </div>
-
-                    <!-- Column 3: Receipt -->
-                    <div class="details-column receipt-column">
-                        <h4>Receipt</h4>
-                        <img src="${p.receipt_url}" 
-                             style="width: 100%; max-width: 250px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; cursor: zoom-in; box-shadow: 0 2px 8px rgba(0,0,0,0.05);"
-                             onclick="event.stopPropagation(); window.openLightbox(this.src);"
-                             title="Click to Enlarge">
+                <div class="details-content" style="padding: 20px 25px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 250px; gap: 25px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Academic Context</div>
+                            <p style="margin: 0; font-size: 0.9rem; color: #334155; font-weight: 500;">
+                                <strong>Type:</strong> ${p.defense_type || 'N/A'}<br>
+                                <strong>Year/Section:</strong> ${p.year_level || ''} - ${p.section || '-'}<br>
+                                <strong>Adviser:</strong> ${p.adviser || '-'}
+                            </p>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Status Info</div>
+                            <p style="margin: 0; font-size: 0.9rem; color: #334155; font-weight: 500;">
+                                <strong>Paid For:</strong> ${p.defense_type || 'N/A'}<br>
+                                <strong>Panels:</strong> ${p.panels || '-'}
+                            </p>
+                        </div>
+                        <div class="receipt-column">
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Proof of Payment</div>
+                            <img src="${p.receipt_url}" 
+                                 style="width: 100%; max-width: 200px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; cursor: zoom-in; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"
+                                 onclick="event.stopPropagation(); window.openLightbox(this.src);">
+                        </div>
                     </div>
                 </div>
             </td>

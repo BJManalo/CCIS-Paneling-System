@@ -82,20 +82,29 @@ function renderSchedules(schedules) {
 
     schedules.forEach(sched => {
         const groupName = sched.student_groups ? sched.student_groups.group_name : 'Unknown Group';
-        const program = sched.student_groups ? sched.student_groups.program : '';
+        const program = (sched.student_groups ? (sched.student_groups.program || '') : '').toUpperCase();
         const displayDate = sched.schedule_date ? new Date(sched.schedule_date).toLocaleDateString() : 'No Date';
-        const displayTime = sched.schedule_time ? new Date(`2000-01-01T${sched.schedule_time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+        const displayTime = sched.schedule_time || 'TBA';
         const type = sched.schedule_type || 'Defense';
         const adviser = sched.adviser || (sched.student_groups ? sched.student_groups.adviser : '-');
+        const venue = sched.schedule_venue || 'TBA';
 
-        // Panels array
-        const panels = [
-            sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5
-        ].filter(p => p);
+        // Defense Type Logic
+        let typeClass = 'type-unknown';
+        const lowerType = type.toLowerCase();
+        if (lowerType.includes('title')) typeClass = 'type-title';
+        else if (lowerType.includes('pre-oral') || lowerType.includes('preoral')) typeClass = 'type-pre-oral';
+        else if (lowerType.includes('final')) typeClass = 'type-final';
 
-        const statusClass = type === 'Title Defense' ? 'badge-type' :
-            type === 'Pre Oral Defense' ? 'badge-program' :
-                type === 'Final Defense' ? 'badge-completed' : 'badge-partial';
+        // Program Logic
+        let progClass = 'prog-unknown';
+        if (program.includes('BSIS')) progClass = 'prog-bsis';
+        else if (program.includes('BSIT')) progClass = 'prog-bsit';
+        else if (program.includes('BSCS')) progClass = 'prog-bscs';
+
+        // Panels list with chips
+        const panelArray = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
+        const panelsHtml = panelArray.map(p => `<span class="chip">${p}</span>`).join('');
 
         // Main Row
         const row = document.createElement('tr');
@@ -106,33 +115,36 @@ function renderSchedules(schedules) {
         row.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="material-icons-round expand-icon" id="sched-icon-${sched.id}">expand_more</span>
-                    <span class="badge ${statusClass}">${type}</span>
+                    <span class="material-icons-round expand-icon" id="sched-icon-${sched.id}" style="font-size: 18px;">expand_more</span>
+                    <span class="type-badge ${typeClass}">${type}</span>
                 </div>
             </td>
-            <td style="font-weight: 500;">${groupName}</td>
-            <td><span class="badge" style="background:#f8fafc; color:#475569; border:1px solid #e2e8f0;">${program}</span></td>
-            <td>${adviser}</td>
+            <td style="font-weight: 600; color: var(--primary-dark);">${groupName}</td>
+            <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>
-                <div style="font-weight: 600; color: var(--primary-dark); font-size: 0.95rem;">${displayDate}</div>
-                <div style="font-size: 0.85em; color: #64748b; display: flex; align-items: center; gap: 4px;">
-                    <span class="material-icons-round" style="font-size:14px;">schedule</span>
-                    ${displayTime}
+                <div style="font-weight: 600; color: #1e293b;">${displayDate}</div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 500;">${displayTime}</div>
+            </td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 4px; color: #475569;">
+                    <span class="material-icons-round" style="font-size: 14px; color: var(--primary-color);">place</span>
+                    ${venue}
                 </div>
             </td>
             <td>
-                <span class="badge" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe;">
-                    <span class="material-icons-round" style="font-size: 14px; margin-right: 4px;">groups</span>
-                    ${panels.length} Panel(s)
-                </span>
+                <div class="chips-container">
+                    ${panelsHtml || '<span style="color:#94a3b8; font-style:italic; font-size:11px;">Not Assigned</span>'}
+                </div>
             </td>
             <td>
-                <button class="action-btn edit" onclick="event.stopPropagation(); openEditScheduleModal('${sched.id}')" title="Edit Schedule">
-                    <span class="material-icons-round">edit</span>
-                </button>
-                <button class="action-btn" onclick="event.stopPropagation(); deleteSchedule('${sched.id}')" title="Delete Schedule" style="color: #ef4444; border-color: #fee2e2;">
-                    <span class="material-icons-round">delete</span>
-                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="action-btn edit" onclick="event.stopPropagation(); openEditScheduleModal('${sched.id}')" title="Edit Schedule">
+                        <span class="material-icons-round">edit</span>
+                    </button>
+                    <button class="action-btn" onclick="event.stopPropagation(); deleteSchedule('${sched.id}')" title="Delete Schedule" style="color: #ef4444; border-color: #fee2e2;">
+                        <span class="material-icons-round">delete</span>
+                    </button>
+                </div>
             </td>
         `;
         tableBody.appendChild(row);
@@ -143,19 +155,17 @@ function renderSchedules(schedules) {
         detailsRow.id = `sched-details-${sched.id}`;
 
         detailsRow.innerHTML = `
-            <td colspan="8" style="padding: 0;">
-                <div class="details-content">
-                    <div class="details-column">
-                        <h4>Venue & Adviser</h4>
-                        <p><strong style="color: #64748b;">VENUE:</strong> ${sched.schedule_venue || 'TBA'}</p>
-                        <p><strong style="color: #64748b;">ADVISER:</strong> ${adviser}</p>
-                        <p style="margin-top: 10px;"><strong style="color: #64748b;">PROGRAM:</strong> ${program}</p>
-                    </div>
-                    <div class="details-column">
-                        <h4>Panel Members</h4>
-                        <ul style="margin: 0; padding-left: 20px; color: #334155;">
-                            ${panels.length > 0 ? panels.map(p => `<li>${p}</li>`).join('') : '<li style="font-style: italic; color: #94a3b8;">No panels assigned</li>'}
-                        </ul>
+            <td colspan="7" style="padding: 0;">
+                <div class="details-content" style="padding: 15px 25px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Group Adviser</div>
+                            <div style="font-weight: 500; color: #334155;">${adviser}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Academic Info</div>
+                            <div style="font-weight: 500; color: #334155;">${program} - Year level ${sched.student_groups?.year_level || '-'}</div>
+                        </div>
                     </div>
                 </div>
             </td>

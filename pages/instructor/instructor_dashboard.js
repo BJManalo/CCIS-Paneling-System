@@ -135,7 +135,23 @@ window.applyDashboardFilters = () => {
         if (!row || !row.statuses) return {};
         let s = row.statuses;
         if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
-        return s;
+
+        // Flatten for easy checking: if a key's value is an object (multi-panel), 
+        // we consider the "overall" status based on panel consensus.
+        const flat = {};
+        Object.keys(s).forEach(fileKey => {
+            const val = s[fileKey];
+            if (typeof val === 'object' && val !== null) {
+                const values = Object.values(val);
+                if (values.some(v => v.includes('Approved'))) flat[fileKey] = 'Approved';
+                else if (values.some(v => v.includes('Approve with Revisions'))) flat[fileKey] = 'Approve with Revisions';
+                else if (values.some(v => v.includes('Rejected') || v.includes('Redefense'))) flat[fileKey] = 'Rejected';
+                else flat[fileKey] = 'Pending';
+            } else {
+                flat[fileKey] = val || 'Pending';
+            }
+        });
+        return flat;
     };
 
     displayRows = [];
@@ -223,7 +239,19 @@ function updateCounts(groups) {
         if (!row || !row.statuses) return [];
         let s = row.statuses;
         if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return []; } }
-        return Object.values(s);
+
+        const results = [];
+        Object.values(s).forEach(val => {
+            if (typeof val === 'object' && val !== null) {
+                const inner = Object.values(val);
+                if (inner.some(v => v.includes('Approved'))) results.push('Approved');
+                else if (inner.some(v => v.includes('Rejected') || v.includes('Redefense'))) results.push('Rejected');
+                else results.push('Pending');
+            } else {
+                results.push(val);
+            }
+        });
+        return results;
     };
 
     let approvedTotal = 0;
@@ -266,12 +294,25 @@ async function renderTable() {
     if (emptyState) emptyState.style.display = 'none';
 
     displayRows.forEach(row => {
+        const program = (row.program || '').toUpperCase();
+        let progClass = 'prog-unknown';
+        if (program.includes('BSIS')) progClass = 'prog-bsis';
+        else if (program.includes('BSIT')) progClass = 'prog-bsit';
+        else if (program.includes('BSCS')) progClass = 'prog-bscs';
+
+        const members = (row.members || '').split(',').filter(m => m.trim());
+        const membersHtml = members.map(m => `<span class="chip">${m.trim()}</span>`).join('');
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${row.title || '-'}</td>
             <td>${row.group_name}</td>
-            <td style="font-size: 11px; color: #64748b;">${row.members}</td>
-            <td>${row.program}</td>
+            <td>
+                <div class="chips-container">
+                    ${membersHtml}
+                </div>
+            </td>
+            <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>${row.year}</td>
             <td>${row.statusHtml}</td>
         `;

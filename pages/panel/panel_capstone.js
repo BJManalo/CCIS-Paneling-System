@@ -8,6 +8,7 @@ let currentTab = 'Title Defense'; // Default
 let currentProgram = 'ALL';
 let searchTerm = '';
 let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
+let currentView = 'panel'; // New: panel or adviser
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCapstoneData();
@@ -166,6 +167,31 @@ async function loadCapstoneData() {
     }
 }
 
+// --- View Switching ---
+window.switchView = (view) => {
+    currentView = view;
+
+    document.getElementById('view-panel').classList.toggle('active', view === 'panel');
+    document.getElementById('view-adviser').classList.toggle('active', view === 'adviser');
+
+    const panelBtn = document.getElementById('view-panel');
+    const adviserBtn = document.getElementById('view-adviser');
+
+    if (view === 'panel') {
+        panelBtn.style.borderBottom = '3px solid var(--primary-color)';
+        panelBtn.style.color = 'var(--primary-color)';
+        adviserBtn.style.borderBottom = '3px solid transparent';
+        adviserBtn.style.color = '#94a3b8';
+    } else {
+        adviserBtn.style.borderBottom = '3px solid var(--primary-color)';
+        adviserBtn.style.color = 'var(--primary-color)';
+        panelBtn.style.borderBottom = '3px solid transparent';
+        panelBtn.style.color = '#94a3b8';
+    }
+
+    renderTable();
+}
+
 // --- Tab Switching ---
 window.switchTab = (tabName) => {
     currentTab = tabName;
@@ -174,16 +200,16 @@ window.switchTab = (tabName) => {
 };
 
 function updateTabStyles(activeTab) {
-    document.querySelectorAll('.role-tab').forEach(tab => {
+    document.querySelectorAll('.sub-tab-btn').forEach(tab => {
         const tabId = tab.id.replace('tab-', '');
         if (tabId === activeTab) {
             tab.classList.add('active');
-            tab.style.color = 'var(--primary-color)';
-            tab.style.borderBottomColor = 'var(--primary-color)';
+            tab.style.fontWeight = '700';
+            tab.style.color = 'var(--primary-dark)';
         } else {
             tab.classList.remove('active');
+            tab.style.fontWeight = '500';
             tab.style.color = '#64748b';
-            tab.style.borderBottomColor = 'transparent';
         }
     });
 }
@@ -207,7 +233,15 @@ function renderTable() {
         const searchMatch = !searchTerm ||
             g.groupName.toLowerCase().includes(searchTerm.toLowerCase());
 
-        return typeMatch && programMatch && searchMatch;
+        // View Match (Panel vs Adviser)
+        let roleMatch = false;
+        if (currentView === 'panel') {
+            roleMatch = g.isPanelist;
+        } else {
+            roleMatch = g.isAdviser;
+        }
+
+        return typeMatch && programMatch && searchMatch && roleMatch;
     });
 
     if (filteredGroups.length === 0) {
@@ -238,14 +272,31 @@ function renderTable() {
         }
 
         const dateStr = g.date ? new Date(g.date).toLocaleDateString() : '-';
-        const panelsStr = g.panels && g.panels.length > 0 ? g.panels.join(', ') : '-';
+        // Chips
+        const panelsHtml = (g.panels || []).map(p => `<span class="chip">${p}</span>`).join('');
 
-        // Define which file set corresponds to current tab for button context
+        // Badges
+        const program = (g.program || '').toUpperCase();
+        let progClass = 'prog-unknown';
+        if (program.includes('BSIS')) progClass = 'prog-bsis';
+        else if (program.includes('BSIT')) progClass = 'prog-bsit';
+        else if (program.includes('BSCS')) progClass = 'prog-bscs';
+
+        let typeClass = 'type-unknown';
+        const lowerType = g.type.toLowerCase();
+        if (lowerType.includes('title')) typeClass = 'type-title';
+        else if (lowerType.includes('pre-oral') || lowerType.includes('preoral')) typeClass = 'type-pre-oral';
+        else if (lowerType.includes('final')) typeClass = 'type-final';
+
+        // View Label
+        const viewLabel = currentView === 'panel' ? 'Panel View' : 'Adviser View';
+        const viewLabelColor = currentView === 'panel' ? '#64748b' : '#3b82f6';
+
+        // Files check
         let currentFileSet = {};
         if (normCurrentTab.includes('title')) currentFileSet = g.files.titles;
         else if (normCurrentTab.includes('preoral')) currentFileSet = g.files.pre_oral;
         else if (normCurrentTab.includes('final')) currentFileSet = g.files.final;
-
         const hasFiles = Object.keys(currentFileSet).length > 0;
 
         const row = document.createElement('tr');
@@ -273,18 +324,27 @@ function renderTable() {
         }
 
         row.innerHTML = `
-            <td style="font-weight: 600; color: var(--primary-dark);">${g.type}</td>
+            <td><span class="type-badge ${typeClass}">${g.type}</span></td>
             <td>
-                <div style="font-weight: 600;">${g.groupName}</div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${g.isAdviser ? 'Adviser View' : 'Panel View'}</div>
+                <div style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem;">${g.groupName}</div>
+                <div style="font-size: 11px; color: ${viewLabelColor}; font-weight: 500; margin-top: 2px;">${viewLabel}</div>
             </td>
-            <td><span class="status-badge" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">${g.program}</span></td>
+            <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>
-                <div style="font-weight: 500;">${dateStr}</div>
-                <div style="font-size: 11px; color: #64748b;">${g.time || ''}</div>
+                <div style="font-weight: 600; color: #1e293b;">${dateStr}</div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 500;">${g.time || ''}</div>
             </td>
-            <td>${g.venue || '-'}</td>
-            <td><span style="font-size: 12px; line-height: 1.4; color: #475569;">${panelsStr}</span></td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 4px; color: #475569;">
+                    <span class="material-icons-round" style="font-size: 14px; color: var(--primary-color);">place</span>
+                    ${g.venue || 'TBA'}
+                </div>
+            </td>
+            <td>
+                <div class="chips-container">
+                    ${panelsHtml || '<span style="color:#94a3b8; font-style:italic; font-size:11px;">Not Assigned</span>'}
+                </div>
+            </td>
             <td>${actionBtn}</td>
         `;
 

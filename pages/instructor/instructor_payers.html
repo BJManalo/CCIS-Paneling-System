@@ -116,44 +116,50 @@
 
     <div class="dashboard-container">
         <!-- Header -->
-        <header class="dashboard-header" style="justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
-                <div class="search-bar" style="width: 300px;">
-                    <span class="material-icons-round">search</span>
-                    <input type="text" placeholder="Search Payers..." id="searchInput">
-                </div>
+        <header class="dashboard-header">
+            <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+            <div class="search-bar">
+                <span class="material-icons-round">search</span>
+                <input type="text" placeholder="Search Payers..." id="searchInput">
             </div>
             <button class="logout-btn" onclick="logout()">
                 <span class="material-icons-round">logout</span>
-                Log Out
+                <span>Log Out</span>
             </button>
         </header>
 
         <!-- Title -->
         <h2 class="page-title">Payers</h2>
 
-        <!-- Filters -->
-        <div class="filter-container" style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-            <select id="filterDefenseType" onchange="filterPayers()"
-                style="padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: 'Outfit', sans-serif;">
-                <option value="">All Defense Types</option>
-                <option value="Title Defense">Title Defense</option>
-                <option value="Pre-Oral Defense">Pre-Oral Defense</option>
-                <option value="Final Defense">Final Defense</option>
-            </select>
+        <!-- Filters (Under Logout) -->
+        <div style="display: flex; justify-content: flex-end; gap: 15px; margin-bottom: 20px;">
+            <div class="custom-select-wrapper" style="width: 200px; position: relative;">
+                <select id="filterDefenseType" onchange="filterPayers()"
+                    style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
+                    <option value="">All Defense Types</option>
+                    <option value="Title Defense">Title Defense</option>
+                    <option value="Pre-Oral Defense">Pre-Oral Defense</option>
+                    <option value="Final Defense">Final Defense</option>
+                </select>
+                <span class="material-icons-round select-arrow"
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
+            </div>
 
-            <select id="filterSection" onchange="filterPayers()"
-                style="padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: 'Outfit', sans-serif;">
-                <option value="">All Sections</option>
-                <!-- Options will be populated dynamically if possible, or static for now -->
-                <option value="A">Section A</option>
-                <option value="B">Section B</option>
-                <option value="C">Section C</option>
-                <option value="D">Section D</option>
-                <option value="E">Section E</option>
-                <option value="F">Section F</option>
-            </select>
+            <div class="custom-select-wrapper" style="width: 200px; position: relative;">
+                <select id="filterSection" onchange="filterPayers()"
+                    style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
+                    <option value="">All Sections</option>
+                    <!-- Options will be populated dynamically if possible, or static for now -->
+                    <option value="A">Section A</option>
+                    <option value="B">Section B</option>
+                    <option value="C">Section C</option>
+                    <option value="D">Section D</option>
+                    <option value="E">Section E</option>
+                    <option value="F">Section F</option>
+                </select>
+                <span class="material-icons-round select-arrow"
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
+            </div>
         </div>
 
         <!-- Table -->

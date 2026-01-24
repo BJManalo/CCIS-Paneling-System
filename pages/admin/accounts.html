@@ -19,27 +19,21 @@
 <body class="dashboard-body">
 
     <div class="dashboard-container">
-        <!-- Header with Logo -->
-        <header class="dashboard-header" style="justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+        <!-- Header with Logo & Search -->
+        <header class="dashboard-header">
+            <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+            <div class="search-bar">
+                <span class="material-icons-round">search</span>
+                <input type="text" placeholder="Search Accounts..." id="searchInput">
             </div>
             <button class="logout-btn" onclick="logout()">
                 <span class="material-icons-round">logout</span>
-                Log Out
+                <span>Log Out</span>
             </button>
         </header>
 
         <!-- Title -->
         <h2 class="page-title">Accounts</h2>
-
-        <!-- Search Bar -->
-        <div class="search-container" style="margin-bottom: 20px;">
-            <div class="search-bar">
-                <input type="text" placeholder="Search Accounts" id="searchInput">
-                <span class="material-icons-round search-icon-right">search</span>
-            </div>
-        </div>
 
         <!-- Accounts Table -->
         <div class="table-container">

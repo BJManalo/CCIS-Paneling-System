@@ -100,6 +100,18 @@ function renderGrades() {
             const statusClass = status === 'Completed' ? 'badge-completed' : 'badge-partial';
             const statusIcon = status === 'Completed' ? 'check_circle' : 'pending';
 
+            const program = (group.program || '').toUpperCase();
+            let progClass = 'prog-unknown';
+            if (program.includes('BSIS')) progClass = 'prog-bsis';
+            else if (program.includes('BSIT')) progClass = 'prog-bsit';
+            else if (program.includes('BSCS')) progClass = 'prog-bscs';
+
+            let typeClass = 'type-unknown';
+            const lowerType = schedType.toLowerCase();
+            if (lowerType.includes('title')) typeClass = 'type-title';
+            else if (lowerType.includes('pre-oral') || lowerType.includes('preoral')) typeClass = 'type-pre-oral';
+            else if (lowerType.includes('final')) typeClass = 'type-final';
+
             // Create unique ID for collapse
             const collapseId = `collapse-${group.id}-${schedType.replace(/\s+/g, '')}`;
 
@@ -108,14 +120,14 @@ function renderGrades() {
             row.style.cursor = 'pointer';
             row.onclick = () => toggleRow(collapseId);
             row.innerHTML = `
-                <td style="font-weight:600; color:var(--primary-color);">
+                <td style="font-weight:700; color:var(--primary-dark);">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span class="material-icons-round" style="font-size: 18px; color:var(--text-light); transition: transform 0.2s;" id="icon-${collapseId}">chevron_right</span>
                         ${group.group_name}
                     </div>
                 </td>
-                <td><span class="badge badge-type">${schedType}</span></td>
-                <td><span class="badge badge-program">${group.program} ${group.year_level}-${group.section}</span></td>
+                <td><span class="type-badge ${typeClass}">${schedType}</span></td>
+                <td><span class="prog-badge ${progClass}">${program}</span></td>
                 <td>
                     <span class="badge ${statusClass}">
                         <span class="material-icons-round" style="font-size:14px;">${statusIcon}</span>
