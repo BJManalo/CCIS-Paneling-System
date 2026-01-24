@@ -11,14 +11,25 @@ let chartFinal = null;
 
 // Data storage
 let allGroups = [];
+let instructorName = '';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Check Login
+    const loginUser = JSON.parse(localStorage.getItem('loginUser'));
+    if (!loginUser || loginUser.role !== 'Instructor') {
+        window.location.href = '../../index.html';
+        return;
+    }
+    instructorName = loginUser.full_name || ''; // Assuming 'full_name' is the property
+
     fetchDashboardData();
 });
 
 async function fetchDashboardData() {
     try {
         // Fetch all student groups
+        // We fetch ALL then filter by Adviser in JS to keep logic simple
+        // Alternatively, we could filter in query .eq('adviser', instructorName)
         const { data, error } = await supabaseClient
             .from('student_groups')
             .select('*');
@@ -27,14 +38,11 @@ async function fetchDashboardData() {
 
         allGroups = data || [];
 
-        // Populate Section Filter
+        // Populate Section Filter (based on MY groups)
         populateSectionFilter();
 
         // Initial Draw
         applyDashboardFilters();
-
-        // Also populate table? (If requested clearly, but user emphasized Charts)
-        // For now, we focus on charts.
 
     } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -43,8 +51,14 @@ async function fetchDashboardData() {
 
 function populateSectionFilter() {
     const sectionFilter = document.getElementById('sectionFilter');
+
+    // Filter groups where I am the adviser first
+    const myGroups = allGroups.filter(g =>
+        g.adviser && g.adviser.toLowerCase().trim() === instructorName.toLowerCase().trim()
+    );
+
     // Get unique sections
-    const sections = [...new Set(allGroups.map(g => g.section).filter(Boolean))].sort();
+    const sections = [...new Set(myGroups.map(g => g.section).filter(Boolean))].sort();
 
     sections.forEach(sec => {
         const option = document.createElement('option');
@@ -60,8 +74,16 @@ window.applyDashboardFilters = () => {
 
     // Filter data
     const filtered = allGroups.filter(g => {
+        // 1. Must be MY group (Adviser check)
+        const isMyGroup = g.adviser && g.adviser.toLowerCase().trim() === instructorName.toLowerCase().trim();
+        if (!isMyGroup) return false;
+
+        // 2. Program Filter
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
+
+        // 3. Section Filter
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
+
         return progMatch && sectMatch;
     });
 
@@ -71,52 +93,40 @@ window.applyDashboardFilters = () => {
 function updateCharts(groups) {
     const total = groups.length;
 
-    // Calculate Stats
-    // Logic: Status is JSON or String. We look for 'Approved' or 'Passed'
-
+    // Reuse similar logic to Admin
     const countPassed = (groups, statusCol, passValue = ['Approved', 'Passed']) => {
         return groups.filter(g => {
             let val = g[statusCol];
             if (!val) return false;
-
-            // Handle potentially JSON string or plain string
-            // Sometimes it's stored as '{"status": "Approved"}'
-            // Sometimes just "Approved"
             let status = val;
             try {
                 if (val.startsWith('{')) {
                     const parsed = JSON.parse(val);
-                    // Assumption: JSON structure might vary, but usually has a key for result
-                    // Let's assume values are values of the object? 
-                    // Or if specific structure known...
-                    // Let's convert object to string/values arrays to search
                     status = Object.values(parsed).join(' ');
                 }
-            } catch (e) { /* ignore, treat as string */ }
-
+            } catch (e) { /* ignore */ }
             return passValue.some(p => status.toLowerCase().includes(p.toLowerCase()));
         }).length;
     };
 
     const titleCount = countPassed(groups, 'title_status', ['Approved']);
-    const preOralCount = countPassed(groups, 'pre_oral_status', ['Passed', 'Approved']); // Use generous matching
+    const preOralCount = countPassed(groups, 'pre_oral_status', ['Passed', 'Approved']);
     const finalCount = countPassed(groups, 'final_status', ['Passed', 'Approved']);
 
     // Draw Charts
-    drawChart('chartTitle', titleCount, total, '#3b82f6'); // Blue
-    drawChart('chartPreOral', preOralCount, total, '#d97706'); // Orange
-    drawChart('chartFinal', finalCount, total, '#16a34a'); // Green
+    drawChart('chartTitle', titleCount, total, '#3b82f6');
+    drawChart('chartPreOral', preOralCount, total, '#d97706');
+    drawChart('chartFinal', finalCount, total, '#16a34a');
 }
 
 function drawChart(canvasId, value, total, color) {
     const ctx = document.getElementById(canvasId).getContext('2d');
 
-    if (total === 0) total = 1; // Avoid divide by zero, though 0/1 is 0%.
+    if (total === 0) total = 1;
     const percentage = Math.round((value / total) * 100);
     const remaining = 100 - percentage;
 
-    // Destroy previous instance if exists (global map needed? Or store on canvas)
-    // Simple way: store in global vars
+    // Destroy previous instance
     if (canvasId === 'chartTitle' && chartTitle) chartTitle.destroy();
     if (canvasId === 'chartPreOral' && chartPreOral) chartPreOral.destroy();
     if (canvasId === 'chartFinal' && chartFinal) chartFinal.destroy();
@@ -170,15 +180,16 @@ function drawChart(canvasId, value, total, color) {
     if (canvasId === 'chartFinal') chartFinal = newChart;
 }
 
-// Keep existing filterTable for compatibility if buttons are clicked (though we hid/moved them?)
-// We can link bottom buttons to our new filters if desired, 
-// But existing UI had them separate. I'll just keep the function to avoid errors.
-window.filterTable = (program) => {
-    document.getElementById('programFilter').value = program;
-    applyDashboardFilters();
-};
-
 function logout() {
     localStorage.removeItem('loginUser');
     window.location.href = '../../index.html';
 }
+
+// Keep filter function dummy
+window.filterTable = (program) => {
+    // Keep as dummy or link to upper logic if desired
+    // Instructor dashboard might have had a table below.
+    // If the user wants to keep the table functional:
+    document.getElementById('programFilter').value = program;
+    applyDashboardFilters();
+};
