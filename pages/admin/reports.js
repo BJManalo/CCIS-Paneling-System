@@ -208,12 +208,8 @@ window.printReport = () => {
 
     const printHeader = document.querySelector('.print-header');
 
-    // Only show header in print if Title Defense is selected
-    if (phase === 'Title Defense') {
-        printHeader.style.display = 'block';
-    } else {
-        printHeader.style.display = 'none';
-    }
+    // Always show header for all defense phases (Title, Pre-oral, Final)
+    printHeader.style.display = 'block';
 
     document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
 
@@ -223,9 +219,14 @@ window.printReport = () => {
 
     document.getElementById('printReportTitle').innerText = titleStr;
 
+    // Temporarily remove page title to hide browser-generated print headers
+    const originalTitle = document.title;
+    document.title = "";
+
     window.print();
 
-    // Reset display for screen
+    // Restore title and reset display for screen
+    document.title = originalTitle;
     printHeader.style.display = 'none';
 };
 
