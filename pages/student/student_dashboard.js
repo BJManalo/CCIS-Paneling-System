@@ -35,8 +35,6 @@ async function loadSubmissionData() {
             // --- Check Grading Status for Tab Locking ---
             const students = group.students || [];
             const totalStudents = students.length;
-
-            // Helper to check if ALL students have a grade for a specific stage
             const checkGraded = (keyword) => {
                 if (totalStudents === 0) return false;
                 const gradedCount = students.filter(s =>
@@ -44,15 +42,10 @@ async function loadSubmissionData() {
                 ).length;
                 return gradedCount === totalStudents;
             };
-
             const isTitleGraded = checkGraded('Title');
-            const isPreOralGraded = checkGraded('Pre'); // Matches "Pre-Oral" or "Pre Oral"
-
-            // Lock/Unlock Tabs
+            const isPreOralGraded = checkGraded('Pre');
             const preOralBtn = document.querySelector('button[onclick*="preoral"]');
             const finalBtn = document.querySelector('button[onclick*="final"]');
-
-            // Logic: Pre-Oral requires Title to be graded
             if (!isTitleGraded) {
                 preOralBtn.disabled = true;
                 preOralBtn.style.opacity = '0.5';
@@ -60,8 +53,6 @@ async function loadSubmissionData() {
                 preOralBtn.title = "Locked: Title Defense grades pending.";
                 preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
             }
-
-            // Logic: Final requires Pre-Oral to be graded
             if (!isPreOralGraded) {
                 finalBtn.disabled = true;
                 finalBtn.style.opacity = '0.5';
@@ -70,33 +61,37 @@ async function loadSubmissionData() {
                 finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
             }
 
-            // Function to safely parse JSON
-            const safeParse = (str) => {
-                try { return JSON.parse(str || '{}'); } catch (e) { return {}; }
+            // Fetch Defense Statuses
+            const { data: defStatuses, error: dsError } = await supabaseClient
+                .from('defense_statuses')
+                .select('*')
+                .eq('group_id', groupId);
+
+            if (dsError) console.error('Error fetching defense statuses:', dsError);
+            const statuses = defStatuses || [];
+
+            // Helper to get status/remarks map for a type
+            const getDefenseData = (typeSnippet) => {
+                const row = statuses.find(s => s.defense_type && s.defense_type.includes(typeSnippet));
+                return {
+                    status: row ? (row.statuses || {}) : {},
+                    remarks: row ? (row.remarks || {}) : {}
+                };
             };
 
-            // Parse File Links
-            // Handle legacy format (single string) vs new format (JSON) for backward compatibility if needed, 
-            // but we are standardizing on JSON now.
-            let tLinks = safeParse(group.title_link);
-            // Fallback for pre-JSON data might be needed if old data exists, but assuming clean slate mostly.
-            // Actually, keep safe fallback just in case:
-            if (group.title_link && typeof group.title_link === 'string' && !group.title_link.startsWith('{')) tLinks = { title1: group.title_link };
+            const titleData = getDefenseData('Title');
+            const preOralData = getDefenseData('Pre-Oral'); // or Pre-Oral
+            const finalData = getDefenseData('Final');
 
+            // Parse File Links
+            const safeParse = (str) => { try { return JSON.parse(str || '{}'); } catch (e) { return {}; } };
+
+            let tLinks = safeParse(group.title_link);
+            if (group.title_link && typeof group.title_link === 'string' && !group.title_link.startsWith('{')) tLinks = { title1: group.title_link };
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
 
-            // Parse Statuses
-            let tStatus = safeParse(group.title_status);
-            let pStatus = safeParse(group.pre_oral_status);
-            let fStatus = safeParse(group.final_status);
-
-            // Parse Remarks
-            let tRemarks = safeParse(group.title_remarks);
-            let pRemarks = safeParse(group.pre_oral_remarks);
-            let fRemarks = safeParse(group.final_remarks);
-
-            // Helper to render status badge and remarks
+            // Render Field Helper
             const renderField = (linkMap, statusMap, remarksMap, key, elementId) => {
                 const el = document.getElementById(elementId);
                 if (!el) return;
@@ -107,7 +102,7 @@ async function loadSubmissionData() {
                 const remarks = remarksMap[key] || '';
 
                 // Define Colors & Icons
-                let color = '#64748b'; // Slate (Pending)
+                let color = '#64748b';
                 let icon = 'hourglass_empty';
                 let bg = '#f1f5f9';
                 let border = '#e2e8f0';
@@ -121,10 +116,6 @@ async function loadSubmissionData() {
                 }
 
                 // 1. Label & Badge Wrapper
-                // We find the label associated with this input (if any) or create a unified header
-                // Note: The HTML structure has labels like "Link" or implicit. 
-                // Let's create a header div that REPLACES the simple "Link" text if it exists above
-
                 const prevEl = el.previousElementSibling;
                 if (prevEl && (prevEl.classList.contains('status-badge-container') || prevEl.innerText === 'Link')) {
                     prevEl.remove();
@@ -146,14 +137,12 @@ async function loadSubmissionData() {
                 if (nextEl && nextEl.classList.contains('remarks-container')) nextEl.remove();
 
                 if (remarks) {
-                    // Split remark to separate Name from Comment if possible for styling
-                    // We assume "Name: Comment" format
                     let headerText = 'Panel Feedback';
                     let bodyText = remarks;
 
                     if (remarks.includes(':')) {
                         const parts = remarks.split(':');
-                        headerText = parts[0].trim();
+                        headerText = parts[0].trim(); // Extract Name (e.g., "Apolinario Ballenas Jr.")
                         bodyText = parts.slice(1).join(':').trim();
                     }
 
@@ -173,18 +162,18 @@ async function loadSubmissionData() {
             };
 
             // Render Titles
-            renderField(tLinks, tStatus, tRemarks, 'title1', 'titleLink1');
-            renderField(tLinks, tStatus, tRemarks, 'title2', 'titleLink2');
-            renderField(tLinks, tStatus, tRemarks, 'title3', 'titleLink3');
+            renderField(tLinks, titleData.status, titleData.remarks, 'title1', 'titleLink1');
+            renderField(tLinks, titleData.status, titleData.remarks, 'title2', 'titleLink2');
+            renderField(tLinks, titleData.status, titleData.remarks, 'title3', 'titleLink3');
 
             // Render Pre-Oral
-            renderField(pLinks, pStatus, pRemarks, 'ch1', 'preOralCh1');
-            renderField(pLinks, pStatus, pRemarks, 'ch2', 'preOralCh2');
-            renderField(pLinks, pStatus, pRemarks, 'ch3', 'preOralCh3');
+            renderField(pLinks, preOralData.status, preOralData.remarks, 'ch1', 'preOralCh1');
+            renderField(pLinks, preOralData.status, preOralData.remarks, 'ch2', 'preOralCh2');
+            renderField(pLinks, preOralData.status, preOralData.remarks, 'ch3', 'preOralCh3');
 
             // Render Final
-            renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
-            renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
+            renderField(fLinks, finalData.status, finalData.remarks, 'ch4', 'finalCh4');
+            renderField(fLinks, finalData.status, finalData.remarks, 'ch5', 'finalCh5');
         }
 
     } catch (err) {
