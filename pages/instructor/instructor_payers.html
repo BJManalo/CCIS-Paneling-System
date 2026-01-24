@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCIS Paneling System - Payers</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="../../assets/css/style.css">
+    <style>
+        /* Expandable Table Styles */
+        tr.main-row {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        tr.main-row:hover {
+            background: #f8fafc;
+        }
+
+        tr.details-row {
+            display: none;
+            background: #f8fafc;
+        }
+
+        tr.details-row.active {
+            display: table-row;
+        }
+
+        .details-content {
+            padding: 20px 25px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 250px;
+            /* Members, Staff, Receipt */
+            gap: 25px;
+            border-bottom: 1px solid #e2e8f0;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @media (max-width: 900px) {
+            .details-content {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .details-column.receipt-column {
+                grid-column: span 2;
+                justify-self: center;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .details-content {
+                grid-template-columns: 1fr;
+            }
+
+            .details-column.receipt-column {
+                grid-column: span 1;
+            }
+        }
+
+        .details-column h4 {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 5px;
+        }
+
+        .details-column p {
+            margin: 0 0 8px 0;
+            color: #334155;
+            font-weight: 500;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .members-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .members-list li {
+            padding: 4px 0;
+            border-bottom: 1px dashed #f1f5f9;
+            font-size: 0.9rem;
+            color: #334155;
+        }
+
+        .members-list li:last-child {
+            border-bottom: none;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s;
+            color: var(--primary-color);
+        }
+
+        tr.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+
+<body class="dashboard-body">
+
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+                <div class="search-bar" style="width: 300px;">
+                    <span class="material-icons-round">search</span>
+                    <input type="text" placeholder="Search Payers..." id="searchInput">
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <span class="material-icons-round">logout</span>
+                Log Out
+            </button>
+        </header>
+
+        <!-- Title -->
+        <h2 class="page-title">Payers</h2>
+
+        <!-- Filters -->
+        <div class="filter-container" style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+            <select id="filterDefenseType" onchange="filterPayers()"
+                style="padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: 'Outfit', sans-serif;">
+                <option value="">All Defense Types</option>
+                <option value="Title Defense">Title Defense</option>
+                <option value="Pre-Oral Defense">Pre-Oral Defense</option>
+                <option value="Final Defense">Final Defense</option>
+            </select>
+
+            <select id="filterSection" onchange="filterPayers()"
+                style="padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: 'Outfit', sans-serif;">
+                <option value="">All Sections</option>
+                <!-- Options will be populated dynamically if possible, or static for now -->
+                <option value="A">Section A</option>
+                <option value="B">Section B</option>
+                <option value="C">Section C</option>
+                <option value="D">Section D</option>
+                <option value="E">Section E</option>
+                <option value="F">Section F</option>
+            </select>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container"
+            style="background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #f1f5f9; text-align: left; color: #64748b;">
+                        <th style="padding: 15px;">Date Paid</th>
+                        <th style="padding: 15px;">Group Name</th>
+                        <th style="padding: 15px;">Defense Type</th>
+                        <th style="padding: 15px;">Section</th>
+                        <th style="padding: 15px;">Receipt</th>
+                        <!-- <th style="padding: 15px;">Status</th> -->
+                    </tr>
+                </thead>
+                <tbody id="payersTableBody">
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 30px;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="instructor_dashboard.html" class="nav-item">
+            <span class="material-icons-round">dashboard</span>
+            <span class="nav-label">Dashboard</span>
+        </a>
+
+
+        <a href="instructor_evaluation.html" class="nav-item">
+            <span class="material-icons-round">rate_review</span>
+            <span class="nav-label">Evaluation</span>
+        </a>
+        <a href="instructor_grades.html" class="nav-item">
+            <span class="material-icons-round">grading</span>
+            <span class="nav-label">Grades</span>
+        </a>
+        <a href="instructor_payers.html" class="nav-item active">
+            <span class="material-icons-round">payments</span>
+            <span class="nav-label">Payers</span>
+        </a>
+        <a href="instructor_schedule.html" class="nav-item">
+            <span class="material-icons-round">calendar_today</span>
+            <span class="nav-label">Schedule</span>
+        </a>
+        <a href="instructor_accounts.html" class="nav-item">
+            <span class="material-icons-round">people</span>
+            <span class="nav-label">Accounts</span>
+        </a>
+    </nav>
+
+    <!-- Lightbox Modal -->
+    <div class="modal-overlay" id="lightboxModal"
+        style="z-index: 3000; background: rgba(0,0,0,0.9); display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; align-items: center; justify-content: center;">
+        <div style="position: relative; max-width: 90%; max-height: 90%;">
+            <button onclick="closeLightbox()"
+                style="position: absolute; top: -40px; right: 0; background: none; border: none; color: white; cursor: pointer;">
+                <span class="material-icons-round" style="font-size: 30px;">close</span>
+            </button>
+            <img id="lightboxImage" src=""
+                style="max-width: 100%; max-height: 90vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../assets/js/shared.js"></script>
+    <script src="instructor_payers.js"></script>
+</body>
+
+</html>
