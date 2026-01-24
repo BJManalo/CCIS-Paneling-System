@@ -138,8 +138,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding-bottom: 15px;
-        border-bottom: 2px solid #1e293b;
+        padding-top: 20px;
     }
 
     .print-header-details {
@@ -147,7 +146,8 @@
         justify-content: space-between;
         font-size: 11px;
         color: #64748b;
-        margin-top: 8px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #1e293b;
         font-weight: 500;
     }
 </style>
@@ -158,6 +158,10 @@
     <div class="dashboard-container">
         <!-- Print Only Header -->
         <div class="print-header">
+            <div class="print-header-details">
+                <span id="printDate"></span>
+                <span>CCIS Paneling System - Reports</span>
+            </div>
             <div class="print-header-top">
                 <img src="../../assets/images/logo.png" style="height: 80px;" alt="Logo Left">
                 <div style="text-align: center; flex: 1; padding: 0 20px;">
@@ -168,10 +172,6 @@
                         Capstone Project Academic Report</h3>
                 </div>
                 <img src="../../assets/images/logo.png" style="height: 80px;" alt="Logo Right">
-            </div>
-            <div class="print-header-details">
-                <span id="printDate"></span>
-                <span>CCIS Paneling System - Reports</span>
             </div>
         </div>
 
