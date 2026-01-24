@@ -7,6 +7,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 // Data storage
 let allGroups = [];
 let allDefenseStatuses = [];
+let allStudents = [];
 let filteredGroups = [];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,8 +32,17 @@ async function fetchDashboardData() {
         if (sError) throw sError;
         allDefenseStatuses = statuses || [];
 
+        // Fetch students
+        const { data: students, error: stdError } = await supabaseClient
+            .from('students')
+            .select('*');
+
+        if (stdError) throw stdError;
+        allStudents = students || [];
+
         console.log('Fetched Groups:', allGroups.length);
         console.log('Fetched DefStatuses:', allDefenseStatuses.length);
+        console.log('Fetched Students:', allStudents.length);
 
         // Populate Section Filter
         populateSectionFilter();
@@ -160,11 +170,16 @@ async function renderTable() {
             }
         }
 
+        const members = allStudents
+            .filter(s => s.group_id === g.id)
+            .map(s => s.full_name)
+            .join(', ');
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${g.group_name || '-'}</td>
             <td>Group #${g.id}</td>
-            <td>-</td>
+            <td style="font-size: 11px; color: #64748b;">${members || '-'}</td>
             <td>${g.program || '-'}</td>
             <td>${g.year_level || '-'}</td>
             <td>${statusHtml}</td>
