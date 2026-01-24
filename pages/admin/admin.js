@@ -185,8 +185,8 @@ async function renderTable() {
 
         const row = document.createElement('tr');
         row.innerHTML = `
+            <td>${g.research_title || '-'}</td>
             <td>${g.group_name || '-'}</td>
-            <td>Group #${g.id}</td>
             <td style="font-size: 11px; color: #64748b;">${members || '-'}</td>
             <td>${g.program || '-'}</td>
             <td>${g.year_level || '-'}</td>
