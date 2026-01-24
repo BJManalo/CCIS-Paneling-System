@@ -55,7 +55,15 @@ async function loadGrades() {
         document.getElementById('grades-ui').style.display = 'block';
 
         if (group && group.students && group.students.length > 0) {
-            processAndRenderGrades(group.students);
+            // Filter to only show the logged-in student's own grade
+            const myGradesOnly = group.students.filter(s => s.id == studentId);
+
+            if (myGradesOnly.length > 0) {
+                processAndRenderGrades(myGradesOnly);
+            } else {
+                // If logged in as a group account or no matching student record
+                processAndRenderGrades(group.students);
+            }
         } else {
             document.getElementById('grades-content').innerHTML = '<div class="empty-state">No student records found.</div>';
         }
