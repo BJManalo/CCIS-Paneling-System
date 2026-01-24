@@ -289,35 +289,84 @@ function handleGroupChange() {
         const adviserInput = document.getElementById('schedAdviser');
         if (adviserInput) adviserInput.value = selectedGroup.adviser || '';
 
-        const program = selectedGroup.program ? selectedGroup.program.toUpperCase() : '';
-        const p1Select = document.getElementById('schedPanel1');
-        const p2Select = document.getElementById('schedPanel2');
-
-        // Defaults
-        if (p1Select) {
-            p1Select.value = "May Lynn Farren";
-            p1Select.disabled = true;
-            p1Select.style.backgroundColor = "#f1f5f9";
-            p1Select.style.cursor = "not-allowed";
-        }
-        if (p2Select) {
-            if (program.includes('BSIT')) p2Select.value = "Nolan Yumen";
-            else if (program.includes('BSIS')) p2Select.value = "Apolinario Ballenas Jr.";
-            else if (program.includes('BSCS')) p2Select.value = "Irene Robles";
-            else p2Select.value = "";
-
-            if (p2Select.value) {
-                p2Select.disabled = true;
-                p2Select.style.backgroundColor = "#f1f5f9";
-                p2Select.style.cursor = "not-allowed";
-            } else {
-                p2Select.disabled = false;
-                p2Select.style.backgroundColor = "";
-                p2Select.style.cursor = "";
-            }
-        }
-        updatePanelOptions();
+        updatePanelsByDefenseType();
     }
+}
+
+function handleTypeChange() {
+    updatePanelsByDefenseType();
+}
+
+function updatePanelsByDefenseType() {
+    const groupId = document.getElementById('schedGroupId').value;
+    const type = document.getElementById('schedType').value;
+
+    if (!groupId) return;
+
+    // Reset panel lock states AND values first to ensure a clean slate
+    const panelIds = ['schedPanel1', 'schedPanel2', 'schedPanel3', 'schedPanel4', 'schedPanel5'];
+    panelIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = ""; // Clear existing value
+            el.disabled = false;
+            el.style.backgroundColor = "";
+            el.style.cursor = "";
+        }
+    });
+
+    if (type === 'Title Defense') {
+        applyDefaultPanels();
+    } else {
+        // Pre-Oral or Final Defense: Look for existing Title Defense to inherit panels
+        const titleDefense = allSchedules.find(s => s.group_id == groupId && s.schedule_type === 'Title Defense');
+
+        if (titleDefense) {
+            // Inherit ALL panels from Title Defense and lock them
+            const pKeys = ['panel1', 'panel2', 'panel3', 'panel4', 'panel5'];
+            pKeys.forEach((key, index) => {
+                const select = document.getElementById(`schedPanel${index + 1}`);
+                if (select && titleDefense[key]) {
+                    select.value = titleDefense[key];
+                    lockPanel(select);
+                }
+            });
+            updatePanelOptions();
+        } else {
+            // Fallback to program-based defaults for the first two panels
+            applyDefaultPanels();
+        }
+    }
+}
+
+function lockPanel(el) {
+    el.disabled = true;
+    el.style.backgroundColor = "#f1f5f9";
+    el.style.cursor = "not-allowed";
+}
+
+function applyDefaultPanels() {
+    const groupId = document.getElementById('schedGroupId').value;
+    const selectedGroup = fetchedGroups.find(g => g.id == groupId);
+    if (!selectedGroup) return;
+
+    const program = selectedGroup.program ? selectedGroup.program.toUpperCase() : '';
+    const p1Select = document.getElementById('schedPanel1');
+    const p2Select = document.getElementById('schedPanel2');
+
+    if (p1Select) {
+        p1Select.value = "May Lynn Farren";
+        lockPanel(p1Select);
+    }
+    if (p2Select) {
+        if (program.includes('BSIT')) p2Select.value = "Nolan Yumen";
+        else if (program.includes('BSIS')) p2Select.value = "Apolinario Ballenas Jr.";
+        else if (program.includes('BSCS')) p2Select.value = "Irene Robles";
+        else p2Select.value = "";
+
+        if (p2Select.value) lockPanel(p2Select);
+    }
+    updatePanelOptions();
 }
 
 function updatePanelOptions() {
