@@ -228,6 +228,14 @@ async function loadSubmissionData() {
             renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
             renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
 
+            // Sub-tab switching for Titles
+            window.switchTitleTab = (index, btn) => {
+                document.querySelectorAll('.title-content').forEach(el => el.classList.remove('active'));
+                document.getElementById('title-content-' + index).classList.add('active');
+                document.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
+                btn.classList.add('active');
+            };
+
             // Store links globally for tab switching
             window.currentLinks = {
                 titles: tLinks,

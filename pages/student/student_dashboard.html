@@ -159,14 +159,66 @@
             </div>
 
             <div id="tab-titles" class="tab-content active">
-                <div class="form-group">
-                    <div class="section-title">
-                        <span class="material-icons-round" style="color: var(--accent-color);">description</span>
-                        Titles
+                <style>
+                    .title-sub-tabs {
+                        display: flex;
+                        gap: 10px;
+                        margin-bottom: 20px;
+                        padding: 4px;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        border: 1px solid #e2e8f0;
+                    }
+
+                    .sub-tab-btn {
+                        flex: 1;
+                        padding: 8px;
+                        font-size: 0.8rem;
+                        font-weight: 600;
+                        border: none;
+                        background: none;
+                        color: #64748b;
+                        cursor: pointer;
+                        border-radius: 6px;
+                        transition: all 0.2s;
+                    }
+
+                    .sub-tab-btn.active {
+                        background: white;
+                        color: var(--primary-color);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                    }
+
+                    .title-content {
+                        display: none;
+                        animation: fadeIn 0.3s ease;
+                    }
+
+                    .title-content.active {
+                        display: block;
+                    }
+                </style>
+
+                <div class="title-sub-tabs">
+                    <button class="sub-tab-btn active" onclick="switchTitleTab(1, this)">Title 1</button>
+                    <button class="sub-tab-btn" onclick="switchTitleTab(2, this)">Title 2</button>
+                    <button class="sub-tab-btn" onclick="switchTitleTab(3, this)">Title 3</button>
+                </div>
+
+                <div id="title-content-1" class="title-content active">
+                    <div class="form-group">
+                        <input type="text" id="titleLink1" placeholder="Title 1 Link">
                     </div>
-                    <input type="text" id="titleLink1" placeholder="Title 1 Link" style="margin-bottom: 10px;">
-                    <input type="text" id="titleLink2" placeholder="Title 2 Link" style="margin-bottom: 10px;">
-                    <input type="text" id="titleLink3" placeholder="Title 3 Link">
+                </div>
+                <div id="title-content-2" class="title-content">
+                    <div class="form-group">
+                        <input type="text" id="titleLink2" placeholder="Title 2 Link">
+                    </div>
+                </div>
+                <div id="title-content-3" class="title-content">
+                    <div class="form-group">
+                        <input type="text" id="titleLink3" placeholder="Title 3 Link">
+                    </div>
                 </div>
             </div>
 
