@@ -35,6 +35,8 @@ async function loadSubmissionData() {
             // --- Check Grading Status for Tab Locking ---
             const students = group.students || [];
             const totalStudents = students.length;
+
+            // Helper to check if ALL students have a grade for a specific stage
             const checkGraded = (keyword) => {
                 if (totalStudents === 0) return false;
                 const gradedCount = students.filter(s =>
@@ -42,10 +44,15 @@ async function loadSubmissionData() {
                 ).length;
                 return gradedCount === totalStudents;
             };
+
             const isTitleGraded = checkGraded('Title');
-            const isPreOralGraded = checkGraded('Pre');
+            const isPreOralGraded = checkGraded('Pre'); // Matches "Pre-Oral" or "Pre Oral"
+
+            // Lock/Unlock Tabs
             const preOralBtn = document.querySelector('button[onclick*="preoral"]');
             const finalBtn = document.querySelector('button[onclick*="final"]');
+
+            // Logic: Pre-Oral requires Title to be graded
             if (!isTitleGraded) {
                 preOralBtn.disabled = true;
                 preOralBtn.style.opacity = '0.5';
@@ -53,6 +60,8 @@ async function loadSubmissionData() {
                 preOralBtn.title = "Locked: Title Defense grades pending.";
                 preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
             }
+
+            // Logic: Final requires Pre-Oral to be graded
             if (!isPreOralGraded) {
                 finalBtn.disabled = true;
                 finalBtn.style.opacity = '0.5';
@@ -61,37 +70,49 @@ async function loadSubmissionData() {
                 finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
             }
 
-            // Fetch Defense Statuses
+            // Function to safely parse JSON
+            const safeParse = (str) => {
+                try { return JSON.parse(str || '{}'); } catch (e) { return {}; }
+            };
+
+            // Parse File Links
+            let tLinks = safeParse(group.title_link);
+            if (group.title_link && typeof group.title_link === 'string' && !group.title_link.startsWith('{')) tLinks = { title1: group.title_link };
+
+            let pLinks = safeParse(group.pre_oral_link);
+            let fLinks = safeParse(group.final_link);
+
+            // Fetch Defense Statuses from the new table
             const { data: defStatuses, error: dsError } = await supabaseClient
                 .from('defense_statuses')
                 .select('*')
                 .eq('group_id', groupId);
 
-            if (dsError) console.error('Error fetching defense statuses:', dsError);
-            const statuses = defStatuses || [];
+            if (dsError) {
+                console.error('Error fetching defense statuses:', dsError);
+            }
 
-            // Helper to get status/remarks map for a type
-            const getDefenseData = (typeSnippet) => {
-                const row = statuses.find(s => s.defense_type && s.defense_type.includes(typeSnippet));
-                return {
-                    status: row ? (row.statuses || {}) : {},
-                    remarks: row ? (row.remarks || {}) : {}
-                };
+            // Helper to get status/remarks for a specific type
+            const getDS = (type) => {
+                const norm = type.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return defStatuses ? defStatuses.find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm) : null;
             };
 
-            const titleData = getDefenseData('Title');
-            const preOralData = getDefenseData('Pre-Oral'); // or Pre-Oral
-            const finalData = getDefenseData('Final');
+            const titleDS = getDS('Title Defense');
+            const preOralDS = getDS('Pre-Oral Defense');
+            const finalDS = getDS('Final Defense');
 
-            // Parse File Links
-            const safeParse = (str) => { try { return JSON.parse(str || '{}'); } catch (e) { return {}; } };
+            // Map Statuses
+            let tStatus = titleDS ? (titleDS.statuses || {}) : {};
+            let pStatus = preOralDS ? (preOralDS.statuses || {}) : {};
+            let fStatus = finalDS ? (finalDS.statuses || {}) : {};
 
-            let tLinks = safeParse(group.title_link);
-            if (group.title_link && typeof group.title_link === 'string' && !group.title_link.startsWith('{')) tLinks = { title1: group.title_link };
-            let pLinks = safeParse(group.pre_oral_link);
-            let fLinks = safeParse(group.final_link);
+            // Map Remarks
+            let tRemarks = titleDS ? (titleDS.remarks || {}) : {};
+            let pRemarks = preOralDS ? (preOralDS.remarks || {}) : {};
+            let fRemarks = finalDS ? (finalDS.remarks || {}) : {};
 
-            // Render Field Helper
+            // Helper to render status badge and remarks
             const renderField = (linkMap, statusMap, remarksMap, key, elementId) => {
                 const el = document.getElementById(elementId);
                 if (!el) return;
@@ -102,20 +123,24 @@ async function loadSubmissionData() {
                 const remarks = remarksMap[key] || '';
 
                 // Define Colors & Icons
-                let color = '#64748b';
+                let color = '#64748b'; // Slate (Pending)
                 let icon = 'hourglass_empty';
                 let bg = '#f1f5f9';
                 let border = '#e2e8f0';
 
-                if (status === 'Approved') {
+                if (status.includes('Approved')) {
                     color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0';
-                } else if (status === 'Approve with Revisions') {
+                } else if (status.includes('Approve with Revisions')) {
                     color = '#d97706'; icon = 'warning'; bg = '#fffbeb'; border = '#fde68a';
-                } else if (status === 'Rejected' || status === 'Redefense') {
+                } else if (status.includes('Rejected') || status.includes('Redefense')) {
                     color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca';
                 }
 
                 // 1. Label & Badge Wrapper
+                // We find the label associated with this input (if any) or create a unified header
+                // Note: The HTML structure has labels like "Link" or implicit. 
+                // Let's create a header div that REPLACES the simple "Link" text if it exists above
+
                 const prevEl = el.previousElementSibling;
                 if (prevEl && (prevEl.classList.contains('status-badge-container') || prevEl.innerText === 'Link')) {
                     prevEl.remove();
@@ -137,12 +162,14 @@ async function loadSubmissionData() {
                 if (nextEl && nextEl.classList.contains('remarks-container')) nextEl.remove();
 
                 if (remarks) {
+                    // Split remark to separate Name from Comment if possible for styling
+                    // We assume "Name: Comment" format
                     let headerText = 'Panel Feedback';
                     let bodyText = remarks;
 
                     if (remarks.includes(':')) {
                         const parts = remarks.split(':');
-                        headerText = parts[0].trim(); // Extract Name (e.g., "Apolinario Ballenas Jr.")
+                        headerText = parts[0].trim();
                         bodyText = parts.slice(1).join(':').trim();
                     }
 
@@ -162,18 +189,18 @@ async function loadSubmissionData() {
             };
 
             // Render Titles
-            renderField(tLinks, titleData.status, titleData.remarks, 'title1', 'titleLink1');
-            renderField(tLinks, titleData.status, titleData.remarks, 'title2', 'titleLink2');
-            renderField(tLinks, titleData.status, titleData.remarks, 'title3', 'titleLink3');
+            renderField(tLinks, tStatus, tRemarks, 'title1', 'titleLink1');
+            renderField(tLinks, tStatus, tRemarks, 'title2', 'titleLink2');
+            renderField(tLinks, tStatus, tRemarks, 'title3', 'titleLink3');
 
             // Render Pre-Oral
-            renderField(pLinks, preOralData.status, preOralData.remarks, 'ch1', 'preOralCh1');
-            renderField(pLinks, preOralData.status, preOralData.remarks, 'ch2', 'preOralCh2');
-            renderField(pLinks, preOralData.status, preOralData.remarks, 'ch3', 'preOralCh3');
+            renderField(pLinks, pStatus, pRemarks, 'ch1', 'preOralCh1');
+            renderField(pLinks, pStatus, pRemarks, 'ch2', 'preOralCh2');
+            renderField(pLinks, pStatus, pRemarks, 'ch3', 'preOralCh3');
 
             // Render Final
-            renderField(fLinks, finalData.status, finalData.remarks, 'ch4', 'finalCh4');
-            renderField(fLinks, finalData.status, finalData.remarks, 'ch5', 'finalCh5');
+            renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
+            renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
         }
 
     } catch (err) {

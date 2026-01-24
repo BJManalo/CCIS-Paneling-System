@@ -403,11 +403,11 @@ window.openFileModal = (groupId) => {
             let statusBg = '#f1f5f9';
             let iconText = 'hourglass_empty';
 
-            if (currentStatus === 'Approved') {
+            if (currentStatus.includes('Approved')) {
                 statusColor = '#059669'; statusBg = '#dcfce7'; iconText = 'check_circle';
-            } else if (currentStatus === 'Approve with Revisions') {
+            } else if (currentStatus.includes('Approve with Revisions')) {
                 statusColor = '#d97706'; statusBg = '#fef3c7'; iconText = 'warning';
-            } else if (currentStatus === 'Rejected' || currentStatus === 'Redefense') {
+            } else if (currentStatus.includes('Rejected') || currentStatus.includes('Redefense')) {
                 statusColor = '#dc2626'; statusBg = '#fee2e2'; iconText = 'cancel';
             }
 
@@ -490,10 +490,15 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
             return;
         }
 
+        const userJson = localStorage.getItem('loginUser');
+        const user = userJson ? JSON.parse(userJson) : null;
+        const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+
         let defenseType = group.type;
 
         let localMap = group.currentStatusJson || {};
-        localMap[fileKey] = newStatus;
+        // Append name to status
+        localMap[fileKey] = `${newStatus} (${userName})`;
 
         const payload = {
             group_id: groupId,
