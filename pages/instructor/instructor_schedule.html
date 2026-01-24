@@ -93,10 +93,10 @@
                 <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 600px;">
                     <div class="search-bar" style="flex: 2;">
                         <span class="material-icons-round">search</span>
-                        <input type="text" placeholder="Search Group or Venue..." id="searchInput">
+                        <input type="text" placeholder="Search Group, Panel, or Venue..." id="searchInput">
                     </div>
                     <div class="custom-select-wrapper" style="flex: 1;">
-                        <select id="typeFilter">
+                        <select id="phaseFilter">
                             <option value="All">All Defense Phases</option>
                             <option value="Title Defense">Title Defense</option>
                             <option value="Pre Oral Defense">Pre-Oral Defense</option>
@@ -112,32 +112,8 @@
             </button>
         </header>
 
-        <!-- Title & Stats -->
+        <!-- Title -->
         <h2 class="page-title">Defense Schedule</h2>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #eff6ff;">
-                    <span class="material-icons-round" style="color: #2563eb;">event</span>
-                </div>
-                <span class="stat-value" id="totalScheduled">0</span>
-                <span class="stat-label">Total Scheduled</span>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #fffbeb;">
-                    <span class="material-icons-round" style="color: #d97706;">history</span>
-                </div>
-                <span class="stat-value" id="upcomingSchedules">0</span>
-                <span class="stat-label">Upcoming This Week</span>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #f0fdf4;">
-                    <span class="material-icons-round" style="color: #16a34a;">groups</span>
-                </div>
-                <span class="stat-value" id="activeGroups">0</span>
-                <span class="stat-label">Unique Groups</span>
-            </div>
-        </div>
 
         <!-- Schedule Table -->
         <div class="table-container">
