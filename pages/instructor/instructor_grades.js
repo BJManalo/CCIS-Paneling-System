@@ -59,14 +59,10 @@ function renderGrades() {
 
     if (!allGradesData || allGradesData.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No scheduled groups found.</td></tr>';
-        updateStats(0, 0, 0);
         return;
     }
 
     let hasVisibleData = false;
-    let statCompleted = 0;
-    let statPartial = 0;
-    let groupsSet = new Set();
 
     allGradesData.forEach(group => {
         // Search Filter (Group Name or Student Names)
@@ -98,15 +94,11 @@ function renderGrades() {
             if (gradedCount === 0) return;
 
             hasVisibleData = true;
-            groupsSet.add(group.id);
 
             const totalStudents = group.students.length;
             const status = (gradedCount === totalStudents) ? 'Completed' : 'Partial';
             const statusClass = status === 'Completed' ? 'badge-completed' : 'badge-partial';
             const statusIcon = status === 'Completed' ? 'check_circle' : 'pending';
-
-            if (status === 'Completed') statCompleted++;
-            else statPartial++;
 
             // Create unique ID for collapse
             const collapseId = `collapse-${group.id}-${schedType.replace(/\s+/g, '')}`;
@@ -173,14 +165,6 @@ function renderGrades() {
     if (!hasVisibleData) {
         tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No grades found matching your criteria.</td></tr>';
     }
-
-    updateStats(statCompleted, statPartial, groupsSet.size);
-}
-
-function updateStats(completed, partial, totalGroups) {
-    document.getElementById('totalCompleted').innerText = completed;
-    document.getElementById('totalPartial').innerText = partial;
-    document.getElementById('totalGroups').innerText = totalGroups;
 }
 
 // Helper to toggle rows
