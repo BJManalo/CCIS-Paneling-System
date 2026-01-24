@@ -20,10 +20,23 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = '../../index.html';
         return;
     }
-    instructorName = loginUser.full_name || '';
+    instructorName = loginUser.full_name || loginUser.name || '';
 
     fetchDashboardData();
 });
+
+// Helper for loose name matching
+function checkNameMatch(dbName, myName) {
+    if (!dbName || !myName) return false;
+    const cleanDb = dbName.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ').filter(Boolean);
+    const cleanMy = myName.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ').filter(Boolean);
+
+    // Check if all parts of my name are in db name (or vice versa)
+    const meInDb = cleanMy.every(part => cleanDb.includes(part));
+    const dbInMe = cleanDb.every(part => cleanMy.includes(part));
+
+    return meInDb || dbInMe;
+}
 
 async function fetchDashboardData() {
     try {
@@ -52,7 +65,6 @@ async function fetchDashboardData() {
 
         console.log('Instructor Name:', instructorName);
         console.log('Total Groups:', allGroups.length);
-        console.log('Adviser Names in DB:', [...new Set(allGroups.map(g => g.adviser))]);
 
         // Populate Section Filter
         populateSectionFilter();
@@ -69,9 +81,9 @@ function populateSectionFilter() {
     const sectionFilter = document.getElementById('sectionFilter');
 
     // Filter groups where I am the adviser
-    const myGroups = allGroups.filter(g =>
-        g.adviser && g.adviser.toLowerCase().trim() === instructorName.toLowerCase().trim()
-    );
+    const myGroups = allGroups.filter(g => {
+        return checkNameMatch(g.adviser, instructorName);
+    });
 
     const sections = [...new Set(myGroups.map(g => g.section).filter(Boolean))].sort();
 
@@ -118,9 +130,9 @@ window.applyDashboardFilters = () => {
 
     // 1. Filter by Adviser, Program, Section, Search (Used for COUNTS)
     const baseGroups = allGroups.filter(g => {
-        const dbAdviser = (g.adviser || '').toLowerCase().trim();
-        const me = instructorName.toLowerCase().trim();
-        const isMyGroup = dbAdviser.includes(me) || me.includes(dbAdviser);
+        const dbAdviser = g.adviser || '';
+        const isMyGroup = checkNameMatch(dbAdviser, instructorName);
+
         if (!isMyGroup) return false;
 
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
