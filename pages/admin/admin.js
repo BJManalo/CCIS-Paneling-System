@@ -10,6 +10,7 @@ let allDefenseStatuses = [];
 let allStudents = [];
 let filteredGroups = [];
 let currentCategory = 'ALL'; // 'ALL', 'APPROVED', 'REJECTED', 'COMPLETED'
+let displayRows = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchDashboardData();
@@ -58,6 +59,7 @@ async function fetchDashboardData() {
 
 function populateSectionFilter() {
     const sectionFilter = document.getElementById('sectionFilter');
+    if (!sectionFilter) return;
     const sections = [...new Set(allGroups.map(g => g.section).filter(Boolean))].sort();
 
     sections.forEach(sec => {
@@ -103,8 +105,8 @@ window.applyDashboardFilters = () => {
     const section = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-    // 1. Filter by Program, Section and Search (Used for COUNTS)
-    const baseFiltered = allGroups.filter(g => {
+    // 1. Get base groups matching metadata filters
+    const baseGroups = allGroups.filter(g => {
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
         const searchMatch = !searchTerm ||
@@ -113,35 +115,88 @@ window.applyDashboardFilters = () => {
         return progMatch && sectMatch && searchMatch;
     });
 
-    // 2. Further filter by Category (Used for TABLE)
-    filteredGroups = baseFiltered.filter(g => {
-        if (currentCategory === 'ALL') return true;
+    const getStatusMap = (row) => {
+        if (!row || !row.statuses) return {};
+        let s = row.statuses;
+        if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
+        return s;
+    };
 
+    displayRows = [];
+
+    baseGroups.forEach(g => {
         const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
         const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
+        const tMap = getStatusMap(titleRow);
+        const fMap = getStatusMap(finalRow);
 
-        const getVals = (row) => {
-            if (!row || !row.statuses) return [];
-            let s = row.statuses;
-            if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return []; } }
-            return Object.values(s);
+        const membersList = allStudents
+            .filter(s => s.group_id === g.id)
+            .map(s => s.full_name)
+            .join(', ');
+
+        const baseObj = {
+            group_name: g.group_name || '-',
+            members: membersList || '-',
+            program: g.program || '-',
+            year: g.year_level || '-',
+            original: g
         };
 
-        const tVals = getVals(titleRow);
-        const fVals = getVals(finalRow);
+        if (currentCategory === 'ALL') {
+            let titleLabel = g.group_name;
+            let statusBadge = '<span class="status-badge pending">Pending</span>';
 
-        if (currentCategory === 'COMPLETED') {
-            return fVals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
+            const approvedKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved'));
+            const finalApproved = Object.values(fMap).some(v => v.toLowerCase().includes('approved'));
+
+            if (finalApproved) {
+                statusBadge = '<span class="status-badge approved">Completed</span>';
+                titleLabel = `<strong>${approvedKey || g.group_name}</strong>`;
+            } else if (approvedKey) {
+                statusBadge = '<span class="status-badge approved" style="background:#dbeafe; color:#2563eb;">Title Approved</span>';
+                titleLabel = `<strong>${approvedKey}</strong>`;
+            } else if (Object.values(tMap).some(v => v.toLowerCase().includes('rejected'))) {
+                const rejCount = Object.values(tMap).filter(v => v.toLowerCase().includes('rejected')).length;
+                statusBadge = `<span class="status-badge rejected">${rejCount} Rejected</span>`;
+                titleLabel = Object.keys(tMap).filter(k => tMap[k].toLowerCase().includes('rejected'))[0];
+            }
+            displayRows.push({ ...baseObj, title: titleLabel, statusHtml: statusBadge });
+
         } else if (currentCategory === 'APPROVED') {
-            return tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
+            Object.keys(tMap).forEach(k => {
+                if (tMap[k].toLowerCase().includes('approved')) {
+                    displayRows.push({
+                        ...baseObj,
+                        title: `<strong>${k}</strong>`,
+                        statusHtml: '<span class="status-badge approved">Title Approved</span>'
+                    });
+                }
+            });
         } else if (currentCategory === 'REJECTED') {
-            return tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('rejected'));
+            Object.keys(tMap).forEach(k => {
+                if (tMap[k].toLowerCase().includes('rejected')) {
+                    displayRows.push({
+                        ...baseObj,
+                        title: `<span style="color: #dc2626;">${k}</span>`,
+                        statusHtml: '<span class="status-badge rejected">Rejected</span>'
+                    });
+                }
+            });
+        } else if (currentCategory === 'COMPLETED') {
+            if (Object.values(fMap).some(v => v.toLowerCase().includes('approved'))) {
+                const approvedKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved'));
+                displayRows.push({
+                    ...baseObj,
+                    title: `<strong>${approvedKey || g.group_name}</strong>`,
+                    statusHtml: '<span class="status-badge approved">Completed</span>'
+                });
+            }
         }
-        return true;
     });
 
-    updateCounts(baseFiltered); // Always show counts for the selected program/section
-    renderTable(); // Show rows according to category tab
+    updateCounts(baseGroups);
+    renderTable();
 };
 
 function updateCounts(groups) {
@@ -162,7 +217,6 @@ function updateCounts(groups) {
     groupIds.forEach(id => {
         const titleRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Title Defense');
         const finalRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Final Defense');
-
         const tVals = getVals(titleRow);
         const fVals = getVals(finalRow);
 
@@ -180,99 +234,31 @@ function updateCounts(groups) {
     if (finalEl) finalEl.innerText = completedTotal;
 }
 
-function countDefenseStatus(allStatuses, defenseType, passValues) {
-    let count = 0;
-
-    const specificRows = allStatuses.filter(ds =>
-        ds.defense_type && ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === defenseType.toLowerCase().replace(/[^a-z0-9]/g, '')
-    );
-
-    specificRows.forEach(row => {
-        let statusMap = row.statuses;
-        // Resilience: Parse if it's a string
-        if (typeof statusMap === 'string') {
-            try { statusMap = JSON.parse(statusMap); } catch (e) { statusMap = {}; }
-        }
-        if (!statusMap) statusMap = {};
-
-        Object.values(statusMap).forEach(v => {
-            if (typeof v === 'string' && passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
-                count++;
-            }
-        });
-    });
-
-    return count;
-}
+function countDefenseStatus(allStatuses, defenseType, passValues) { return 0; }
 
 async function renderTable() {
     const tableBody = document.getElementById('tableBody');
     const emptyState = document.getElementById('emptyState');
+    if (!tableBody) return;
     tableBody.innerHTML = '';
 
-    if (filteredGroups.length === 0) {
+    if (displayRows.length === 0) {
         if (emptyState) emptyState.style.display = 'block';
         return;
     }
     if (emptyState) emptyState.style.display = 'none';
 
-    filteredGroups.forEach(g => {
-        // Get status and titles
-        const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
-        const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
-
-        let statusHtml = '<span class="status-badge pending">Pending</span>';
-        let projectTitle = '<span style="color: #94a3b8; font-style: italic;">No title approved</span>';
-
-        // 1. Determine Status Badge
-        if (finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'))) {
-            statusHtml = '<span class="status-badge approved">Completed</span>';
-        } else if (titleRow) {
-            const statusVals = Object.values(titleRow.statuses || {});
-            const approvedCount = statusVals.filter(v => v.toLowerCase().includes('approved')).length;
-            const rejectedCount = statusVals.filter(v => v.toLowerCase().includes('rejected')).length;
-            const totalSubmitted = statusVals.length;
-
-            if (approvedCount > 0) {
-                statusHtml = '<span class="status-badge approved" style="background:#dbeafe; color: #2563eb; border-color:#bfdbfe;">Title Approved</span>';
-            } else if (rejectedCount > 0) {
-                if (rejectedCount === totalSubmitted) {
-                    statusHtml = `<span class="status-badge rejected">All Rejected (${rejectedCount}/${totalSubmitted})</span>`;
-                } else {
-                    statusHtml = `<span class="status-badge rejected">${rejectedCount}/${totalSubmitted} Rejected</span>`;
-                }
-            }
-        }
-
-        // 2. Determine Project Title (Show Approved one if exists, otherwise show first submitted)
-        if (titleRow && titleRow.statuses) {
-            const approvedKey = Object.keys(titleRow.statuses).find(k => titleRow.statuses[k].toLowerCase().includes('approved'));
-            if (approvedKey) {
-                projectTitle = `<strong>${approvedKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</strong>`;
-            } else {
-                // Not approved yet, show first submitted title if any
-                const firstSubmitted = Object.keys(titleRow.statuses)[0];
-                if (firstSubmitted) {
-                    projectTitle = `<span style="color: #64748b;">${firstSubmitted.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>`;
-                }
-            }
-        }
-
-        const members = allStudents
-            .filter(s => s.group_id === g.id)
-            .map(s => s.full_name)
-            .join(', ');
-
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${projectTitle}</td>
-            <td>${g.group_name || '-'}</td>
-            <td style="font-size: 11px; color: #64748b;">${members || '-'}</td>
-            <td>${g.program || '-'}</td>
-            <td>${g.year_level || '-'}</td>
-            <td>${statusHtml}</td>
+    displayRows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${row.title || '-'}</td>
+            <td>${row.group_name}</td>
+            <td style="font-size: 11px; color: #64748b;">${row.members}</td>
+            <td>${row.program}</td>
+            <td>${row.year}</td>
+            <td>${row.statusHtml}</td>
         `;
-        tableBody.appendChild(row);
+        tableBody.appendChild(tr);
     });
 }
 
@@ -282,8 +268,11 @@ function logout() {
 }
 
 window.filterTable = (program) => {
-    document.getElementById('programFilter').value = program;
-    applyDashboardFilters();
+    const filterEl = document.getElementById('programFilter');
+    if (filterEl) {
+        filterEl.value = program;
+        applyDashboardFilters();
+    }
 };
 
 document.getElementById('searchInput')?.addEventListener('input', applyDashboardFilters);
