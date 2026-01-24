@@ -85,33 +85,55 @@ function updateCounts(groups) {
     // 1. Approved Titles
     const approvedTitles = countStatus(groups, 'title_status', ['Approved']);
 
-    // 2. Recommended Titles (Pre-Oral)
-    const recommendedTitles = countStatus(groups, 'pre_oral_status', ['Passed', 'Approved']);
+    // 2. Rejected Titles
+    const rejectedTitles = countStatus(groups, 'title_status', ['Rejected']);
 
     // 3. Completed (Graduates / Final Defense)
     const completed = countStatus(groups, 'final_status', ['Passed', 'Approved']);
 
     // Display Counts
-    document.getElementById('countTitle').innerText = approvedTitles;
-    document.getElementById('countPreOral').innerText = recommendedTitles;
-    document.getElementById('countFinal').innerText = completed;
+    const titleEl = document.getElementById('countTitle');
+    const preOralEl = document.getElementById('countPreOral');
+    const finalEl = document.getElementById('countFinal');
+
+    if (titleEl) titleEl.innerText = approvedTitles;
+    if (preOralEl) {
+        preOralEl.innerText = rejectedTitles;
+        // Rename dynamic label
+        const titleContainer = preOralEl.parentElement.querySelector('.chart-title');
+        if (titleContainer) titleContainer.innerText = "Rejected Titles";
+        preOralEl.style.color = '#dc2626';
+    }
+    if (finalEl) finalEl.innerText = completed;
 }
 
 function countStatus(groups, statusCol, passValues) {
-    return groups.filter(g => {
+    let count = 0;
+    groups.forEach(g => {
         let val = g[statusCol];
-        if (!val) return false;
+        if (!val) return;
 
-        let status = val;
         try {
             if (val.startsWith('{')) {
                 const parsed = JSON.parse(val);
-                status = Object.values(parsed).join(' ');
+                const values = Object.values(parsed);
+                values.forEach(v => {
+                    if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
+                        count++;
+                    }
+                });
+            } else {
+                if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
+                    count++;
+                }
             }
-        } catch (e) { /* ignore */ }
-
-        return passValues.some(p => status.toLowerCase().includes(p.toLowerCase()));
-    }).length;
+        } catch (e) {
+            if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
+                count++;
+            }
+        }
+    });
+    return count;
 }
 
 function logout() {

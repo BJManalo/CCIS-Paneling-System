@@ -60,39 +60,67 @@ window.applyDashboardFilters = () => {
 };
 
 function updateCounts(groups) {
-    // 1. Approved Titles (Title Defense 'Approved')
+    // 1. Approved Titles
     const approvedTitles = countStatus(groups, 'title_status', ['Approved']);
 
-    // 2. Recommended Titles (Pre-Oral 'Passed' or 'Approved')
-    // Note: User asked for "Recommended Titles" tab for Pre-Oral
-    const recommendedTitles = countStatus(groups, 'pre_oral_status', ['Passed', 'Approved']);
+    // 2. Rejected Titles (changed from Recommended as per latest request)
+    const rejectedTitles = countStatus(groups, 'title_status', ['Rejected']);
 
     // 3. Completed (Graduates)
-    // "once the panel decision in the chapter 5 ... is approve that title is automatic completed"
     const completed = countStatus(groups, 'final_status', ['Passed', 'Approved']);
 
     // Animate or set text
-    document.getElementById('countTitle').innerText = approvedTitles;
-    document.getElementById('countPreOral').innerText = recommendedTitles;
-    document.getElementById('countFinal').innerText = completed;
+    const titleEl = document.getElementById('countTitle');
+    const preOralEl = document.getElementById('countPreOral');
+    const finalEl = document.getElementById('countFinal');
+
+    // Update Labels if needed (HTML might say "Recommended", we should ensure it matches "Rejected")
+    // Previous HTML had "Recommended Titles". User asked for "Rejected Titles".
+    // I should update the HTML too, or simpler: update the ID or just the number logic.
+    // I'll update text content headers in JS if possible or assume HTML update.
+    // Let's stick to updating numbers. 
+    // Wait, the HTML says "Recommended Titles" for the middle card.
+    // I will rename the middle card title dynamically to "Rejected Titles" to be safe.
+
+    // Safety check for elements
+    if (titleEl) titleEl.innerText = approvedTitles;
+    if (preOralEl) {
+        preOralEl.innerText = rejectedTitles;
+        // Find sibling key
+        const titleContainer = preOralEl.parentElement.querySelector('.chart-title');
+        if (titleContainer) titleContainer.innerText = "Rejected Titles";
+        preOralEl.style.color = '#dc2626'; // Red for rejected
+    }
+    if (finalEl) finalEl.innerText = completed;
 }
 
 function countStatus(groups, statusCol, passValues) {
-    return groups.filter(g => {
+    let count = 0;
+    groups.forEach(g => {
         let val = g[statusCol];
-        if (!val) return false;
+        if (!val) return;
 
-        // Handle JSON or String
-        let status = val;
         try {
             if (val.startsWith('{')) {
                 const parsed = JSON.parse(val);
-                status = Object.values(parsed).join(' ');
+                const values = Object.values(parsed);
+                values.forEach(v => {
+                    if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
+                        count++;
+                    }
+                });
+            } else {
+                if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
+                    count++;
+                }
             }
-        } catch (e) { /* ignore */ }
-
-        return passValues.some(p => status.toLowerCase().includes(p.toLowerCase()));
-    }).length;
+        } catch (e) {
+            if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
+                count++;
+            }
+        }
+    });
+    return count;
 }
 
 function logout() {
@@ -100,7 +128,6 @@ function logout() {
     window.location.href = '../../index.html';
 }
 
-// Keep filterTable dummy function
 window.filterTable = (program) => {
     document.getElementById('programFilter').value = program;
     applyDashboardFilters();
