@@ -8,11 +8,25 @@ let currentTab = 'Title Defense'; // Default
 let currentProgram = 'ALL';
 let searchTerm = '';
 let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
-let currentView = 'panel'; // New: panel or adviser
+
+let currentRole = 'Panel'; // Default
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCapstoneData();
 });
+
+// --- Role Switching ---
+window.switchRole = (role) => {
+    currentRole = role;
+
+    // Update active buttons
+    document.querySelectorAll('.role-filter-btn').forEach(btn => {
+        if (btn.id === `role-${role}`) btn.classList.add('active');
+        else btn.classList.remove('active');
+    });
+
+    renderTable();
+};
 
 // Normalize helper (lowercase, remove hyphens/spaces)
 function normalizeType(str) {
@@ -167,31 +181,6 @@ async function loadCapstoneData() {
     }
 }
 
-// --- View Switching ---
-window.switchView = (view) => {
-    currentView = view;
-
-    document.getElementById('view-panel').classList.toggle('active', view === 'panel');
-    document.getElementById('view-adviser').classList.toggle('active', view === 'adviser');
-
-    const panelBtn = document.getElementById('view-panel');
-    const adviserBtn = document.getElementById('view-adviser');
-
-    if (view === 'panel') {
-        panelBtn.style.borderBottom = '3px solid var(--primary-color)';
-        panelBtn.style.color = 'var(--primary-color)';
-        adviserBtn.style.borderBottom = '3px solid transparent';
-        adviserBtn.style.color = '#94a3b8';
-    } else {
-        adviserBtn.style.borderBottom = '3px solid var(--primary-color)';
-        adviserBtn.style.color = 'var(--primary-color)';
-        panelBtn.style.borderBottom = '3px solid transparent';
-        panelBtn.style.color = '#94a3b8';
-    }
-
-    renderTable();
-}
-
 // --- Tab Switching ---
 window.switchTab = (tabName) => {
     currentTab = tabName;
@@ -200,16 +189,16 @@ window.switchTab = (tabName) => {
 };
 
 function updateTabStyles(activeTab) {
-    document.querySelectorAll('.sub-tab-btn').forEach(tab => {
+    document.querySelectorAll('.role-tab').forEach(tab => {
         const tabId = tab.id.replace('tab-', '');
         if (tabId === activeTab) {
             tab.classList.add('active');
-            tab.style.fontWeight = '700';
-            tab.style.color = 'var(--primary-dark)';
+            tab.style.color = 'var(--primary-color)';
+            tab.style.borderBottomColor = 'var(--primary-color)';
         } else {
             tab.classList.remove('active');
-            tab.style.fontWeight = '500';
             tab.style.color = '#64748b';
+            tab.style.borderBottomColor = 'transparent';
         }
     });
 }
@@ -233,13 +222,9 @@ function renderTable() {
         const searchMatch = !searchTerm ||
             g.groupName.toLowerCase().includes(searchTerm.toLowerCase());
 
-        // View Match (Panel vs Adviser)
-        let roleMatch = false;
-        if (currentView === 'panel') {
-            roleMatch = g.isPanelist;
-        } else {
-            roleMatch = g.isAdviser;
-        }
+        // Role Match
+        const roleMatch = (currentRole === 'Panel' && g.isPanelist) ||
+            (currentRole === 'Adviser' && g.isAdviser);
 
         return typeMatch && programMatch && searchMatch && roleMatch;
     });
@@ -272,10 +257,12 @@ function renderTable() {
         }
 
         const dateStr = g.date ? new Date(g.date).toLocaleDateString() : '-';
-        // Chips
-        const panelsHtml = (g.panels || []).map(p => `<span class="chip">${p}</span>`).join('');
 
-        // Badges
+        // Panels Chips
+        const panelList = g.panels && g.panels.length > 0 ? g.panels : [];
+        const panelsHtml = panelList.map(p => `<span class="chip">${p}</span>`).join('');
+
+        // Using standard badges
         const program = (g.program || '').toUpperCase();
         let progClass = 'prog-unknown';
         if (program.includes('BSIS')) progClass = 'prog-bsis';
@@ -288,15 +275,12 @@ function renderTable() {
         else if (lowerType.includes('pre-oral') || lowerType.includes('preoral')) typeClass = 'type-pre-oral';
         else if (lowerType.includes('final')) typeClass = 'type-final';
 
-        // View Label
-        const viewLabel = currentView === 'panel' ? 'Panel View' : 'Adviser View';
-        const viewLabelColor = currentView === 'panel' ? '#64748b' : '#3b82f6';
-
-        // Files check
+        // Define which file set corresponds to current tab for button context
         let currentFileSet = {};
         if (normCurrentTab.includes('title')) currentFileSet = g.files.titles;
         else if (normCurrentTab.includes('preoral')) currentFileSet = g.files.pre_oral;
         else if (normCurrentTab.includes('final')) currentFileSet = g.files.final;
+
         const hasFiles = Object.keys(currentFileSet).length > 0;
 
         const row = document.createElement('tr');
@@ -326,13 +310,13 @@ function renderTable() {
         row.innerHTML = `
             <td><span class="type-badge ${typeClass}">${g.type}</span></td>
             <td>
-                <div style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem;">${g.groupName}</div>
-                <div style="font-size: 11px; color: ${viewLabelColor}; font-weight: 500; margin-top: 2px;">${viewLabel}</div>
+                <div style="font-weight: 600;">${g.groupName}</div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${g.isAdviser ? 'Adviser View' : 'Panel View'}</div>
             </td>
             <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>
-                <div style="font-weight: 600; color: #1e293b;">${dateStr}</div>
-                <div style="font-size: 11px; color: #64748b; font-weight: 500;">${g.time || ''}</div>
+                <div style="font-weight: 500;">${dateStr}</div>
+                <div style="font-size: 11px; color: #64748b;">${g.time || ''}</div>
             </td>
             <td>
                 <div style="display: flex; align-items: center; gap: 4px; color: #475569;">
@@ -481,6 +465,8 @@ window.openFileModal = (groupId) => {
             }
 
             let optionsHtml = '';
+            // ... (option generation omitted for brevity if not used in read-only)
+
             if (categoryKey === 'titles') {
                 optionsHtml = `
                     <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
@@ -495,16 +481,27 @@ window.openFileModal = (groupId) => {
                 `;
             }
 
-            // Other Panel Feedback HTML
+            // Other Panel Feedback HTML (Visible to everyone)
             let otherFeedbackHtml = '';
-            const otherPanels = Object.keys(fileStatuses).filter(p => p !== userName);
-            if (otherPanels.length > 0) {
+            // For Adviser, we want to see ALL panel feedback, not just "others".
+            // Since Adviser name isn't in the status map as a KEY usually (unless they are also a panel), 
+            // "others" logic works fine if we consider Adviser is not a panel key.
+            // But if currentRole is Adviser, we want to see ALL entries in fileStatuses.
+
+            let panelsToDisplay = [];
+            if (currentRole === 'Adviser') {
+                panelsToDisplay = Object.keys(fileStatuses);
+            } else {
+                panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
+            }
+
+            if (panelsToDisplay.length > 0) {
                 otherFeedbackHtml = `
                     <div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">
-                        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Peer Evaluations</div>
-                        ${otherPanels.map(panel => `
+                        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Panel Evaluations</div>
+                        ${panelsToDisplay.map(panel => `
                             <div style="font-size: 11px; margin-bottom: 4px; color: #475569;">
-                                <strong style="color: var(--primary-color);">${panel}:</strong> ${fileStatuses[panel]}
+                                <strong style="color: var(--primary-color);">${panel}:</strong> ${fileStatuses[panel] || 'Pending'}
                                 ${fileRemarks[panel] ? `<br><span style="color: #64748b; font-style: italic;">"${fileRemarks[panel].replace(panel + ':', '').trim()}"</span>` : ''}
                             </div>
                         `).join('')}
@@ -512,7 +509,9 @@ window.openFileModal = (groupId) => {
                 `;
             }
 
-            controls.innerHTML = `
+            let interactiveControls = '';
+            if (currentRole === 'Panel') {
+                interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
                     <div style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
@@ -533,8 +532,21 @@ window.openFileModal = (groupId) => {
                         style="width: 100%; margin-top: 5px; background: ${myRemarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${myRemarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
                         ${myRemarks ? 'Update Remarks' : 'Save Remarks'}
                     </button>
-                    ${otherFeedbackHtml}
                 </div>
+                `;
+            } else {
+                // Adviser View (Read Only)
+                interactiveControls = `
+                    <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
+                        <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
+                        Viewing as Adviser (Read Only)
+                    </div>
+                `;
+            }
+
+            controls.innerHTML = `
+                ${interactiveControls}
+                ${otherFeedbackHtml}
             `;
             itemContainer.appendChild(controls);
             section.appendChild(itemContainer);

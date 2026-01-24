@@ -9,12 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 let allData = [];
-let groupGrades = {};
+let groupGrades = {}; // Map of groupId -> { 'Title Defense': true, ... } (if graded by THIS instructor)
 let currentTab = 'Title Defense';
 let currentFilter = 'ALL';
 let instructorId = null;
-let currentView = 'panel'; // 'panel' or 'adviser'
-let currentUserName = '';
 
 async function loadCapstoneData() {
     const tableBody = document.getElementById('tableBody');
@@ -26,7 +24,6 @@ async function loadCapstoneData() {
         return;
     }
     instructorId = loginUser.id;
-    currentUserName = loginUser.full_name || loginUser.name || '';
 
     tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">Loading data...</td></tr>';
     if (emptyState) emptyState.style.display = 'none';
@@ -45,7 +42,7 @@ async function loadCapstoneData() {
                     start_time, 
                     end_time, 
                     room, 
-                    panel1, panel2, panel3, panel4, panel5
+                    panel1, panel2, panel3, panel4
                 )
             `);
 
@@ -125,14 +122,14 @@ async function loadCapstoneData() {
                     id: group.id,
                     groupName: group.group_name,
                     program: group.program,
-                    adviser: group.adviser,
-                    type: sched.schedule_type,
+                    type: sched.schedule_type, // 'Title Defense', etc.
                     date: sched.date,
                     time: `${formatTime(sched.start_time)} - ${formatTime(sched.end_time)}`,
                     venue: sched.room,
-                    panels: [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(Boolean),
-                    file: 'Project-File.pdf',
-                    status: 'Pending',
+                    panels: [sched.panel1, sched.panel2, sched.panel3, sched.panel4].filter(Boolean),
+                    file: 'Project-File.pdf', // Placeholder or real column if exists
+                    status: 'Pending', // Placeholder
+                    // Logic Data
                     normalizedType: normalizeType(sched.schedule_type)
                 });
             });
@@ -163,34 +160,6 @@ function formatTime(timeStr) {
 }
 
 // --- Tabs & Locking ---
-// --- View Switching ---
-window.switchView = (view) => {
-    currentView = view;
-
-    // Toggle active state for local tabs
-    document.getElementById('view-panel').classList.toggle('active', view === 'panel');
-    document.getElementById('view-adviser').classList.toggle('active', view === 'adviser');
-
-    // Update styles manually if needed (or rely on CSS class .active)
-    const panelBtn = document.getElementById('view-panel');
-    const adviserBtn = document.getElementById('view-adviser');
-
-    if (view === 'panel') {
-        panelBtn.style.borderBottom = '3px solid var(--primary-color)';
-        panelBtn.style.color = 'var(--primary-color)';
-        adviserBtn.style.borderBottom = '3px solid transparent';
-        adviserBtn.style.color = '#94a3b8';
-    } else {
-        adviserBtn.style.borderBottom = '3px solid var(--primary-color)';
-        adviserBtn.style.color = 'var(--primary-color)';
-        panelBtn.style.borderBottom = '3px solid transparent';
-        panelBtn.style.color = '#94a3b8';
-    }
-
-    renderTable();
-}
-
-// --- Tabs & Locking ---
 window.switchTab = (tabName) => {
     currentTab = tabName;
     updateTabStyles(tabName);
@@ -198,17 +167,25 @@ window.switchTab = (tabName) => {
 };
 
 function updateTabStyles(activeTab) {
-    document.querySelectorAll('.sub-tab-btn').forEach(tab => {
-        const tabId = tab.id.replace('tab-', '');
+    document.querySelectorAll('.role-tab').forEach(tab => {
+        const tabId = tab.id.replace('tab-', ''); // "Title Defense"
+        const isLocked = false; // We don't lock the TAB itself globally, we lock ITEMS inside?
+        // Or do we lock the whole tab if NO groups are eligible?
+        // "Panel... cannot view the submission for pre oral until..."
+        // This implies per-group locking.
+        // So the tab is always clickable, but the list might be empty or rows locked.
+        // Let's simplify: Tab describes the *stage*.
 
         if (tabId === activeTab) {
             tab.classList.add('active');
-            tab.style.fontWeight = '700';
-            tab.style.color = 'var(--primary-dark)';
+            tab.style.fontWeight = '600';
+            tab.style.color = 'var(--primary-color)';
+            tab.style.borderBottom = '3px solid var(--primary-color)';
         } else {
             tab.classList.remove('active');
             tab.style.fontWeight = '500';
-            tab.style.color = '#64748b';
+            tab.style.color = '#888';
+            tab.style.borderBottom = '3px solid transparent';
         }
     });
 }
@@ -250,18 +227,7 @@ function renderTable() {
         // 2. Filter by Program
         const programMatch = currentFilter === 'ALL' || (item.program && item.program.toUpperCase() === currentFilter);
 
-        // 3. Filter by View (Panel vs Adviser)
-        let roleMatch = false;
-        if (currentView === 'panel') {
-            roleMatch = item.panels.includes(currentUserName);
-        } else {
-            roleMatch = item.adviser === currentUserName;
-        }
-
-        // DEBUG: If no user match found, you might want to uncomment this to see data
-        // roleMatch = true; 
-
-        return typeMatch && programMatch && roleMatch;
+        return typeMatch && programMatch;
     });
 
     if (filteredData.length === 0) {
@@ -294,24 +260,6 @@ function renderTable() {
 
         const row = document.createElement('tr');
 
-        // Logic for program badge
-        const program = (item.program || '').toUpperCase();
-        let progClass = 'prog-unknown';
-        if (program.includes('BSIS')) progClass = 'prog-bsis';
-        else if (program.includes('BSIT')) progClass = 'prog-bsit';
-        else if (program.includes('BSCS')) progClass = 'prog-bscs';
-
-        // Logic for type badge
-        let typeClass = 'type-unknown';
-        const lowerType = item.type.toLowerCase();
-        if (lowerType.includes('title')) typeClass = 'type-title';
-        else if (lowerType.includes('pre-oral') || lowerType.includes('preoral')) typeClass = 'type-pre-oral';
-        else if (lowerType.includes('final')) typeClass = 'type-final';
-
-        // View Label
-        const viewLabel = currentView === 'panel' ? 'Panel View' : 'Adviser View';
-        const viewLabelColor = currentView === 'panel' ? '#64748b' : '#3b82f6';
-
         // Action Button Logic
         let actionHtml = '';
         if (isLocked) {
@@ -326,41 +274,24 @@ function renderTable() {
             row.style.background = '#f8fafc';
         } else {
             actionHtml = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <button onclick="viewGroup('${item.id}', '${item.type}')" 
-                        style="display: flex; align-items: center; gap: 4px; background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; padding: 0;">
-                        <span class="material-icons-round" style="font-size: 18px;">folder_open</span>
-                        View Files
-                    </button>
-                </div>
+                <button onclick="viewGroup('${item.id}', '${item.type}')" 
+                    style="background: none; border: 1px solid var(--primary-color); color: var(--primary-color); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; font-family: inherit; font-size: 0.85rem; transition: all 0.2s;">
+                    View File
+                </button>
             `;
         }
 
-        // Create chips for panels
-        const panelsHtml = item.panels.map(p => `<span class="chip">${p}</span>`).join('');
-
         row.innerHTML = `
-            <td><span class="type-badge ${typeClass}">${item.type}</span></td>
+            <td style="font-weight: 600; color: var(--primary-dark);">${item.type}</td>
             <td>
-                <div style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem;">${item.groupName}</div>
-                <div style="font-size: 11px; color: ${viewLabelColor}; font-weight: 500; margin-top: 2px;">${viewLabel}</div>
+                <div style="font-weight: 600;">${item.groupName}</div>
+                <!-- <div style="font-size: 12px; color: #666;">ID: ${item.id}</div> -->
             </td>
-            <td><span class="prog-badge ${progClass}">${program}</span></td>
-            <td>
-                <div style="font-weight: 600; color: #1e293b;">${item.date || '-'}</div>
-                <div style="font-size: 11px; color: #64748b; font-weight: 500;">${item.time}</div>
-            </td>
-            <td>
-                <div style="display: flex; align-items: center; gap: 4px; color: #475569;">
-                    <span class="material-icons-round" style="font-size: 14px; color: var(--primary-color);">place</span>
-                    ${item.venue || 'TBA'}
-                </div>
-            </td>
-            <td>
-                <div class="chips-container">
-                    ${panelsHtml || '<span style="color:#94a3b8; font-style:italic; font-size:11px;">Not Assigned</span>'}
-                </div>
-            </td>
+            <td><span class="status-badge" style="background: #e2e8f0; color: #475569;">${item.program}</span></td>
+            <td>${item.date ? item.date + '<br><span style="color:#64748b; font-size:0.85em;">' + item.time + '</span>' : '-'}</td>
+            <td>${item.venue || '-'}</td>
+            <td><span style="font-size: 13px;">${item.panels.join(', ')}</span></td>
+            <!-- <td>${item.file ? 'Available' : 'None'}</td> -->
             <td>${actionHtml}</td>
         `;
         tableBody.appendChild(row);

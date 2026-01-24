@@ -90,11 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (accountData.role === 'Admin') {
                         window.location.href = 'pages/admin/admin.html';
                     } else if (accountData.role === 'Instructor') {
-                        window.location.href = 'pages/instructor/instructor_capstone.html';
+                        window.location.href = 'pages/instructor/instructor_dashboard.html';
                     } else if (accountData.role === 'Panel' || accountData.role === 'Adviser') {
-                        window.location.href = 'pages/panel/panel_capstone.html';
+                        window.location.href = 'pages/panel/panel_evaluation.html';
                     } else {
-                        window.location.href = 'pages/panel/panel_capstone.html';
+                        window.location.href = 'pages/panel/panel_evaluation.html';
                     }
                     return;
                 }
