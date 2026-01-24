@@ -7,6 +7,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 // Data storage
 let allGroups = [];
 let allDefenseStatuses = [];
+let filteredGroups = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchDashboardData();
@@ -56,14 +57,20 @@ function populateSectionFilter() {
 window.applyDashboardFilters = () => {
     const program = document.getElementById('programFilter').value;
     const section = document.getElementById('sectionFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-    const filteredGroups = allGroups.filter(g => {
+    filteredGroups = allGroups.filter(g => {
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
-        return progMatch && sectMatch;
+        const searchMatch = !searchTerm ||
+            (g.group_name && g.group_name.toLowerCase().includes(searchTerm)) ||
+            (g.program && g.program.toLowerCase().includes(searchTerm));
+
+        return progMatch && sectMatch && searchMatch;
     });
 
     updateCounts(filteredGroups);
+    renderTable();
 };
 
 function updateCounts(groups) {
@@ -81,43 +88,26 @@ function updateCounts(groups) {
     // 3. Completed (Check 'Final Defense' rows)
     const completed = countDefenseStatus(relevantStatuses, 'Final Defense', ['Passed', 'Approved']);
 
-    // Animate or set text
+    // Display
     const titleEl = document.getElementById('countTitle');
     const preOralEl = document.getElementById('countPreOral');
     const finalEl = document.getElementById('countFinal');
 
-    // Update Labels if needed (HTML might say "Recommended", we should ensure it matches "Rejected")
-    // Previous HTML had "Recommended Titles". User asked for "Rejected Titles".
-    // I should update the HTML too, or simpler: update the ID or just the number logic.
-    // Let's stick to updating numbers. 
-    // Wait, the HTML says "Recommended Titles" for the middle card.
-    // I will rename the middle card title dynamically to "Rejected Titles" to be safe.
-
-    // Safety check for elements
     if (titleEl) titleEl.innerText = approvedTitles;
-    if (preOralEl) {
-        preOralEl.innerText = rejectedTitles;
-        // Find sibling key
-        const titleContainer = preOralEl.parentElement.querySelector('.chart-title');
-        if (titleContainer) titleContainer.innerText = "Rejected Titles";
-        preOralEl.style.color = '#dc2626'; // Red for rejected
-    }
+    if (preOralEl) preOralEl.innerText = rejectedTitles;
     if (finalEl) finalEl.innerText = completed;
 }
 
 function countDefenseStatus(allStatuses, defenseType, passValues) {
     let count = 0;
 
-    // Filter by type (normalize to be safe)
     const specificRows = allStatuses.filter(ds =>
         ds.defense_type && ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === defenseType.toLowerCase().replace(/[^a-z0-9]/g, '')
     );
 
     specificRows.forEach(row => {
-        const statuses = row.statuses || {};
-        const values = Object.values(statuses);
-
-        values.forEach(v => {
+        const statusMap = row.statuses || {};
+        Object.values(statusMap).forEach(v => {
             if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
                 count++;
             }
@@ -125,6 +115,53 @@ function countDefenseStatus(allStatuses, defenseType, passValues) {
     });
 
     return count;
+}
+
+async function renderTable() {
+    const tableBody = document.getElementById('tableBody');
+    const emptyState = document.getElementById('emptyState');
+    tableBody.innerHTML = '';
+
+    if (filteredGroups.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+    }
+    if (emptyState) emptyState.style.display = 'none';
+
+    // Fetch student members for each filtered group if possible
+    // For now, assume we just show the group info. 
+    // If members are in a separate table, we'd need another fetch.
+
+    filteredGroups.forEach(g => {
+        // Get status for Title Defense
+        const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
+
+        let statusHtml = '<span class="status-badge pending">Pending</span>';
+
+        // If Final is Approved, they are Completed
+        if (finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'))) {
+            statusHtml = '<span class="status-badge approved">Completed</span>';
+        } else if (titleRow) {
+            const vals = Object.values(titleRow.statuses || {});
+            if (vals.some(v => v.toLowerCase().includes('approved'))) {
+                statusHtml = '<span class="status-badge approved" style="background:#dbeafe; color: #2563eb; border-color:#bfdbfe;">Title Approved</span>';
+            } else if (vals.some(v => v.toLowerCase().includes('rejected'))) {
+                statusHtml = '<span class="status-badge rejected">Rejected</span>';
+            }
+        }
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${g.group_name || '-'}</td>
+            <td>Group #${g.id}</td>
+            <td>-</td>
+            <td>${g.program || '-'}</td>
+            <td>${g.year_level || '-'}</td>
+            <td>${statusHtml}</td>
+        `;
+        tableBody.appendChild(row);
+    });
 }
 
 function logout() {
@@ -136,3 +173,5 @@ window.filterTable = (program) => {
     document.getElementById('programFilter').value = program;
     applyDashboardFilters();
 };
+
+document.getElementById('searchInput')?.addEventListener('input', applyDashboardFilters);

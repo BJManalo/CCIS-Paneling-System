@@ -7,6 +7,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 // Data storage
 let allGroups = [];
 let allDefenseStatuses = [];
+let filteredGroups = [];
 let instructorName = '';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -70,9 +71,10 @@ function populateSectionFilter() {
 window.applyDashboardFilters = () => {
     const program = document.getElementById('programFilter').value;
     const section = document.getElementById('sectionFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
     // Filter data
-    const filtered = allGroups.filter(g => {
+    filteredGroups = allGroups.filter(g => {
         // 1. Must be MY group (Adviser check)
         const isMyGroup = g.adviser && g.adviser.toLowerCase().trim() === instructorName.toLowerCase().trim();
         if (!isMyGroup) return false;
@@ -83,16 +85,20 @@ window.applyDashboardFilters = () => {
         // 3. Section Filter
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
 
-        return progMatch && sectMatch;
+        // 4. Search
+        const searchMatch = !searchTerm ||
+            (g.group_name && g.group_name.toLowerCase().includes(searchTerm)) ||
+            (g.program && g.program.toLowerCase().includes(searchTerm));
+
+        return progMatch && sectMatch && searchMatch;
     });
 
-    updateCounts(filtered);
+    updateCounts(filteredGroups);
+    renderTable();
 };
 
 function updateCounts(groups) {
     const groupIds = groups.map(g => g.id);
-
-    // Filter statuses for MY filtered groups
     const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
 
     // 1. Approved Titles
@@ -101,7 +107,7 @@ function updateCounts(groups) {
     // 2. Rejected Titles
     const rejectedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Rejected']);
 
-    // 3. Completed (Graduates)
+    // 3. Completed Titles
     const completed = countDefenseStatus(relevantStatuses, 'Final Defense', ['Passed', 'Approved']);
 
     // Display Counts
@@ -110,12 +116,7 @@ function updateCounts(groups) {
     const finalEl = document.getElementById('countFinal');
 
     if (titleEl) titleEl.innerText = approvedTitles;
-    if (preOralEl) {
-        preOralEl.innerText = rejectedTitles;
-        const titleContainer = preOralEl.parentElement.querySelector('.chart-title');
-        if (titleContainer) titleContainer.innerText = "Rejected Titles";
-        preOralEl.style.color = '#dc2626';
-    }
+    if (preOralEl) preOralEl.innerText = rejectedTitles;
     if (finalEl) finalEl.innerText = completed;
 }
 
@@ -126,9 +127,8 @@ function countDefenseStatus(allStatuses, defenseType, passValues) {
     );
 
     specificRows.forEach(row => {
-        const statuses = row.statuses || {};
-        const values = Object.values(statuses);
-        values.forEach(v => {
+        const statusMap = row.statuses || {};
+        Object.values(statusMap).forEach(v => {
             if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
                 count++;
             }
@@ -136,6 +136,46 @@ function countDefenseStatus(allStatuses, defenseType, passValues) {
     });
 
     return count;
+}
+
+async function renderTable() {
+    const tableBody = document.getElementById('tableBody');
+    const emptyState = document.getElementById('emptyState');
+    tableBody.innerHTML = '';
+
+    if (filteredGroups.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+    }
+    if (emptyState) emptyState.style.display = 'none';
+
+    filteredGroups.forEach(g => {
+        const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
+
+        let statusHtml = '<span class="status-badge pending">Pending</span>';
+        if (finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'))) {
+            statusHtml = '<span class="status-badge approved">Completed</span>';
+        } else if (titleRow) {
+            const vals = Object.values(titleRow.statuses || {});
+            if (vals.some(v => v.toLowerCase().includes('approved'))) {
+                statusHtml = '<span class="status-badge approved" style="background:#dbeafe; color: #2563eb; border-color:#bfdbfe;">Title Approved</span>';
+            } else if (vals.some(v => v.toLowerCase().includes('rejected'))) {
+                statusHtml = '<span class="status-badge rejected">Rejected</span>';
+            }
+        }
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${g.group_name || '-'}</td>
+            <td>Group #${g.id}</td>
+            <td>-</td>
+            <td>${g.program || '-'}</td>
+            <td>${g.year_level || '-'}</td>
+            <td>${statusHtml}</td>
+        `;
+        tableBody.appendChild(row);
+    });
 }
 
 function logout() {
@@ -147,3 +187,5 @@ window.filterTable = (program) => {
     document.getElementById('programFilter').value = program;
     applyDashboardFilters();
 };
+
+document.getElementById('searchInput')?.addEventListener('input', applyDashboardFilters);
