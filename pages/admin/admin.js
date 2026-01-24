@@ -145,23 +145,36 @@ function updateCounts(groups) {
     // Filter relevant statuses belonging to these groups
     const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
 
-    // 1. Approved Titles (Check 'Title Defense' rows)
-    const approvedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Approved']);
+    // 1. Approved Titles (Count groups that have at least one approved title)
+    const approvedCount = groups.filter(g => {
+        const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        return titleRow && Object.values(titleRow.statuses || {}).some(v => v.toLowerCase().includes('approved'));
+    }).length;
 
-    // 2. Rejected Titles (Check 'Title Defense' rows)
-    const rejectedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Rejected']);
+    // 2. Rejected Titles (Count groups that have rejected titles AND NO approved title)
+    const rejectedCount = groups.filter(g => {
+        const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        if (!titleRow) return false;
+        const vals = Object.values(titleRow.statuses || {});
+        const hasRejected = vals.some(v => v.toLowerCase().includes('rejected'));
+        const hasApproved = vals.some(v => v.toLowerCase().includes('approved'));
+        return hasRejected && !hasApproved;
+    }).length;
 
-    // 3. Completed (Check 'Final Defense' rows)
-    const completed = countDefenseStatus(relevantStatuses, 'Final Defense', ['Passed', 'Approved']);
+    // 3. Completed (Count groups with approved Final Defense)
+    const completedCount = groups.filter(g => {
+        const finalRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
+        return finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'));
+    }).length;
 
     // Display
     const titleEl = document.getElementById('countTitle');
     const preOralEl = document.getElementById('countPreOral');
     const finalEl = document.getElementById('countFinal');
 
-    if (titleEl) titleEl.innerText = approvedTitles;
-    if (preOralEl) preOralEl.innerText = rejectedTitles;
-    if (finalEl) finalEl.innerText = completed;
+    if (titleEl) titleEl.innerText = approvedCount;
+    if (preOralEl) preOralEl.innerText = rejectedCount;
+    if (finalEl) finalEl.innerText = completedCount;
 }
 
 function countDefenseStatus(allStatuses, defenseType, passValues) {

@@ -161,22 +161,35 @@ function updateCounts(groups) {
     const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
 
     // 1. Approved Titles
-    const approvedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Approved']);
+    const approvedCount = groups.filter(g => {
+        const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        return titleRow && Object.values(titleRow.statuses || {}).some(v => v.toLowerCase().includes('approved'));
+    }).length;
 
     // 2. Rejected Titles
-    const rejectedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Rejected']);
+    const rejectedCount = groups.filter(g => {
+        const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        if (!titleRow) return false;
+        const vals = Object.values(titleRow.statuses || {});
+        const hasRejected = vals.some(v => v.toLowerCase().includes('rejected'));
+        const hasApproved = vals.some(v => v.toLowerCase().includes('approved'));
+        return hasRejected && !hasApproved;
+    }).length;
 
     // 3. Completed Titles
-    const completed = countDefenseStatus(relevantStatuses, 'Final Defense', ['Passed', 'Approved']);
+    const completedCount = groups.filter(g => {
+        const finalRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
+        return finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'));
+    }).length;
 
     // Display Counts
     const titleEl = document.getElementById('countTitle');
     const preOralEl = document.getElementById('countPreOral');
     const finalEl = document.getElementById('countFinal');
 
-    if (titleEl) titleEl.innerText = approvedTitles;
-    if (preOralEl) preOralEl.innerText = rejectedTitles;
-    if (finalEl) finalEl.innerText = completed;
+    if (titleEl) titleEl.innerText = approvedCount;
+    if (preOralEl) preOralEl.innerText = rejectedCount;
+    if (finalEl) finalEl.innerText = completedCount;
 }
 
 function countDefenseStatus(allStatuses, defenseType, passValues) {
