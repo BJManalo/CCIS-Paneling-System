@@ -103,17 +103,18 @@ window.applyDashboardFilters = () => {
     const section = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-    filteredGroups = allGroups.filter(g => {
-        // 1. Basic Filters
+    // 1. Filter by Program, Section and Search (Used for COUNTS)
+    const baseFiltered = allGroups.filter(g => {
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
         const searchMatch = !searchTerm ||
             (g.group_name && g.group_name.toLowerCase().includes(searchTerm)) ||
             (g.program && g.program.toLowerCase().includes(searchTerm));
+        return progMatch && sectMatch && searchMatch;
+    });
 
-        if (!(progMatch && sectMatch && searchMatch)) return false;
-
-        // 2. Category Filter
+    // 2. Further filter by Category (Used for TABLE)
+    filteredGroups = baseFiltered.filter(g => {
         if (currentCategory === 'ALL') return true;
 
         const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
@@ -126,18 +127,16 @@ window.applyDashboardFilters = () => {
         } else if (currentCategory === 'APPROVED') {
             return titleStatus.toLowerCase().includes('approved');
         } else if (currentCategory === 'REJECTED') {
-            // All submitted must be rejected if rejected count > 0 and no approved
             const statusVals = Object.values(titleRow?.statuses || {});
             const approved = statusVals.some(v => v.toLowerCase().includes('approved'));
             const rejected = statusVals.some(v => v.toLowerCase().includes('rejected'));
             return rejected && !approved;
         }
-
         return true;
     });
 
-    updateCounts(filteredGroups);
-    renderTable();
+    updateCounts(baseFiltered); // Always show counts for the selected program/section
+    renderTable(); // Show rows according to category tab
 };
 
 function updateCounts(groups) {

@@ -115,25 +115,23 @@ window.applyDashboardFilters = () => {
     const section = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-    // Filter data
-    filteredGroups = allGroups.filter(g => {
-        // 1. Must be MY group (Adviser check) - Lenient search
+    // 1. Filter by Adviser, Program, Section, Search (Used for COUNTS)
+    const baseFiltered = allGroups.filter(g => {
         const dbAdviser = (g.adviser || '').toLowerCase().trim();
         const me = instructorName.toLowerCase().trim();
         const isMyGroup = dbAdviser.includes(me) || me.includes(dbAdviser);
-
         if (!isMyGroup) return false;
 
-        // 2. Program/Section/Search Filters
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
         const searchMatch = !searchTerm ||
             (g.group_name && g.group_name.toLowerCase().includes(searchTerm)) ||
             (g.program && g.program.toLowerCase().includes(searchTerm));
+        return progMatch && sectMatch && searchMatch;
+    });
 
-        if (!(progMatch && sectMatch && searchMatch)) return false;
-
-        // 3. Category Filter
+    // 2. Further filter by Category (Used for TABLE)
+    filteredGroups = baseFiltered.filter(g => {
         if (currentCategory === 'ALL') return true;
 
         const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
@@ -151,11 +149,10 @@ window.applyDashboardFilters = () => {
             const rejected = statusVals.some(v => v.toLowerCase().includes('rejected'));
             return rejected && !approved;
         }
-
         return true;
     });
 
-    updateCounts(filteredGroups);
+    updateCounts(baseFiltered);
     renderTable();
 };
 
