@@ -83,50 +83,52 @@ async function loadCapstoneData() {
             }
         });
 
-        // 4. Process Data
+        // 4. Fetch Defense Statuses
+        const { data: defStatuses, error: dsError } = await supabaseClient
+            .from('defense_statuses')
+            .select('*');
+
+        if (dsError) throw dsError;
+
+        // 5. Process Data
         allData = [];
 
         groups.forEach(group => {
             const groupSchedules = schedules.filter(s => s.group_id === group.id);
 
-            // We potentially have multple schedules (Title, Pre, Final)
-            // But the existing code flattened groups. 
-            // We need to create multiple entries if a group has multiple active schedules?
-            // Actually, the TABS control which schedule we show.
-            // So we should generate one entry PER schedule type found, usually.
-            // Or if no schedule, maybe a draft entry?
-            // Let's iterate found schedules. If none, maybe skip or show as 'Draft'.
-
-            if (groupSchedules.length === 0) {
-                // Skip or handle no-schedule groups
-                return;
-            }
+            if (groupSchedules.length === 0) return;
 
             groupSchedules.forEach(sched => {
-                // Check Access: Is user Adviser or Panel?
                 const isAdviser = group.adviser === user.name;
                 const isPanelist = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].includes(user.name);
 
-                if (!isAdviser && !isPanelist) return; // Skip if not related
+                if (!isAdviser && !isPanelist) return;
 
-                // File Links parsing
-                let files = {};
-                let statusMap = {};
-                let remarksMap = {};
-
-                // Determine which column to read based on schedule type?
-                // Actually the group has all columns. We just need to pick the right one for the Modal later.
-                // For the TABLE row, we just need generic info.
-
-                // Normalized Type
                 const normType = normalizeType(sched.schedule_type);
 
-                // Populate with ALL file data for modal usage
-                files = {
+                // Find matching defense status row
+                const statusRow = defStatuses.find(ds => ds.group_id === group.id && normalizeType(ds.defense_type) === normType);
+
+                const currentStatuses = statusRow ? (statusRow.statuses || {}) : {};
+                const currentRemarks = statusRow ? (statusRow.remarks || {}) : {};
+
+                let files = {
                     titles: group.title_link ? JSON.parse(group.title_link) : {},
                     pre_oral: group.pre_oral_link ? JSON.parse(group.pre_oral_link) : {},
                     final: group.final_link ? JSON.parse(group.final_link) : {}
                 };
+
+                // Map old structure to use new status source
+                // We create specific buckets for the UI to use, but they come from the generic 'statuses' json of that row
+                let titleStatus = {}, preOralStatus = {}, finalStatus = {};
+                if (normType.includes('title')) titleStatus = currentStatuses;
+                else if (normType.includes('preoral')) preOralStatus = currentStatuses;
+                else if (normType.includes('final')) finalStatus = currentStatuses;
+
+                let titleRemarks = {}, preOralRemarks = {}, finalRemarks = {};
+                if (normType.includes('title')) titleRemarks = currentRemarks;
+                else if (normType.includes('preoral')) preOralRemarks = currentRemarks;
+                else if (normType.includes('final')) finalRemarks = currentRemarks;
 
                 allData.push({
                     id: group.id,
@@ -139,14 +141,15 @@ async function loadCapstoneData() {
                     venue: sched.schedule_venue,
                     panels: [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p),
                     files: files,
-                    // Pass specific statuses for Modal
-                    titleStatus: group.title_status ? JSON.parse(group.title_status) : {},
-                    preOralStatus: group.pre_oral_status ? JSON.parse(group.pre_oral_status) : {},
-                    finalStatus: group.final_status ? JSON.parse(group.final_status) : {},
 
-                    titleRemarks: group.title_remarks ? JSON.parse(group.title_remarks) : {},
-                    preOralRemarks: group.pre_oral_remarks ? JSON.parse(group.pre_oral_remarks) : {},
-                    finalRemarks: group.final_remarks ? JSON.parse(group.final_remarks) : {},
+                    // Unified accessors
+                    titleStatus, preOralStatus, finalStatus,
+                    titleRemarks, preOralRemarks, finalRemarks,
+
+                    // Store raw status info for updates
+                    defenseStatusId: statusRow ? statusRow.id : null,
+                    currentStatusJson: currentStatuses,
+                    currentRemarksJson: currentRemarks,
 
                     status: sched.status || 'Active',
                     isAdviser: isAdviser,

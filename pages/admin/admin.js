@@ -6,6 +6,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
 // Data storage
 let allGroups = [];
+let allDefenseStatuses = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchDashboardData();
@@ -14,13 +15,20 @@ document.addEventListener('DOMContentLoaded', () => {
 async function fetchDashboardData() {
     try {
         // Fetch all student groups
-        const { data, error } = await supabaseClient
+        const { data: groups, error: gError } = await supabaseClient
             .from('student_groups')
             .select('*');
 
-        if (error) throw error;
+        if (gError) throw gError;
+        allGroups = groups || [];
 
-        allGroups = data || [];
+        // Fetch all defense statuses
+        const { data: statuses, error: sError } = await supabaseClient
+            .from('defense_statuses')
+            .select('*');
+
+        if (sError) throw sError;
+        allDefenseStatuses = statuses || [];
 
         // Populate Section Filter
         populateSectionFilter();
@@ -49,25 +57,29 @@ window.applyDashboardFilters = () => {
     const program = document.getElementById('programFilter').value;
     const section = document.getElementById('sectionFilter').value;
 
-    // Filter data
-    const filtered = allGroups.filter(g => {
+    const filteredGroups = allGroups.filter(g => {
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
         return progMatch && sectMatch;
     });
 
-    updateCounts(filtered);
+    updateCounts(filteredGroups);
 };
 
 function updateCounts(groups) {
-    // 1. Approved Titles
-    const approvedTitles = countStatus(groups, 'title_status', ['Approved']);
+    const groupIds = groups.map(g => g.id);
 
-    // 2. Rejected Titles (changed from Recommended as per latest request)
-    const rejectedTitles = countStatus(groups, 'title_status', ['Rejected']);
+    // Filter relevant statuses belonging to these groups
+    const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
 
-    // 3. Completed (Graduates)
-    const completed = countStatus(groups, 'final_status', ['Passed', 'Approved']);
+    // 1. Approved Titles (Check 'Title Defense' rows)
+    const approvedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Approved']);
+
+    // 2. Rejected Titles (Check 'Title Defense' rows)
+    const rejectedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Rejected']);
+
+    // 3. Completed (Check 'Final Defense' rows)
+    const completed = countDefenseStatus(relevantStatuses, 'Final Defense', ['Passed', 'Approved']);
 
     // Animate or set text
     const titleEl = document.getElementById('countTitle');
@@ -77,7 +89,6 @@ function updateCounts(groups) {
     // Update Labels if needed (HTML might say "Recommended", we should ensure it matches "Rejected")
     // Previous HTML had "Recommended Titles". User asked for "Rejected Titles".
     // I should update the HTML too, or simpler: update the ID or just the number logic.
-    // I'll update text content headers in JS if possible or assume HTML update.
     // Let's stick to updating numbers. 
     // Wait, the HTML says "Recommended Titles" for the middle card.
     // I will rename the middle card title dynamically to "Rejected Titles" to be safe.
@@ -94,32 +105,25 @@ function updateCounts(groups) {
     if (finalEl) finalEl.innerText = completed;
 }
 
-function countStatus(groups, statusCol, passValues) {
+function countDefenseStatus(allStatuses, defenseType, passValues) {
     let count = 0;
-    groups.forEach(g => {
-        let val = g[statusCol];
-        if (!val) return;
 
-        try {
-            if (val.startsWith('{')) {
-                const parsed = JSON.parse(val);
-                const values = Object.values(parsed);
-                values.forEach(v => {
-                    if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
-                        count++;
-                    }
-                });
-            } else {
-                if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
-                    count++;
-                }
-            }
-        } catch (e) {
-            if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
+    // Filter by type (normalize to be safe)
+    const specificRows = allStatuses.filter(ds =>
+        ds.defense_type && ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === defenseType.toLowerCase().replace(/[^a-z0-9]/g, '')
+    );
+
+    specificRows.forEach(row => {
+        const statuses = row.statuses || {};
+        const values = Object.values(statuses);
+
+        values.forEach(v => {
+            if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
                 count++;
             }
-        }
+        });
     });
+
     return count;
 }
 

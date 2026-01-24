@@ -6,6 +6,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
 // Data storage
 let allGroups = [];
+let allDefenseStatuses = [];
 let instructorName = '';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -22,13 +23,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchDashboardData() {
     try {
-        const { data, error } = await supabaseClient
+        const { data: groups, error: gError } = await supabaseClient
             .from('student_groups')
             .select('*');
 
-        if (error) throw error;
+        if (gError) throw gError;
+        allGroups = groups || [];
 
-        allGroups = data || [];
+        // Fetch all defense statuses
+        const { data: statuses, error: sError } = await supabaseClient
+            .from('defense_statuses')
+            .select('*');
+
+        if (sError) throw sError;
+        allDefenseStatuses = statuses || [];
 
         // Populate Section Filter
         populateSectionFilter();
@@ -82,14 +90,19 @@ window.applyDashboardFilters = () => {
 };
 
 function updateCounts(groups) {
+    const groupIds = groups.map(g => g.id);
+
+    // Filter statuses for MY filtered groups
+    const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
+
     // 1. Approved Titles
-    const approvedTitles = countStatus(groups, 'title_status', ['Approved']);
+    const approvedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Approved']);
 
     // 2. Rejected Titles
-    const rejectedTitles = countStatus(groups, 'title_status', ['Rejected']);
+    const rejectedTitles = countDefenseStatus(relevantStatuses, 'Title Defense', ['Rejected']);
 
-    // 3. Completed (Graduates / Final Defense)
-    const completed = countStatus(groups, 'final_status', ['Passed', 'Approved']);
+    // 3. Completed (Graduates)
+    const completed = countDefenseStatus(relevantStatuses, 'Final Defense', ['Passed', 'Approved']);
 
     // Display Counts
     const titleEl = document.getElementById('countTitle');
@@ -99,7 +112,6 @@ function updateCounts(groups) {
     if (titleEl) titleEl.innerText = approvedTitles;
     if (preOralEl) {
         preOralEl.innerText = rejectedTitles;
-        // Rename dynamic label
         const titleContainer = preOralEl.parentElement.querySelector('.chart-title');
         if (titleContainer) titleContainer.innerText = "Rejected Titles";
         preOralEl.style.color = '#dc2626';
@@ -107,32 +119,22 @@ function updateCounts(groups) {
     if (finalEl) finalEl.innerText = completed;
 }
 
-function countStatus(groups, statusCol, passValues) {
+function countDefenseStatus(allStatuses, defenseType, passValues) {
     let count = 0;
-    groups.forEach(g => {
-        let val = g[statusCol];
-        if (!val) return;
+    const specificRows = allStatuses.filter(ds =>
+        ds.defense_type && ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === defenseType.toLowerCase().replace(/[^a-z0-9]/g, '')
+    );
 
-        try {
-            if (val.startsWith('{')) {
-                const parsed = JSON.parse(val);
-                const values = Object.values(parsed);
-                values.forEach(v => {
-                    if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
-                        count++;
-                    }
-                });
-            } else {
-                if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
-                    count++;
-                }
-            }
-        } catch (e) {
-            if (passValues.some(p => val.toLowerCase().includes(p.toLowerCase()))) {
+    specificRows.forEach(row => {
+        const statuses = row.statuses || {};
+        const values = Object.values(statuses);
+        values.forEach(v => {
+            if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
                 count++;
             }
-        }
+        });
     });
+
     return count;
 }
 
