@@ -151,7 +151,7 @@ async function loadCapstoneData() {
                     currentStatusJson: currentStatuses,
                     currentRemarksJson: currentRemarks,
 
-                    status: sched.status || 'Active',
+                    status: sched.status || 'Active', // This line can be removed too if we don't need it at all, but I'll leave data processing for now.
                     isAdviser: isAdviser,
                     isPanelist: isPanelist
                 });
@@ -286,7 +286,6 @@ function renderTable() {
             <td>${g.venue || '-'}</td>
             <td><span style="font-size: 12px; line-height: 1.4; color: #475569;">${panelsStr}</span></td>
             <td>${actionBtn}</td>
-            <td><span class="status-badge ${g.status.toLowerCase()}">${g.status}</span></td>
         `;
 
         tableBody.appendChild(row);
