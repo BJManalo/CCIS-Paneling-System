@@ -228,11 +228,19 @@ async function loadSubmissionData() {
             renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
             renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
 
-            // Sub-tab switching for Titles
-            window.switchTitleTab = (index, btn) => {
-                document.querySelectorAll('.title-content').forEach(el => el.classList.remove('active'));
-                document.getElementById('title-content-' + index).classList.add('active');
-                document.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
+            // Generic Sub-tab switching (for Title, Pre-Oral, Final)
+            window.switchSubTab = (stageId, index, btn) => {
+                const parent = document.getElementById('tab-' + stageId);
+                if (!parent) return;
+
+                // Hide all sub-contents in this stage
+                parent.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
+                // Show target sub-content
+                const target = document.getElementById(`${stageId}-content-${index}`);
+                if (target) target.classList.add('active');
+
+                // Update sub-tab buttons in this stage
+                parent.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
                 btn.classList.add('active');
             };
 
@@ -250,6 +258,14 @@ async function loadSubmissionData() {
                 document.getElementById('tab-' + tabId).classList.add('active');
                 document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
                 btn.classList.add('active');
+
+                // Reset sub-tabs to the first one when switching main tabs
+                const parent = document.getElementById('tab-' + tabId);
+                const firstSubBtn = parent.querySelector('.sub-tab-btn');
+                if (firstSubBtn) {
+                    const firstIndex = tabId === 'final' ? 4 : 1;
+                    window.switchSubTab(tabId, firstIndex, firstSubBtn);
+                }
 
                 // 2. Update Button & Input Locking based on this specific tab's data
                 const saveBtn = document.querySelector('.save-btn');
