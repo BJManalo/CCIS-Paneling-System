@@ -433,8 +433,8 @@ window.openFileModal = (groupId) => {
                     <textarea id="remarks-${categoryKey}-${label}" placeholder="Add feedback..." 
                         style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 13px; min-height: 60px; resize: vertical;">${remarks}</textarea>
                     <button onclick="saveRemarks(${group.id}, '${categoryKey}', '${label}')" 
-                        style="width: 100%; margin-top: 5px; background: var(--primary-light); color: var(--primary-color); border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                        Save Remarks
+                        style="width: 100%; margin-top: 5px; background: ${remarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${remarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                        ${remarks ? 'Saved' : 'Save Remarks'}
                     </button>
                 </div>
             `;
@@ -515,11 +515,28 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     try {
         const { error } = await supabaseClient.from('student_groups').update({ [column]: JSON.stringify(localMap) }).eq('id', groupId);
         if (error) throw error;
-        // visual feedback
-        const btn = textarea.nextElementSibling; btn.innerText = 'Saved!'; setTimeout(() => btn.innerText = 'Save Remarks', 2000);
-        if (categoryKey === 'titles') group.titleRemarks = localMap;
-        else if (categoryKey === 'pre_oral') group.preOralRemarks = localMap;
-        else if (categoryKey === 'final') group.finalRemarks = localMap;
+
+        // Update local data
+        if (categoryKey === 'titles') {
+            if (!group.titleRemarks) group.titleRemarks = {};
+            group.titleRemarks[fileKey] = formattedText;
+        } else if (categoryKey === 'pre_oral') {
+            if (!group.preOralRemarks) group.preOralRemarks = {};
+            group.preOralRemarks[fileKey] = formattedText;
+        } else if (categoryKey === 'final') {
+            if (!group.finalRemarks) group.finalRemarks = {};
+            group.finalRemarks[fileKey] = formattedText;
+        }
+
+        // Persistent visual feedback
+        const textarea = document.getElementById(`remarks-${categoryKey}-${fileKey}`);
+        if (textarea) {
+            const btn = textarea.nextElementSibling;
+            btn.innerText = 'Saved';
+            btn.style.background = '#dcfce7';
+            btn.style.color = '#166534';
+            // We do NOT set a timeout to revert it, per user request.
+        }
     } catch (e) { console.error(e); alert('Error saving remarks'); }
 };
 
