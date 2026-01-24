@@ -31,6 +31,9 @@ async function fetchDashboardData() {
         if (sError) throw sError;
         allDefenseStatuses = statuses || [];
 
+        console.log('Fetched Groups:', allGroups.length);
+        console.log('Fetched DefStatuses:', allDefenseStatuses.length);
+
         // Populate Section Filter
         populateSectionFilter();
 
@@ -106,9 +109,15 @@ function countDefenseStatus(allStatuses, defenseType, passValues) {
     );
 
     specificRows.forEach(row => {
-        const statusMap = row.statuses || {};
+        let statusMap = row.statuses;
+        // Resilience: Parse if it's a string
+        if (typeof statusMap === 'string') {
+            try { statusMap = JSON.parse(statusMap); } catch (e) { statusMap = {}; }
+        }
+        if (!statusMap) statusMap = {};
+
         Object.values(statusMap).forEach(v => {
-            if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
+            if (typeof v === 'string' && passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
                 count++;
             }
         });

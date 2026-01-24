@@ -39,6 +39,10 @@ async function fetchDashboardData() {
         if (sError) throw sError;
         allDefenseStatuses = statuses || [];
 
+        console.log('Instructor Name:', instructorName);
+        console.log('Total Groups:', allGroups.length);
+        console.log('Adviser Names in DB:', [...new Set(allGroups.map(g => g.adviser))]);
+
         // Populate Section Filter
         populateSectionFilter();
 
@@ -75,8 +79,11 @@ window.applyDashboardFilters = () => {
 
     // Filter data
     filteredGroups = allGroups.filter(g => {
-        // 1. Must be MY group (Adviser check)
-        const isMyGroup = g.adviser && g.adviser.toLowerCase().trim() === instructorName.toLowerCase().trim();
+        // 1. Must be MY group (Adviser check) - Lenient search
+        const dbAdviser = (g.adviser || '').toLowerCase().trim();
+        const me = instructorName.toLowerCase().trim();
+        const isMyGroup = dbAdviser.includes(me) || me.includes(dbAdviser);
+
         if (!isMyGroup) return false;
 
         // 2. Program Filter
@@ -127,9 +134,14 @@ function countDefenseStatus(allStatuses, defenseType, passValues) {
     );
 
     specificRows.forEach(row => {
-        const statusMap = row.statuses || {};
+        let statusMap = row.statuses;
+        if (typeof statusMap === 'string') {
+            try { statusMap = JSON.parse(statusMap); } catch (e) { statusMap = {}; }
+        }
+        if (!statusMap) statusMap = {};
+
         Object.values(statusMap).forEach(v => {
-            if (passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
+            if (typeof v === 'string' && passValues.some(p => v.toLowerCase().includes(p.toLowerCase()))) {
                 count++;
             }
         });
