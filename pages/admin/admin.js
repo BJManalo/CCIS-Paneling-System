@@ -4,11 +4,6 @@ const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
 const PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
 const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
-// Chart instances
-let chartTitle = null;
-let chartPreOral = null;
-let chartFinal = null;
-
 // Data storage
 let allGroups = [];
 
@@ -30,11 +25,8 @@ async function fetchDashboardData() {
         // Populate Section Filter
         populateSectionFilter();
 
-        // Initial Draw
+        // Initial Count Update
         applyDashboardFilters();
-
-        // Also populate table? (If requested clearly, but user emphasized Charts)
-        // For now, we focus on charts.
 
     } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -43,7 +35,6 @@ async function fetchDashboardData() {
 
 function populateSectionFilter() {
     const sectionFilter = document.getElementById('sectionFilter');
-    // Get unique sections
     const sections = [...new Set(allGroups.map(g => g.section).filter(Boolean))].sort();
 
     sections.forEach(sec => {
@@ -65,120 +56,52 @@ window.applyDashboardFilters = () => {
         return progMatch && sectMatch;
     });
 
-    updateCharts(filtered);
+    updateCounts(filtered);
 };
 
-function updateCharts(groups) {
-    const total = groups.length;
+function updateCounts(groups) {
+    // 1. Approved Titles (Title Defense 'Approved')
+    const approvedTitles = countStatus(groups, 'title_status', ['Approved']);
 
-    // Calculate Stats
-    // Logic: Status is JSON or String. We look for 'Approved' or 'Passed'
+    // 2. Recommended Titles (Pre-Oral 'Passed' or 'Approved')
+    // Note: User asked for "Recommended Titles" tab for Pre-Oral
+    const recommendedTitles = countStatus(groups, 'pre_oral_status', ['Passed', 'Approved']);
 
-    const countPassed = (groups, statusCol, passValue = ['Approved', 'Passed']) => {
-        return groups.filter(g => {
-            let val = g[statusCol];
-            if (!val) return false;
+    // 3. Completed (Graduates)
+    // "once the panel decision in the chapter 5 ... is approve that title is automatic completed"
+    const completed = countStatus(groups, 'final_status', ['Passed', 'Approved']);
 
-            // Handle potentially JSON string or plain string
-            // Sometimes it's stored as '{"status": "Approved"}'
-            // Sometimes just "Approved"
-            let status = val;
-            try {
-                if (val.startsWith('{')) {
-                    const parsed = JSON.parse(val);
-                    // Assumption: JSON structure might vary, but usually has a key for result
-                    // Let's assume values are values of the object? 
-                    // Or if specific structure known...
-                    // Let's convert object to string/values arrays to search
-                    status = Object.values(parsed).join(' ');
-                }
-            } catch (e) { /* ignore, treat as string */ }
-
-            return passValue.some(p => status.toLowerCase().includes(p.toLowerCase()));
-        }).length;
-    };
-
-    const titleCount = countPassed(groups, 'title_status', ['Approved']);
-    const preOralCount = countPassed(groups, 'pre_oral_status', ['Passed', 'Approved']); // Use generous matching
-    const finalCount = countPassed(groups, 'final_status', ['Passed', 'Approved']);
-
-    // Draw Charts
-    drawChart('chartTitle', titleCount, total, '#3b82f6'); // Blue
-    drawChart('chartPreOral', preOralCount, total, '#d97706'); // Orange
-    drawChart('chartFinal', finalCount, total, '#16a34a'); // Green
+    // Animate or set text
+    document.getElementById('countTitle').innerText = approvedTitles;
+    document.getElementById('countPreOral').innerText = recommendedTitles;
+    document.getElementById('countFinal').innerText = completed;
 }
 
-function drawChart(canvasId, value, total, color) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
+function countStatus(groups, statusCol, passValues) {
+    return groups.filter(g => {
+        let val = g[statusCol];
+        if (!val) return false;
 
-    if (total === 0) total = 1; // Avoid divide by zero, though 0/1 is 0%.
-    const percentage = Math.round((value / total) * 100);
-    const remaining = 100 - percentage;
-
-    // Destroy previous instance if exists (global map needed? Or store on canvas)
-    // Simple way: store in global vars
-    if (canvasId === 'chartTitle' && chartTitle) chartTitle.destroy();
-    if (canvasId === 'chartPreOral' && chartPreOral) chartPreOral.destroy();
-    if (canvasId === 'chartFinal' && chartFinal) chartFinal.destroy();
-
-    const config = {
-        type: 'doughnut',
-        data: {
-            labels: ['Completed', 'Pending'],
-            datasets: [{
-                data: [percentage, remaining],
-                backgroundColor: [color, '#f1f5f9'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            cutout: '70%',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: { enabled: false }
+        // Handle JSON or String
+        let status = val;
+        try {
+            if (val.startsWith('{')) {
+                const parsed = JSON.parse(val);
+                status = Object.values(parsed).join(' ');
             }
-        },
-        plugins: [{
-            id: 'textCenter',
-            beforeDraw: function (chart) {
-                var width = chart.width,
-                    height = chart.height,
-                    ctx = chart.ctx;
+        } catch (e) { /* ignore */ }
 
-                ctx.restore();
-                var fontSize = (height / 114).toFixed(2);
-                ctx.font = "bold " + fontSize + "em sans-serif";
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = color;
-
-                var text = percentage + "%",
-                    textX = Math.round((width - ctx.measureText(text).width) / 2),
-                    textY = height / 2;
-
-                ctx.fillText(text, textX, textY);
-                ctx.save();
-            }
-        }]
-    };
-
-    const newChart = new Chart(ctx, config);
-
-    if (canvasId === 'chartTitle') chartTitle = newChart;
-    if (canvasId === 'chartPreOral') chartPreOral = newChart;
-    if (canvasId === 'chartFinal') chartFinal = newChart;
+        return passValues.some(p => status.toLowerCase().includes(p.toLowerCase()));
+    }).length;
 }
-
-// Keep existing filterTable for compatibility if buttons are clicked (though we hid/moved them?)
-// We can link bottom buttons to our new filters if desired, 
-// But existing UI had them separate. I'll just keep the function to avoid errors.
-window.filterTable = (program) => {
-    document.getElementById('programFilter').value = program;
-    applyDashboardFilters();
-};
 
 function logout() {
     localStorage.removeItem('loginUser');
     window.location.href = '../../index.html';
 }
+
+// Keep filterTable dummy function
+window.filterTable = (program) => {
+    document.getElementById('programFilter').value = program;
+    applyDashboardFilters();
+};
