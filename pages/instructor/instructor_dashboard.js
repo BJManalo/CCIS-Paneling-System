@@ -136,18 +136,25 @@ window.applyDashboardFilters = () => {
 
         const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
         const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
-        const titleStatus = titleRow ? Object.values(titleRow.statuses || {}).join(' ') : '';
-        const finalStatus = finalRow ? Object.values(finalRow.statuses || {}).join(' ') : '';
+
+        const getVals = (row) => {
+            if (!row || !row.statuses) return [];
+            let s = row.statuses;
+            if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return []; } }
+            return Object.values(s);
+        };
+
+        const tVals = getVals(titleRow);
+        const fVals = getVals(finalRow);
 
         if (currentCategory === 'COMPLETED') {
-            return finalStatus.toLowerCase().includes('approved');
+            return fVals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
         } else if (currentCategory === 'APPROVED') {
-            return titleStatus.toLowerCase().includes('approved');
+            return tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
         } else if (currentCategory === 'REJECTED') {
-            const statusVals = Object.values(titleRow?.statuses || {});
-            const approved = statusVals.some(v => v.toLowerCase().includes('approved'));
-            const rejected = statusVals.some(v => v.toLowerCase().includes('rejected'));
-            return rejected && !approved;
+            const hasApp = tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
+            const hasRej = tVals.some(v => typeof v === 'string' && v.toLowerCase().includes('rejected'));
+            return hasRej && !hasApp;
         }
         return true;
     });
@@ -160,26 +167,32 @@ function updateCounts(groups) {
     const groupIds = groups.map(g => g.id);
     const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
 
+    const getVals = (row) => {
+        if (!row || !row.statuses) return [];
+        let s = row.statuses;
+        if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return []; } }
+        return Object.values(s);
+    };
+
     // 1. Approved Titles
     const approvedCount = groups.filter(g => {
         const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
-        return titleRow && Object.values(titleRow.statuses || {}).some(v => v.toLowerCase().includes('approved'));
+        return getVals(titleRow).some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
     }).length;
 
     // 2. Rejected Titles
     const rejectedCount = groups.filter(g => {
         const titleRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
-        if (!titleRow) return false;
-        const vals = Object.values(titleRow.statuses || {});
-        const hasRejected = vals.some(v => v.toLowerCase().includes('rejected'));
-        const hasApproved = vals.some(v => v.toLowerCase().includes('approved'));
-        return hasRejected && !hasApproved;
+        const vals = getVals(titleRow);
+        const hasRej = vals.some(v => typeof v === 'string' && v.toLowerCase().includes('rejected'));
+        const hasApp = vals.some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
+        return hasRej && !hasApp;
     }).length;
 
     // 3. Completed Titles
     const completedCount = groups.filter(g => {
         const finalRow = relevantStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
-        return finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'));
+        return getVals(finalRow).some(v => typeof v === 'string' && v.toLowerCase().includes('approved'));
     }).length;
 
     // Display Counts
