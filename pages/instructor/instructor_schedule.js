@@ -23,6 +23,10 @@ const allPanels = [
 document.addEventListener('DOMContentLoaded', () => {
     loadSchedules();
     checkUrlParams();
+
+    // Add Filter Listeners
+    document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+    document.getElementById('typeFilter')?.addEventListener('change', applyFilters);
 });
 
 // Check if we came from the Accounts page to schedule a specific group
@@ -66,8 +70,55 @@ async function loadSchedules() {
     tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">Loading schedules...</td></tr>';
 
     const schedules = await getSchedules();
-    allSchedules = schedules;
-    renderSchedules(allSchedules);
+    allSchedules = schedules || [];
+    applyFilters();
+}
+
+function applyFilters() {
+    const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    const typeFilter = document.getElementById('typeFilter')?.value || 'All';
+
+    const filtered = allSchedules.filter(sched => {
+        const groupName = (sched.student_groups?.group_name || '').toLowerCase();
+        const program = (sched.student_groups?.program || '').toLowerCase();
+        const venue = (sched.schedule_venue || '').toLowerCase();
+        const type = (sched.schedule_type || '').toLowerCase();
+        const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5]
+            .filter(p => p).join(' ').toLowerCase();
+
+        const matchesSearch = groupName.includes(searchTerm) ||
+            program.includes(searchTerm) ||
+            venue.includes(searchTerm) ||
+            type.includes(searchTerm) ||
+            panels.includes(searchTerm);
+
+        const matchesType = typeFilter === 'All' || sched.schedule_type === typeFilter;
+
+        return matchesSearch && matchesType;
+    });
+
+    renderSchedules(filtered);
+    updateStats(filtered);
+}
+
+function updateStats(schedules) {
+    const totalScheduled = schedules.length;
+
+    // Upcoming this week
+    const now = new Date();
+    const oneWeekFromNow = new Date();
+    oneWeekFromNow.setDate(now.getDate() + 7);
+
+    const upcoming = schedules.filter(s => {
+        const d = new Date(s.schedule_date);
+        return d >= now && d <= oneWeekFromNow;
+    }).length;
+
+    const uniqueGroups = new Set(schedules.map(s => s.group_id)).size;
+
+    document.getElementById('totalScheduled').innerText = totalScheduled;
+    document.getElementById('upcomingSchedules').innerText = upcoming;
+    document.getElementById('activeGroups').innerText = uniqueGroups;
 }
 
 function renderSchedules(schedules) {
@@ -102,29 +153,32 @@ function renderSchedules(schedules) {
         row.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="material-icons-round expand-icon" id="sched-icon-${sched.id}">expand_more</span>
-                    <span style="font-weight: 500; color: var(--accent-color);">${type}</span>
+                    <span class="material-icons-round expand-icon" id="sched-icon-${sched.id}" style="color:var(--text-light); font-size:18px;">chevron_right</span>
+                    <span class="badge badge-type">${type}</span>
                 </div>
             </td>
-            <td style="font-weight: 500;">${groupName}</td>
-            <td>${program}</td>
-            <td>${adviser}</td>
+            <td style="font-weight: 600; color: var(--primary-color);">${groupName}</td>
+            <td><span class="badge badge-program">${program}</span></td>
+            <td style="color: var(--text-main); font-weight: 500;">${adviser}</td>
             <td>
-                <div style="font-weight: 600; color: var(--primary-dark);">${displayDate}</div>
-                <div style="font-size: 0.85em; color: #64748b;">${displayTime}</div>
+                <div style="font-weight: 700; color: var(--text-main);">${displayDate}</div>
+                <div style="font-size: 0.85em; color: var(--primary-color); font-weight:600;">${displayTime}</div>
             </td>
             <td>
-                <span class="status-badge" style="background: #eef2ff; color: var(--primary-color);">
+                <span class="badge badge-completed">
+                    <span class="material-icons-round" style="font-size:14px;">person</span>
                     ${panels.length} Panel(s)
                 </span>
             </td>
             <td>
-                <button class="edit-btn" onclick="event.stopPropagation(); openEditScheduleModal('${sched.id}')" title="Edit Schedule" style="background:none; border:none; cursor:pointer; color:var(--primary-color);">
-                    <span class="material-icons-round" style="font-size: 20px;">edit</span>
-                </button>
-                <button class="edit-btn" onclick="event.stopPropagation(); deleteSchedule('${sched.id}')" title="Delete Schedule" style="background:none; border:none; cursor:pointer; color: #ef4444;">
-                    <span class="material-icons-round" style="font-size: 20px;">delete</span>
-                </button>
+                <div style="display:flex; gap:5px;">
+                    <button class="action-btn edit" onclick="event.stopPropagation(); openEditScheduleModal('${sched.id}')" title="Edit Schedule">
+                        <span class="material-icons-round">edit</span>
+                    </button>
+                    <button class="action-btn" onclick="event.stopPropagation(); deleteSchedule('${sched.id}')" title="Delete Schedule" style="color: #ef4444; border-color: #fecaca; background: #fef2f2;">
+                        <span class="material-icons-round">delete</span>
+                    </button>
+                </div>
             </td>
         `;
         tableBody.appendChild(row);
@@ -185,21 +239,9 @@ async function deleteSchedule(id) {
     }
 }
 
-// --- Search Filter ---
-document.getElementById('searchInput')?.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtered = allSchedules.filter(sched => {
-        const groupName = (sched.student_groups?.group_name || '').toLowerCase();
-        const program = (sched.student_groups?.program || '').toLowerCase();
-        const venue = (sched.schedule_venue || '').toLowerCase();
-        const type = (sched.schedule_type || '').toLowerCase();
-        const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5]
-            .filter(p => p).join(' ').toLowerCase();
+// --- Search Filter Logic (DEPRECATED: replaced by applyFilters) ---
+// We keep it as a placeholder or remove it. Replacing with actual applyFilters call.
 
-        return groupName.includes(term) || program.includes(term) || venue.includes(term) || type.includes(term) || panels.includes(term);
-    });
-    renderSchedules(filtered);
-});
 
 // --- Fetch Groups for Dropdown ---
 async function fetchGroupsForDropdown() {
