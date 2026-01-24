@@ -119,39 +119,60 @@ async function loadSubmissionData() {
 
                 el.value = linkMap[key] || '';
 
-                const status = statusMap[key] || 'Pending';
-                const remarks = remarksMap[key] || '';
+                const rawStatus = statusMap[key] || 'Pending';
+                const rawRemarks = remarksMap[key] || {}; // Now expecting object or string
 
-                // Define Colors & Icons
-                let color = '#64748b'; // Slate (Pending)
-                let icon = 'hourglass_empty';
-                let bg = '#f1f5f9';
-                let border = '#e2e8f0';
+                // --- Multi-Panel Logic ---
+                let feedbackData = []; // Array of { panel, status, remarks }
 
-                if (status.includes('Approved')) {
-                    color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0';
-                } else if (status.includes('Approve with Revisions')) {
-                    color = '#d97706'; icon = 'warning'; bg = '#fffbeb'; border = '#fde68a';
-                } else if (status.includes('Rejected') || status.includes('Redefense')) {
-                    color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca';
+                if (typeof rawStatus === 'object') {
+                    // Modern structure: { "Panel Name": "Approved" }
+                    Object.keys(rawStatus).forEach(panel => {
+                        feedbackData.push({
+                            panel: panel,
+                            status: rawStatus[panel],
+                            remarks: typeof rawRemarks === 'object' ? (rawRemarks[panel] || '') : ''
+                        });
+                    });
+                } else {
+                    // Compatibility with old single-string format
+                    feedbackData.push({
+                        panel: 'Panel',
+                        status: rawStatus,
+                        remarks: typeof rawRemarks === 'string' ? rawRemarks : ''
+                    });
                 }
 
                 // 1. Label & Badge Wrapper
-                // We find the label associated with this input (if any) or create a unified header
-                // Note: The HTML structure has labels like "Link" or implicit. 
-                // Let's create a header div that REPLACES the simple "Link" text if it exists above
-
                 const prevEl = el.previousElementSibling;
                 if (prevEl && (prevEl.classList.contains('status-badge-container') || prevEl.innerText === 'Link')) {
                     prevEl.remove();
                 }
 
+                // Prepare Badge HTML (can be multiple)
+                const badgesHtml = feedbackData.map(f => {
+                    let color = '#64748b'; let icon = 'hourglass_empty'; let bg = '#f1f5f9'; let border = '#e2e8f0';
+                    if (f.status.includes('Approved')) {
+                        color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0';
+                    } else if (f.status.includes('Approve with Revisions')) {
+                        color = '#d97706'; icon = 'warning'; bg = '#fffbeb'; border = '#fde68a';
+                    } else if (f.status.includes('Rejected') || f.status.includes('Redefense')) {
+                        color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca';
+                    }
+
+                    return `
+                        <div style="font-size: 0.65rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 2px 6px; border-radius: 6px; display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;" title="${f.panel}">
+                            <span class="material-icons-round" style="font-size: 10px;">${icon}</span>
+                            ${f.status} ${feedbackData.length > 1 ? `<span style="opacity:0.6; font-size:9px;">(${f.panel})</span>` : ''}
+                        </div>
+                    `;
+                }).join('');
+
                 const headerHtml = `
-                    <div class="status-badge-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <div class="status-badge-container" style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px;">
                         <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Submission Link</span>
-                        <div style="font-size: 0.7rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 2px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            <span class="material-icons-round" style="font-size: 12px;">${icon}</span>
-                            ${status}
+                        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                            ${badgesHtml}
                         </div>
                     </div>
                 `;
@@ -161,29 +182,34 @@ async function loadSubmissionData() {
                 const nextEl = el.nextElementSibling;
                 if (nextEl && nextEl.classList.contains('remarks-container')) nextEl.remove();
 
-                if (remarks) {
-                    // Split remark to separate Name from Comment if possible for styling
-                    // We assume "Name: Comment" format
-                    let headerText = 'Panel Feedback';
-                    let bodyText = remarks;
+                const validRemarks = feedbackData.filter(f => f.remarks && f.remarks.trim() !== '');
+                if (validRemarks.length > 0) {
+                    const remarksHtml = validRemarks.map(f => {
+                        let color = '#64748b'; let bg = '#f1f5f9';
+                        if (f.status.includes('Approved')) { color = '#059669'; bg = '#f0fdf4'; }
+                        else if (f.status.includes('Approve with Revisions')) { color = '#d97706'; bg = '#fffbeb'; }
+                        else if (f.status.includes('Rejected') || f.status.includes('Redefense')) { color = '#dc2626'; bg = '#fef2f2'; }
 
-                    if (remarks.includes(':')) {
-                        const parts = remarks.split(':');
-                        headerText = parts[0].trim();
-                        bodyText = parts.slice(1).join(':').trim();
-                    }
+                        let headerText = f.panel;
+                        let bodyText = f.remarks;
+                        if (f.remarks.includes(':')) {
+                            const parts = f.remarks.split(':');
+                            headerText = parts[0].trim();
+                            bodyText = parts.slice(1).join(':').trim();
+                        }
 
-                    const remarksHtml = `
-                        <div class="remarks-container" style="margin-top: 8px; background: ${bg}; opacity: 0.9; border-left: 3px solid ${color}; border-radius: 0 6px 6px 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span class="material-icons-round" style="font-size: 14px; color: ${color};">face</span>
-                                <span style="font-size: 0.75rem; font-weight: 700; color: ${color}; text-transform: uppercase;">${headerText}</span>
+                        return `
+                            <div class="remarks-container" style="margin-top: 8px; background: ${bg}; opacity: 0.9; border-left: 3px solid ${color}; border-radius: 0 6px 6px 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="material-icons-round" style="font-size: 14px; color: ${color};">face</span>
+                                    <span style="font-size: 0.75rem; font-weight: 700; color: ${color}; text-transform: uppercase;">${headerText}</span>
+                                </div>
+                                <div style="font-size: 0.9rem; color: #334155; line-height: 1.5; margin-left: 20px;">
+                                    ${bodyText}
+                                </div>
                             </div>
-                            <div style="font-size: 0.9rem; color: #334155; line-height: 1.5; margin-left: 20px;">
-                                ${bodyText}
-                            </div>
-                        </div>
-                    `;
+                        `;
+                    }).join('');
                     el.insertAdjacentHTML('afterend', remarksHtml);
                 }
             };

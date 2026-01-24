@@ -372,6 +372,10 @@ window.openFileModal = (groupId) => {
             // Re-implement simplified version here to save space or reuse if function available
 
             // To ensure it works, I'll inject the controls logic directly again (safest)
+            const userJson = localStorage.getItem('loginUser');
+            const user = userJson ? JSON.parse(userJson) : null;
+            const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+
             let currentStatusMap = {};
             let currentRemarksMap = {};
 
@@ -386,8 +390,14 @@ window.openFileModal = (groupId) => {
                 currentRemarksMap = group.finalRemarks || {};
             }
 
-            const currentStatus = currentStatusMap[label] || 'Pending';
-            const remarks = currentRemarksMap[label] || '';
+            // --- Multi-Panel Logic ---
+            // If the map value is a string (old version), we ignore it for multi-panel or try to adapt.
+            // New structure: currentStatusMap[label] = { "Panel Name": "Status" }
+            const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
+            const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
+
+            const myStatus = fileStatuses[userName] || 'Pending';
+            const myRemarks = fileRemarks[userName] || '';
 
             // ... (Controls Rendering Code) ...
             const controls = document.createElement('div');
@@ -402,50 +412,68 @@ window.openFileModal = (groupId) => {
             let statusBg = '#f1f5f9';
             let iconText = 'hourglass_empty';
 
-            if (currentStatus.includes('Approved')) {
+            if (myStatus.includes('Approved')) {
                 statusColor = '#059669'; statusBg = '#dcfce7'; iconText = 'check_circle';
-            } else if (currentStatus.includes('Approve with Revisions')) {
+            } else if (myStatus.includes('Approve with Revisions')) {
                 statusColor = '#d97706'; statusBg = '#fef3c7'; iconText = 'warning';
-            } else if (currentStatus.includes('Rejected') || currentStatus.includes('Redefense')) {
+            } else if (myStatus.includes('Rejected') || myStatus.includes('Redefense')) {
                 statusColor = '#dc2626'; statusBg = '#fee2e2'; iconText = 'cancel';
             }
 
             let optionsHtml = '';
             if (categoryKey === 'titles') {
                 optionsHtml = `
-                    <option value="Approved" ${currentStatus === 'Approved' ? 'selected' : ''}>Approve</option>
-                    <option value="Approve with Revisions" ${currentStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
-                    <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
+                    <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
+                    <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
+                    <option value="Rejected" ${myStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
                 `;
             } else {
                 optionsHtml = `
-                    <option value="Approved" ${currentStatus === 'Approved' ? 'selected' : ''}>Approve</option>
-                    <option value="Approve with Revisions" ${currentStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
-                    <option value="Redefense" ${currentStatus === 'Redefense' ? 'selected' : ''}>Redefense</option>
+                    <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
+                    <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
+                    <option value="Redefense" ${myStatus === 'Redefense' ? 'selected' : ''}>Redefense</option>
+                `;
+            }
+
+            // Other Panel Feedback HTML
+            let otherFeedbackHtml = '';
+            const otherPanels = Object.keys(fileStatuses).filter(p => p !== userName);
+            if (otherPanels.length > 0) {
+                otherFeedbackHtml = `
+                    <div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">
+                        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Peer Evaluations</div>
+                        ${otherPanels.map(panel => `
+                            <div style="font-size: 11px; margin-bottom: 4px; color: #475569;">
+                                <strong style="color: var(--primary-color);">${panel}:</strong> ${fileStatuses[panel]}
+                                ${fileRemarks[panel] ? `<br><span style="color: #64748b; font-style: italic;">"${fileRemarks[panel].replace(panel + ':', '').trim()}"</span>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
                 `;
             }
 
             controls.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Status</span>
+                    <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
                     <div style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
                         <span class="material-icons-round" style="font-size: 14px;">${iconText}</span>
-                        ${currentStatus}
+                        ${myStatus}
                     </div>
                 </div>
                 <select onchange="updateStatus(${group.id}, '${categoryKey}', '${label}', this.value)" 
                     style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; cursor: pointer; background: white; color: #334155; font-weight: 500; outline: none; margin-bottom: 5px;">
-                    <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''}>Change Status...</option>
+                    <option value="Pending" ${myStatus === 'Pending' ? 'selected' : ''}>Change Your Status...</option>
                     ${optionsHtml}
                 </select>
                 <div style="margin-top: 5px;">
-                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Remarks</div>
-                    <textarea id="remarks-${categoryKey}-${label}" placeholder="Add feedback..." 
-                        style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 13px; min-height: 60px; resize: vertical;">${remarks}</textarea>
+                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Your Remarks</div>
+                    <textarea id="remarks-${categoryKey}-${label}" placeholder="Add your feedback..." 
+                        style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 13px; min-height: 60px; resize: vertical;">${myRemarks.includes(':') ? myRemarks.split(':').slice(1).join(':').trim() : myRemarks}</textarea>
                     <button onclick="saveRemarks(${group.id}, '${categoryKey}', '${label}')" 
-                        style="width: 100%; margin-top: 5px; background: ${remarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${remarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                        ${remarks ? 'Saved' : 'Save Remarks'}
+                        style="width: 100%; margin-top: 5px; background: ${myRemarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${myRemarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                        ${myRemarks ? 'Update Remarks' : 'Save Remarks'}
                     </button>
+                    ${otherFeedbackHtml}
                 </div>
             `;
             itemContainer.appendChild(controls);
@@ -496,8 +524,12 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
         let defenseType = group.type;
 
         let localMap = group.currentStatusJson || {};
-        // Append name to status
-        localMap[fileKey] = `${newStatus} (${userName})`;
+
+        // Multi-panel structure: { "title1": { "Panel A": "Approved" } }
+        if (typeof localMap[fileKey] !== 'object') {
+            localMap[fileKey] = {}; // Transition to new structure
+        }
+        localMap[fileKey][userName] = newStatus;
 
         const payload = {
             group_id: groupId,
@@ -548,11 +580,11 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     const normTab = normalizeType(currentTab);
     const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
 
-    // Note: If tab is somehow mismatching code flow, we might need a fallback,
-    // but the modal content (input) shouldn't exist if we aren't in that tab's context.
-
     let localMap = group.currentRemarksJson || {};
-    localMap[fileKey] = formattedText;
+    if (typeof localMap[fileKey] !== 'object') {
+        localMap[fileKey] = {};
+    }
+    localMap[fileKey][userName] = formattedText;
 
     let defenseType = group.type;
 
