@@ -178,11 +178,19 @@ async function renderTable() {
         if (finalRow && Object.values(finalRow.statuses || {}).some(v => v.toLowerCase().includes('approved'))) {
             statusHtml = '<span class="status-badge approved">Completed</span>';
         } else if (titleRow) {
-            const vals = Object.values(titleRow.statuses || {});
-            if (vals.some(v => v.toLowerCase().includes('approved'))) {
+            const statusVals = Object.values(titleRow.statuses || {});
+            const approvedCount = statusVals.filter(v => v.toLowerCase().includes('approved')).length;
+            const rejectedCount = statusVals.filter(v => v.toLowerCase().includes('rejected')).length;
+            const totalSubmitted = statusVals.length;
+
+            if (approvedCount > 0) {
                 statusHtml = '<span class="status-badge approved" style="background:#dbeafe; color: #2563eb; border-color:#bfdbfe;">Title Approved</span>';
-            } else if (vals.some(v => v.toLowerCase().includes('rejected'))) {
-                statusHtml = '<span class="status-badge rejected">Rejected</span>';
+            } else if (rejectedCount > 0) {
+                if (rejectedCount === totalSubmitted) {
+                    statusHtml = `<span class="status-badge rejected">All Rejected (${rejectedCount}/${totalSubmitted})</span>`;
+                } else {
+                    statusHtml = `<span class="status-badge rejected">${rejectedCount}/${totalSubmitted} Rejected</span>`;
+                }
             }
         }
 
