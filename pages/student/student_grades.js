@@ -13,20 +13,8 @@ async function loadGrades() {
     }
 
     let groupId = loginUser.id;
-    let studentId = loginUser.id;
 
     try {
-        // First, check if the loginUser is actually a student (to get their group_id)
-        let { data: studentRecord, error: studentError } = await supabaseClient
-            .from('students')
-            .select('group_id')
-            .eq('id', studentId)
-            .single();
-
-        if (studentRecord && studentRecord.group_id) {
-            groupId = studentRecord.group_id;
-        }
-
         // Fetch group members and their grades
         const { data: group, error } = await supabaseClient
             .from('student_groups')
@@ -55,15 +43,7 @@ async function loadGrades() {
         document.getElementById('grades-ui').style.display = 'block';
 
         if (group && group.students && group.students.length > 0) {
-            // Filter to only show the logged-in student's own grade
-            const myGradesOnly = group.students.filter(s => s.id == studentId);
-
-            if (myGradesOnly.length > 0) {
-                processAndRenderGrades(myGradesOnly);
-            } else {
-                // If logged in as a group account or no matching student record
-                processAndRenderGrades(group.students);
-            }
+            processAndRenderGrades(group.students);
         } else {
             document.getElementById('grades-content').innerHTML = '<div class="empty-state">No student records found.</div>';
         }
