@@ -150,6 +150,7 @@ window.applyFilters = () => {
             project_title: projectTitle,
             program: group.program || '-',
             section: group.section || '-',
+            year: group.year_level || '-',
             phase: phase,
             statusHtml: statusHtml,
             grade: studentGrade,
@@ -189,13 +190,11 @@ function renderTable() {
     filteredRows.forEach(row => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${row.student_name}</strong></td>
-            <td>${row.group_name}</td>
-            <td style="font-size: 11px; color: #64748b;">${row.project_title}</td>
+            <td style="font-weight: 500;">${row.group_name}</td>
+            <td style="font-weight: 600;">${row.student_name}</td>
             <td>${row.program}</td>
+            <td>${row.year}</td>
             <td>${row.section}</td>
-            <td>${row.phase}</td>
-            <td>${row.statusHtml}</td>
             <td style="font-weight: 700; color: var(--primary-color);">${row.grade}</td>
         `;
         tableBody.appendChild(tr);
@@ -207,6 +206,15 @@ window.printReport = () => {
     const prog = document.getElementById('programFilter').value;
     const sect = document.getElementById('sectionFilter').value;
 
+    const printHeader = document.querySelector('.print-header');
+
+    // Only show header in print if Title Defense is selected
+    if (phase === 'Title Defense') {
+        printHeader.style.display = 'block';
+    } else {
+        printHeader.style.display = 'none';
+    }
+
     document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
 
     let titleStr = `${phase} Academic Report`;
@@ -216,6 +224,9 @@ window.printReport = () => {
     document.getElementById('printReportTitle').innerText = titleStr;
 
     window.print();
+
+    // Reset display for screen
+    printHeader.style.display = 'none';
 };
 
 function logout() {
