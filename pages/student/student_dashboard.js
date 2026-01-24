@@ -202,27 +202,58 @@ async function loadSubmissionData() {
             renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
             renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
 
-            // --- Manage "Save Submissions" button state ---
-            const saveBtn = document.querySelector('.save-btn');
+            // Store links globally for tab switching
+            window.currentLinks = {
+                titles: tLinks,
+                preoral: pLinks,
+                final: fLinks
+            };
 
-            // Helper to check if any value in the link object is non-empty
-            const hasAnyData = (obj) => Object.values(obj).some(val => val && val.trim() !== '');
+            // Move switchSubmissionTab to global window scope and handle logic
+            window.switchSubmissionTab = (tabId, btn) => {
+                // 1. Update UI Tabs
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                document.getElementById('tab-' + tabId).classList.add('active');
+                document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                btn.classList.add('active');
 
-            const hasExistingLinks = hasAnyData(tLinks) || hasAnyData(pLinks) || hasAnyData(fLinks);
+                // 2. Update Button & Input Locking based on this specific tab's data
+                const saveBtn = document.querySelector('.save-btn');
+                const hasAnyData = (obj) => Object.values(obj).some(val => val && val.trim() !== '');
 
-            if (hasExistingLinks) {
-                saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
-                saveBtn.disabled = true;
-                saveBtn.style.opacity = '0.7';
-                saveBtn.style.cursor = 'default';
+                const stageLinks = window.currentLinks[tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final'];
+                const isSubmitted = hasAnyData(stageLinks);
 
-                // Also disable the inputs so they can't be changed
-                document.querySelectorAll('.form-group input').forEach(input => {
-                    input.readOnly = true;
-                    input.style.backgroundColor = '#f1f5f9';
-                    input.placeholder = 'Submitted (View Only)';
-                });
-            }
+                if (isSubmitted) {
+                    saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.7';
+                    saveBtn.style.cursor = 'default';
+
+                    // Lock ONLY the inputs in the active tab
+                    document.querySelector(`#tab-${tabId}`).querySelectorAll('input').forEach(input => {
+                        input.readOnly = true;
+                        input.style.backgroundColor = '#f1f5f9';
+                        input.placeholder = 'Submitted (View Only)';
+                    });
+                } else {
+                    saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
+                    saveBtn.disabled = false;
+                    saveBtn.style.opacity = '1';
+                    saveBtn.style.cursor = 'pointer';
+
+                    // Unlock inputs in the active tab
+                    document.querySelector(`#tab-${tabId}`).querySelectorAll('input').forEach(input => {
+                        input.readOnly = false;
+                        input.style.backgroundColor = '#f8fafc';
+                        input.placeholder = input.id.includes('title') ? 'Title Link' : 'Chapter Link';
+                    });
+                }
+            };
+
+            // Initial call for the active tab (Title Defense by default)
+            const activeTabBtn = document.querySelector('.tab-btn.active');
+            if (activeTabBtn) window.switchSubmissionTab('titles', activeTabBtn);
         }
 
     } catch (err) {
@@ -280,29 +311,43 @@ window.saveSubmissions = async function () {
     btn.innerHTML = '<span class="material-icons-round spin">sync</span> Saving...';
     btn.disabled = true;
 
-    // Collect data into JSON objects
-    const tLinks = {
-        title1: document.getElementById('titleLink1').value.trim(),
-        title2: document.getElementById('titleLink2').value.trim(),
-        title3: document.getElementById('titleLink3').value.trim()
-    };
+    const activeTab = document.querySelector('.tab-btn.active');
+    const tabId = activeTab.innerText.toLowerCase().includes('title') ? 'titles' :
+        activeTab.innerText.toLowerCase().includes('pre') ? 'preoral' : 'final';
 
-    const pLinks = {
-        ch1: document.getElementById('preOralCh1').value.trim(),
-        ch2: document.getElementById('preOralCh2').value.trim(),
-        ch3: document.getElementById('preOralCh3').value.trim()
-    };
+    // Collect data ONLY for the active tab
+    let updates = {};
+    let activeLinks = {};
 
-    const fLinks = {
-        ch4: document.getElementById('finalCh4').value.trim(),
-        ch5: document.getElementById('finalCh5').value.trim()
-    };
+    if (tabId === 'titles') {
+        activeLinks = {
+            title1: document.getElementById('titleLink1').value.trim(),
+            title2: document.getElementById('titleLink2').value.trim(),
+            title3: document.getElementById('titleLink3').value.trim()
+        };
+        updates.title_link = JSON.stringify(activeLinks);
+    } else if (tabId === 'preoral') {
+        activeLinks = {
+            ch1: document.getElementById('preOralCh1').value.trim(),
+            ch2: document.getElementById('preOralCh2').value.trim(),
+            ch3: document.getElementById('preOralCh3').value.trim()
+        };
+        updates.pre_oral_link = JSON.stringify(activeLinks);
+    } else if (tabId === 'final') {
+        activeLinks = {
+            ch4: document.getElementById('finalCh4').value.trim(),
+            ch5: document.getElementById('finalCh5').value.trim()
+        };
+        updates.final_link = JSON.stringify(activeLinks);
+    }
 
-    const updates = {
-        title_link: JSON.stringify(tLinks),
-        pre_oral_link: JSON.stringify(pLinks),
-        final_link: JSON.stringify(fLinks)
-    };
+    // Basic Validation: Ensure at least one link is provided
+    if (!Object.values(activeLinks).some(v => v !== '')) {
+        showToast('Please provide at least one link before saving.', 'warning');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        return;
+    }
 
     try {
         const { error } = await supabaseClient
@@ -314,17 +359,9 @@ window.saveSubmissions = async function () {
 
         showToast('Submissions saved successfully!', 'success');
 
-        // Update button state to "Submitted" and disable
-        btn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
-        btn.disabled = true;
-        btn.style.opacity = '0.7';
-        btn.style.cursor = 'default';
-
-        // Disable all submission inputs
-        document.querySelectorAll('.form-group input').forEach(input => {
-            input.readOnly = true;
-            input.style.backgroundColor = '#f1f5f9';
-        });
+        // Update local state and lock current tab only
+        window.currentLinks[tabId] = activeLinks;
+        window.switchSubmissionTab(tabId, activeTab);
 
     } catch (err) {
         console.error('Submission error:', err);
