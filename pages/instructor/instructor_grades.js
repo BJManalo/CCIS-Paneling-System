@@ -1,4 +1,4 @@
-// instructor_grades.js
+// instructor_grades.js - Updated at 2026-01-25
 
 // --- Supabase Configuration ---
 const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
