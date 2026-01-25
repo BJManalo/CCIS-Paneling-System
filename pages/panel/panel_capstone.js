@@ -208,11 +208,9 @@ window.filterStatus = (status) => {
     currentStatusFilter = status;
     document.querySelectorAll('.status-btn').forEach(btn => {
         if (btn.id === `status-${status}`) {
-            btn.classList.add('active');
             btn.style.opacity = '1';
             btn.style.transform = 'scale(1.05)';
         } else {
-            btn.classList.remove('active');
             btn.style.opacity = '0.5';
             btn.style.transform = 'scale(1)';
         }
@@ -225,11 +223,11 @@ function renderTable() {
     const emptyState = document.getElementById('emptyState');
     tableBody.innerHTML = '';
 
-    const normCurrentTab = normalizeType(currentTab);
-
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
     const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+
+    const normCurrentTab = normalizeType(currentTab);
 
     // Filter
     filteredGroups = allData.filter(g => {
@@ -261,7 +259,7 @@ function renderTable() {
         let isFinished = false;
 
         if (fileKeys.length === 0) {
-            isFinished = false; // Blank submissions are definitely not finished
+            isFinished = false; // Blank student submissions are NOT finished
         } else {
             const statuses = g.currentStatusJson || {};
             const remarks = g.currentRemarksJson || {};
@@ -274,7 +272,7 @@ function renderTable() {
                     return s !== 'Pending' && r.trim() !== '';
                 });
             } else {
-                // For Advisers: Finished if ALL assigned panelists have evaluated all files
+                // For Advisers: Finished if ALL panelists assigned have evaluated all files
                 const panels = g.panels || [];
                 if (panels.length === 0) {
                     isFinished = false;

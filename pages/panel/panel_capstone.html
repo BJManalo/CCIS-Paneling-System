@@ -122,7 +122,7 @@
         </div>
 
         <!-- Filters -->
-        <div class="filter-section" style="display: flex; gap: 12px; margin-bottom: 25px;">
+        <div class="filter-section" style="display: flex; gap: 12px; margin-bottom: 25px; align-items: center;">
             <button class="filter-btn bsis" onclick="filterTable('BSIS')"
                 style="background: #f472b6 !important; color: white !important;">BSIS</button>
             <button class="filter-btn bsit" onclick="filterTable('BSIT')"
@@ -130,13 +130,13 @@
             <button class="filter-btn bscs" onclick="filterTable('BSCS')"
                 style="background: #f87171 !important; color: white !important;">BSCS</button>
 
-            <div style="width: 1px; background: #e2e8f0; margin: 0 10px;"></div>
+            <div style="width: 1px; background: #e2e8f0; height: 24px; margin: 0 4px;"></div>
 
-            <button class="filter-btn status-btn active" onclick="filterStatus('ALL')" id="status-ALL"
-                style="background: #64748b !important; color: white !important;">All Status</button>
-            <button class="filter-btn status-btn" onclick="filterStatus('FINISHED')" id="status-FINISHED"
+            <button class="filter-btn status-btn active" id="status-ALL" onclick="filterStatus('ALL')"
+                style="background: #64748b !important; color: white !important;">All</button>
+            <button class="filter-btn status-btn" id="status-FINISHED" onclick="filterStatus('FINISHED')"
                 style="background: #10b981 !important; color: white !important; opacity: 0.5;">Finished</button>
-            <button class="filter-btn status-btn" onclick="filterStatus('UNFINISHED')" id="status-UNFINISHED"
+            <button class="filter-btn status-btn" id="status-UNFINISHED" onclick="filterStatus('UNFINISHED')"
                 style="background: #ef4444 !important; color: white !important; opacity: 0.5;">Unfinished</button>
         </div>
 
