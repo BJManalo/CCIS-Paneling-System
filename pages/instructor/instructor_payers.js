@@ -89,46 +89,23 @@ function renderPayers(payments) {
 
         detailsRow.innerHTML = `
             <td colspan="5" style="padding: 0;">
-                <div class="details-content" style="padding: 20px 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                    <div style="display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 60px; align-items: start; width: 100%;">
-                        
-                        <!-- Col 1 -->
+                <div class="details-content" style="padding: 20px 25px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 40px; align-items: start;">
                         <div>
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">Academic Context</div>
                             <div style="font-size: 0.95rem; color: #334155; line-height: 1.6;">
-                                <div style="margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
-                                    <span style="display:block; font-size: 0.8em; color:#64748b; font-weight:600;">Type</span>
-                                    <span style="font-weight: 600; color: #1e293b;">${p.defense_type || 'N/A'}</span>
-                                </div>
-                                <div style="margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
-                                    <span style="display:block; font-size: 0.8em; color:#64748b; font-weight:600;">Year/Section</span>
-                                    <span>${p.year_level || ''} - ${p.section || '-'}</span>
-                                </div>
-                                <div>
-                                    <span style="display:block; font-size: 0.8em; color:#64748b; font-weight:600;">Adviser</span>
-                                    <span>${p.adviser || '-'}</span>
-                                </div>
+                                <div style="margin-bottom: 8px;"><strong style="color: #1e293b;">Type:</strong> ${p.defense_type || 'N/A'}</div>
+                                <div style="margin-bottom: 8px;"><strong style="color: #1e293b;">Year/Section:</strong> ${p.year_level || ''} - ${p.section || '-'}</div>
+                                <div><strong style="color: #1e293b;">Adviser:</strong> ${p.adviser || '-'}</div>
                             </div>
                         </div>
-
-                        <!-- Col 2 -->
                         <div>
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">Status Info</div>
                             <div style="font-size: 0.95rem; color: #334155; line-height: 1.6;">
-                                <div style="margin-bottom: 15px;">
-                                    <span style="display:block; font-size: 0.8em; color:#64748b; font-weight:600; margin-bottom: 4px;">Paid For</span>
-                                    <span class="chip" style="background:var(--primary-color); color:white;">${p.defense_type || 'N/A'}</span>
-                                </div>
-                                <div>
-                                    <span style="display:block; font-size: 0.8em; color:#64748b; font-weight:600; margin-bottom: 4px;">Panel Members</span>
-                                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                                        ${(p.panels || '-').split(',').map(m => m.trim() ? `<div style="padding: 4px 8px; background: white; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.9em;">• ${m.trim()}</div>` : '-').join('')}
-                                    </div>
-                                </div>
+                                <div style="margin-bottom: 8px;"><strong style="color: #1e293b;">Paid For:</strong> ${p.defense_type || 'N/A'}</div>
+                                <div><strong style="color: #1e293b;">Panels:</strong> ${p.panels || '-'}</div>
                             </div>
                         </div>
-
-                        <!-- Col 3: Receipt -->
                         <div class="receipt-column">
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">Proof of Payment</div>
                             <div style="background: white; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; display: inline-block;">
@@ -137,7 +114,6 @@ function renderPayers(payments) {
                                      onclick="event.stopPropagation(); window.openLightbox(this.src);">
                             </div>
                         </div>
-
                     </div>
                 </div>
             </td>

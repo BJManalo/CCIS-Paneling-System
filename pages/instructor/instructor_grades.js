@@ -213,11 +213,250 @@ function renderGrades() {
     }
 }
 
-// ... existing toggleRow, fetchGroupsForDropdown, handleGroupChange, saveGrades, openGradeModal, openGradeModalForEdit, closeGradeModal ... 
-// (I will keep them, but since this tool replaces a block, I must ensure I don't cut them off incorrectly. 
-// The target range was lines 18-209. I ended replacement at 209 in previous calls.
-// The user has cursor at 600.
-// Let's replace the whole `renderGrades` and `printReport`.
+//Helper to toggle rows
+function toggleRow(id) {
+    const row = document.getElementById(id);
+    const icon = document.getElementById('icon-' + id);
+    if (row.style.display === 'none') {
+        row.style.display = 'table-row';
+        if (icon) icon.style.transform = 'rotate(90deg)';
+    } else {
+        row.style.display = 'none';
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+// --- Fetch Groups for Dropdown ---
+async function fetchGroupsForDropdown(includeGroupId = null) {
+    try {
+        // Fetch groups with schedules, AND students with their grades
+        const { data: groups, error: groupsError } = await supabaseClient
+            .from('student_groups')
+            .select(`
+                *, 
+                schedules!inner(id, schedule_type),
+                students (
+                    id,
+                    grades ( id, grade_type )
+                )
+            `)
+            .order('group_name', { ascending: true });
+
+        if (groupsError) throw groupsError;
+
+        fetchedGroups = groups;
+
+        const select = document.getElementById('gradeGroupId');
+        select.innerHTML = '<option value="">Select Group</option>';
+
+        groups.forEach(group => {
+            if (!group.schedules || group.schedules.length === 0) return;
+
+            group.schedules.forEach(schedule => {
+                const currentType = schedule.schedule_type;
+                const totalStudents = group.students.length;
+                if (totalStudents === 0) return;
+
+                // Count graded students for this type
+                const gradedCount = group.students.filter(s =>
+                    s.grades && s.grades.some(g => g.grade_type === currentType)
+                ).length;
+
+                // Filter out fully graded ones unless editing
+                const isEditingThisGroup = (includeGroupId && group.id == includeGroupId);
+                if (gradedCount === totalStudents && !isEditingThisGroup) {
+                    return;
+                }
+
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = `${group.group_name} (${currentType})`;
+                option.dataset.scheduleType = currentType;
+                select.appendChild(option);
+            });
+        });
+    } catch (err) {
+        console.error("Error loading groups:", err);
+    }
+}
+
+// --- Handle Group Selection & Load Students ---
+async function handleGroupChange() {
+    const select = document.getElementById('gradeGroupId');
+    const groupId = select.value;
+    const gradingArea = document.getElementById('gradingArea');
+
+    const selectedOption = select.options[select.selectedIndex];
+    // If "Select Group" is chosen, selectedOption might not have dataset. Default safe.
+    const currentScheduleType = selectedOption && selectedOption.dataset.scheduleType ? selectedOption.dataset.scheduleType : '';
+
+    // Store it for saving later
+    document.getElementById('gradeForm').dataset.currentScheduleType = currentScheduleType;
+
+    if (!groupId) {
+        gradingArea.innerHTML = '<p class="text-light" style="font-size:0.9em;">Select a group to load students.</p>';
+        return;
+    }
+
+    gradingArea.innerHTML = '<p>Loading students...</p>';
+
+    try {
+        // Fetch students AND their existing grade
+        const { data: students, error } = await supabaseClient
+            .from('students')
+            .select(`
+                id, 
+                full_name,
+                grades (
+                    id, 
+                    grade,
+                    grade_type
+                )
+            `)
+            .eq('group_id', groupId);
+
+        if (error) throw error;
+
+        gradingArea.innerHTML = `
+            <div style="margin-bottom:15px; padding:10px; background:#e3f2fd; border-radius:8px; color:#1565c0; font-size:0.9em; font-weight:500;">
+                Grading for: ${currentScheduleType || 'Defense'}
+            </div>
+        `;
+
+        if (!students || students.length === 0) {
+            gradingArea.innerHTML += '<p>No students found in this group.</p>';
+            return;
+        }
+
+        students.forEach(student => {
+            const gradeRecord = (student.grades)
+                ? student.grades.find(g => g.grade_type === currentScheduleType)
+                : null;
+
+            const gradeValue = (gradeRecord && (gradeRecord.grade || gradeRecord.grade === 0)) ? gradeRecord.grade : '';
+            const gradeId = gradeRecord ? gradeRecord.id : '';
+
+            const div = document.createElement('div');
+            div.className = 'student-grade-row';
+            div.style.cssText = 'background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;';
+
+            div.innerHTML = `
+                <div style="flex: 1;">
+                    <h4 style="margin: 0; color: #333;">${student.full_name}</h4>
+                </div>
+                
+                <input type="hidden" name="studentId" value="${student.id}">
+                <input type="hidden" name="gradeId" value="${gradeId}">
+                
+                <div class="input-group" style="margin-bottom: 0; width: 150px;">
+                    <label style="font-size: 0.8em; margin-bottom: 5px;">Grade</label>
+                    <input type="number" step="0.01" class="grade-input" name="grade" value="${gradeValue}" placeholder="0" style="font-weight: bold;">
+                </div>
+            `;
+            gradingArea.appendChild(div);
+        });
+
+    } catch (err) {
+        console.error('Error loading students:', err);
+        gradingArea.innerHTML = '<p>Error loading students.</p>';
+    }
+}
+
+// --- Save Grades ---
+async function saveGrades(event) {
+    if (event) event.preventDefault();
+
+    const saveBtn = document.querySelector('.btn-save');
+    const originalBtnText = saveBtn.textContent;
+    saveBtn.textContent = 'Saving...';
+    saveBtn.disabled = true;
+
+    const currentScheduleType = document.getElementById('gradeForm').dataset.currentScheduleType;
+
+    try {
+        const studentRows = document.querySelectorAll('.student-grade-row');
+        const updates = [];
+
+        studentRows.forEach(row => {
+            const studentId = row.querySelector('[name="studentId"]').value;
+            const gradeId = row.querySelector('[name="gradeId"]').value;
+            const gradeValue = row.querySelector('[name="grade"]').value;
+
+            const gradeData = {
+                student_id: studentId,
+                grade: gradeValue === '' ? null : gradeValue,
+                grade_type: currentScheduleType
+            };
+
+            if (gradeId) {
+                updates.push(supabaseClient.from('grades').update(gradeData).eq('id', gradeId));
+            } else if (gradeValue !== '') {
+                updates.push(supabaseClient.from('grades').insert(gradeData));
+            }
+        });
+
+        await Promise.all(updates);
+
+        closeGradeModal();
+        loadGrades();
+
+    } catch (err) {
+        alert('Error saving grades: ' + err.message);
+        console.error(err);
+    } finally {
+        saveBtn.textContent = originalBtnText;
+        saveBtn.disabled = false;
+    }
+}
+
+// --- Modal Functions ---
+async function openGradeModal() {
+    await fetchGroupsForDropdown();
+    document.getElementById('gradeForm').reset();
+    document.getElementById('gradeGroupId').disabled = false;
+    document.getElementById('gradingArea').innerHTML = '<p class="text-light" style="font-size:0.9em;">Select a group to load students.</p>';
+    document.querySelector('.modal-title').textContent = 'Input Grades';
+    document.getElementById('gradeModal').classList.add('active');
+}
+
+async function openGradeModalForEdit(groupId, scheduleType) {
+    await fetchGroupsForDropdown(groupId);
+
+    const select = document.getElementById('gradeGroupId');
+    select.disabled = true;
+
+    // Find the right option
+    let found = false;
+    for (let i = 0; i < select.options.length; i++) {
+        const opt = select.options[i];
+        if (opt.value == groupId && opt.dataset.scheduleType === scheduleType) {
+            select.selectedIndex = i;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        // Fallback if odd state
+        select.value = groupId;
+    }
+
+    await handleGroupChange();
+
+    document.querySelector('.modal-title').textContent = 'Edit Grades';
+    document.getElementById('gradeModal').classList.add('active');
+}
+
+function closeGradeModal() {
+    document.getElementById('gradeModal').classList.remove('active');
+    document.getElementById('gradeForm').reset();
+}
+
+document.getElementById('gradeModal').addEventListener('click', (e) => {
+    if (e.target.id === 'gradeModal') {
+        closeGradeModal();
+    }
+});
 
 // --- Print Report (Global) ---
 window.printReport = () => {
