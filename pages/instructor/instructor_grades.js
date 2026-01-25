@@ -597,17 +597,18 @@ function generatePrintTable(dataList, reportTitle) {
         dateEl.innerText = `Generated on: ${new Date().toLocaleString()}`;
     }
 
-    // Table Columns: GROUP NAME | STUDENT NAME | PROGRAM | YEAR | GRADE
-    // Defense Type and Section are in the Header Title as requested.
+    // Table Columns: GROUP NAME | DEFENSE TYPE | STUDENT NAME | PROGRAM | YEAR | SECTION | GRADE
 
     let html = `
         <table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; margin-top: 20px; color: black;">
             <thead>
                 <tr style="background-color: #f8fafc; border: 1px solid #cbd5e1;">
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 25%; color: #475569;">GROUP NAME</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 35%; color: #475569;">STUDENT NAME</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 15%; color: #475569;">GROUP NAME</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 15%; color: #475569;">DEFENSE TYPE</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 25%; color: #475569;">STUDENT NAME</th>
                     <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">PROGRAM</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 15%; color: #475569;">YEAR</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">YEAR</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">SECTION</th>
                     <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 15%; color: #475569;">GRADE</th>
                 </tr>
             </thead>
@@ -629,9 +630,11 @@ function generatePrintTable(dataList, reportTitle) {
             html += `
                 <tr>
                     <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: #1e293b;">${group.group_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b; text-transform: uppercase; font-size: 10px; font-weight: 700;">${scheduleType}</td>
                     <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: #1e293b;">${student.full_name}</td>
                     <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b;">${group.program || '-'}</td>
                     <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b;">${group.year_level || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b;">${group.section || '-'}</td>
                     <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; color: #2563eb;">${gradeVal}</td>
                 </tr>
              `;
