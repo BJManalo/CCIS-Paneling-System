@@ -161,19 +161,19 @@ async function loadSubmissionData() {
                     }
 
                     return `
-                        <div style="font-size: 0.65rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 2px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px;" title="${f.panel}">
+                        <div style="font-size: 0.65rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 2px 6px; border-radius: 6px; display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;" title="${f.panel}">
                             <span class="material-icons-round" style="font-size: 10px;">${icon}</span>
-                            ${f.status} ${feedbackData.length > 1 ? `<span style="opacity:0.6; font-size:9px; margin-left:2px;">(${f.panel})</span>` : ''}
+                            ${f.status} ${feedbackData.length > 1 ? `<span style="opacity:0.6; font-size:9px;">(${f.panel})</span>` : ''}
                         </div>
                     `;
                 }).join('');
 
                 const headerHtml = `
-                    <div class="status-badge-container" style="margin-bottom: 8px;">
-                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-bottom: 6px;">
+                    <div class="status-badge-container" style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Submission Link</span>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end;">
                             ${badgesHtml}
                         </div>
-                        <span style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block;">Submission Link</span>
                     </div>
                 `;
                 el.insertAdjacentHTML('beforebegin', headerHtml);
