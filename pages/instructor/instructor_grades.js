@@ -600,14 +600,27 @@ function generatePrintTable(dataList, reportTitle, subTitle = '') {
         // Insert it directly into the header info div
         // This ensures it is visible under the College Name
         const headerInfoDiv = titleEl.parentNode;
-        // Insert before title
-        // Or if we want it *under* College name (h2)
-        // Let's just append it to the container for now, checking where it lands.
-        // The container has h1, h2, h3.
-        // We want: Uni (h1) -> College (h2) -> DEFENSE TYPE (h3/h4) -> Report Title (h3)
-        // Currently 'titleEl' is the Report Title.
 
-        headerInfoDiv.insertBefore(sub, titleEl);
+        // We want: H1 (Uni) -> H2 (College) -> SUBTITLE -> H3 (Report Title)
+
+        // Current DOM likely:
+        // div
+        //   h1
+        //   h2
+        //   h3#printReportTitle
+
+        // So inserting before titleEl (h3) puts it exactly where we want.
+        // BUT, if there was a previous subtitle removed, we are clean.
+
+        // Let's ensure strict order by finding H2 and inserting after it?
+        // insertBefore is safer if we know H3 exists.
+
+        if (titleEl && titleEl.parentNode) {
+            titleEl.parentNode.insertBefore(sub, titleEl);
+        } else {
+            // Fallback
+            headerInfoDiv.appendChild(sub);
+        }
     }
 
     // Set Date
