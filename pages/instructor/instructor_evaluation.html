@@ -249,6 +249,42 @@
                 transform: translateX(0);
             }
         }
+
+        /* Filter Chips */
+        .filter-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: #64748b;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .filter-chip:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+
+        .filter-chip.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(26, 86, 219, 0.25);
+        }
     </style>
 </head>
 
@@ -272,7 +308,17 @@
         <h2 class="page-title">Evaluations History</h2>
 
         <!-- Main Content -->
+        <!-- Main Content -->
         <div class="evaluation-wrapper" style="padding: 0; max-width: 1000px; margin: 0 auto;">
+
+            <!-- Filters -->
+            <div class="filter-container">
+                <button class="filter-chip active" onclick="setFilter('ALL', this)">AllEvaluations</button>
+                <button class="filter-chip" onclick="setFilter('title', this)">Title Defense</button>
+                <button class="filter-chip" onclick="setFilter('pre', this)">Pre-Oral Defense</button>
+                <button class="filter-chip" onclick="setFilter('final', this)">Final Defense</button>
+            </div>
+
             <div id="accordionContainer" class="accordion-list">
                 <!-- Populated by JS -->
             </div>

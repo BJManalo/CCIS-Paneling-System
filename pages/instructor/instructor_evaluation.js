@@ -6,6 +6,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 // Global State
 let allData = [];
 let loadedEvaluations = [];
+let currentTypeFilter = 'ALL';
 
 document.addEventListener('DOMContentLoaded', () => {
     loadEvaluations();
@@ -238,7 +239,7 @@ async function loadEvaluations() {
         }
 
         loadedEvaluations = processedEvaluations;
-        renderAccordions(processedEvaluations);
+        applyFilters();
 
     } catch (err) {
         console.error('Error loading data:', err);
@@ -247,15 +248,47 @@ async function loadEvaluations() {
 }
 
 // Search Filter
-document.getElementById('searchInput')?.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtered = loadedEvaluations.filter(ev =>
-        ev.groupName.toLowerCase().includes(term) ||
-        ev.panelistName.toLowerCase().includes(term) ||
-        ev.defenseType.toLowerCase().includes(term)
-    );
-    renderAccordions(filtered);
+// Search Filter
+document.getElementById('searchInput')?.addEventListener('input', () => {
+    applyFilters();
 });
+
+window.setFilter = (type, btn) => {
+    currentTypeFilter = type;
+
+    // Visual Update
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    applyFilters();
+};
+
+function applyFilters() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+    const filtered = loadedEvaluations.filter(ev => {
+        // Text Match
+        const matchesText = ev.groupName.toLowerCase().includes(searchTerm) ||
+            ev.panelistName.toLowerCase().includes(searchTerm) ||
+            ev.defenseType.toLowerCase().includes(searchTerm);
+
+        // Type Match
+        let matchesType = true;
+        const dType = ev.defenseType.toLowerCase();
+
+        if (currentTypeFilter === 'title') {
+            matchesType = dType.includes('title');
+        } else if (currentTypeFilter === 'pre') {
+            matchesType = dType.includes('pre') && (dType.includes('oral') || dType.includes('defense'));
+        } else if (currentTypeFilter === 'final') {
+            matchesType = dType.includes('final');
+        }
+
+        return matchesText && matchesType;
+    });
+
+    renderAccordions(filtered);
+}
 
 function renderAccordions(evaluations) {
     const container = document.getElementById('accordionContainer');
