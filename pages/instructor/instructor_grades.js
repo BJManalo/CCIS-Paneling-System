@@ -1,4 +1,4 @@
-// instructor_grades.js - Updated at 2026-01-25
+// instructor_grades.js
 
 // --- Supabase Configuration ---
 const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
@@ -533,10 +533,26 @@ window.printReport = () => {
 
     // Title Construction
     let title = "Student Grades Report";
-    if (typeFilter !== 'All') title += ` - ${typeFilter}`;
+    let subTitle = "";
+    if (typeFilter !== 'All') {
+        // If specific type selected, use it as subtitle
+        subTitle = typeFilter;
+    } else {
+        // If All, maybe just empty or "All Phrases"
+        subTitle = "All Defense Phases";
+    }
+
     if (sectionFilter !== 'All') title += ` - Section ${sectionFilter}`;
 
-    generatePrintTable(groupsToPrint, title);
+    // Target the specific header
+    const printHeader = document.querySelector('#printableArea .print-header');
+    if (printHeader) printHeader.style.display = 'block';
+
+    generatePrintTable(groupsToPrint, title, subTitle);
+    window.print();
+
+    // CSS @media print handles visibility during print, but we hide it again for screen cleanup
+    if (printHeader) printHeader.style.display = 'none';
 };
 
 // --- Print Single Group ---
@@ -544,79 +560,71 @@ window.printGroup = (groupId, scheduleType) => {
     const group = allGradesData.find(g => g.id === groupId);
     if (!group) return;
 
+    const printHeader = document.querySelector('#printableArea .print-header');
+    if (printHeader) printHeader.style.display = 'block';
+
     const data = [{
         group: group,
         scheduleType: scheduleType
     }];
 
-    const title = `Grades Report for ${scheduleType} for the ${group.group_name}`;
-    generatePrintTable(data, title);
+    // Title: Grade Report [Section]
+    // Subtitle: [Defense Type]
+    generatePrintTable(data, `Grade Report - ${group.group_name} (${group.section || 'N/A'})`, scheduleType);
+    window.print();
+
+    if (printHeader) printHeader.style.display = 'none';
 };
 
 // --- Table Generator ---
-async function generatePrintTable(dataList, reportTitle) {
-    const printableArea = document.getElementById('printableArea');
+// --- Table Generator ---
+function generatePrintTable(dataList, reportTitle, subTitle = '') {
+    const printContent = document.getElementById('printContent');
+    const titleEl = document.getElementById('printReportTitle');
 
+    // Set Main Title
+    titleEl.textContent = reportTitle;
 
-    // Attempt to load logos explicitly to debug paths
-    let uaLogoSrc = '../../assets/images/ua_logo_official.png';
-    let ccsLogoSrc = '../../assets/images/ccs_logo_official.jpg';
+    // Remove any existing subtitle
+    const oldSub = document.getElementById('dynamicSubtitle');
+    if (oldSub) oldSub.remove();
 
-    // Helper to fetch and convert to ObjectURL (robust for some local setups)
-    const loadValidImage = async (path) => {
-        try {
-            const resp = await fetch(path);
-            if (!resp.ok) throw new Error('404');
-            const blob = await resp.blob();
-            return URL.createObjectURL(blob);
-        } catch (e) {
-            console.warn("Logo load failed for " + path, e);
-            return null; // Fallback to path and hope browser handles it or shows broken icon
-        }
-    };
+    // Create Subtitle Element
+    // We force this to be "DEFENSE TYPE" from the argument
+    if (subTitle) {
+        const sub = document.createElement('h3');
+        sub.id = 'dynamicSubtitle';
+        sub.style.cssText = 'font-size: 16px; color: #1e293b; margin: 4px 0 10px; font-weight: 800; text-align: center; text-transform: uppercase; letter-spacing: 1px;';
+        sub.textContent = subTitle;
 
-    // Pre-fetch logos
-    const [uaBlobUrl, ccsBlobUrl] = await Promise.all([
-        loadValidImage(uaLogoSrc),
-        loadValidImage(ccsLogoSrc)
-    ]);
+        // Insert it directly into the header info div
+        // This ensures it is visible under the College Name
+        const headerInfoDiv = titleEl.parentNode;
+        // Insert before title
+        // Or if we want it *under* College name (h2)
+        // Let's just append it to the container for now, checking where it lands.
+        // The container has h1, h2, h3.
+        // We want: Uni (h1) -> College (h2) -> DEFENSE TYPE (h3/h4) -> Report Title (h3)
+        // Currently 'titleEl' is the Report Title.
 
-    if (uaBlobUrl) uaLogoSrc = uaBlobUrl;
-    if (ccsBlobUrl) ccsLogoSrc = ccsBlobUrl;
+        headerInfoDiv.insertBefore(sub, titleEl);
+    }
 
-    // Header HTML with Logos
-    const headerHtml = `
-        <div class="print-header" style="text-align: center; margin-bottom: 20px;">
-            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px; text-align: right; font-style: italic;">
-                Generated on: ${new Date().toLocaleString()}
-            </div>
-            
-            <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 15px; position: relative;">
-                <img src="${uaLogoSrc}" alt="UA Logo" style="width: 80px; height: 80px; object-fit: contain; display: block;">
-                
-                <div style="text-align: center;">
-                    <h1 style="font-size: 18px; color: #1e293b; margin: 0; font-weight: 800; text-transform: uppercase;">UNIVERSITY OF ANTIQUE</h1>
-                    <h2 style="font-size: 14px; color: #334155; margin: 2px 0; font-weight: 600;">College of Computer Studies</h2>
-                    <h3 style="font-size: 13px; color: #2563eb; margin: 8px 0 0; font-weight: 700; text-transform: uppercase;">${reportTitle}</h3>
-                </div>
+    // Set Date
+    document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleString()}`;
 
-                <img src="${ccsLogoSrc}" alt="CCS Logo" style="width: 80px; height: 80px; object-fit: contain; display: block;">
-            </div>
-            <div style="height: 2px; background: #334155; margin-bottom: 20px;"></div>
-        </div>
-    `;
+    // Flatten to rows: Group | Student | Program | Year | Section | Grade
 
-    // Table HTML
-    let tableHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 11px;">
-            <thead style="background: #f1f5f9; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+    let html = `
+        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; margin-top: 10px;">
+            <thead style="background: #f1f5f9;">
                 <tr>
-                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: left; color: #334155;">Group Name</th>
-                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: left; color: #334155;">Student Name</th>
-                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Program</th>
-                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Year</th>
-                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Section</th>
-                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Grade</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Group Name</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Student Name</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Program</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Year</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Section</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Grade</th>
                 </tr>
             </thead>
             <tbody>
@@ -627,47 +635,28 @@ async function generatePrintTable(dataList, reportTitle) {
         const students = group.students || [];
 
         students.forEach(student => {
+            // Find grade for this type
             const gradeRec = student.grades ? student.grades.find(g => g.grade_type === scheduleType) : null;
-            const gradeVal = (gradeRec && gradeRec.grade !== null && gradeRec.grade !== undefined) ? gradeRec.grade : '-';
+            // If printing specific group, we might show all students even if not graded? 
+            // But 'renderGrades' filters. Let's show what we have.
 
-            tableHtml += `
+            const gradeVal = (gradeRec && gradeRec.grade !== null) ? gradeRec.grade : '-';
+
+            html += `
                 <tr>
-                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 600; color: #0f172a;">${group.group_name}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; color: #334155;">${student.full_name}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center;">${group.program || '-'}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center;">${group.year_level || '-'}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center;">${group.section || '-'}</td>
-                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700; color: #0f172a;">${gradeVal}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: 600;">${group.group_name}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${student.full_name}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.program || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.year_level || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.section || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${gradeVal}</td>
                 </tr>
              `;
         });
     });
 
-    tableHtml += `</tbody></table>`;
-
-    // Inject everything
-    printableArea.innerHTML = headerHtml + tableHtml;
-
-    // WAIT for images to load before printing using the newly assigned sources
-    // Even though we just fetched them, the <img> tag still needs to decode/render the blob
-    const images = printableArea.querySelectorAll('img');
-    const promises = Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve) => {
-            img.onload = resolve;
-            img.onerror = resolve; // Print anyway
-        });
-    });
-
-    Promise.all(promises).then(() => {
-        setTimeout(() => {
-            window.print();
-
-            // Cleanup ObjectURLs to prevent memory leaks (though minor for print page)
-            if (uaBlobUrl) URL.revokeObjectURL(uaBlobUrl);
-            if (ccsBlobUrl) URL.revokeObjectURL(ccsBlobUrl);
-        }, 500);
-    });
+    html += `</tbody></table>`;
+    printContent.innerHTML = html;
 }
 
 function logout() {
