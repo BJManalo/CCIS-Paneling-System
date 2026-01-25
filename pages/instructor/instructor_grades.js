@@ -550,7 +550,8 @@ window.printGroup = (groupId, scheduleType) => {
         scheduleType: scheduleType
     }];
 
-    generatePrintTable(data, `Grade Report - ${group.group_name} (${group.section || 'N/A'}) - ${scheduleType}`);
+    const title = `Grades Report for ${scheduleType} for the ${group.group_name}`;
+    generatePrintTable(data, title);
     window.print();
 };
 
