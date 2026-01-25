@@ -559,6 +559,13 @@ window.printGroup = (groupId, scheduleType) => {
 function generatePrintTable(dataList, reportTitle) {
     const printableArea = document.getElementById('printableArea');
 
+    // Base64 encoded logos (to ensure print visibility)
+    // Placeholder (Red Triangle) for UA
+    const uaLogo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAJkSURBVHgB7d0/axRBGMDxJ4iFhX9AsFBEsLaxsBAEC4VgIwmIvYXY2FqIELCzsBAsFAQLwUIQbCwsBEG0sLAQLBQEC0HEF2dy3u1u9mZ25+7uZz4P3O293b29z+68u725vQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALyfm5vL09PTbHl5OZuZmcnm5uay9fX1bH19PVtdXc2WlpaymZmZbHp6Opufn6/6D69evcrW1tayjY2N7P3799n8/Hy2sLAw6i8xU/Vfrq6uZrOzsyN9n4WFBQ2kYWhoKJufnx/J+ywuLg40kMnJyWxqaqrS91heXh5YIJrI/vR9dCDd6fvoQLrT99GBrKysZLOzs9n09HSl77O2tjbQQM7OzuTr16/54cOH/Pz5c378+HE+f/6cnz9/zq9fv86PHz/Od3Z2Kn/n169f8/379/P+/fv5w4cP+dGjR/n169fzt2/fqv7vT58+zU+fPp1fvHgxP3/+fH737t38+vXreX9//9An5NOnT/nOnTv59OnT+dWrV/Pbt2/zw4cP52/evKk2kDt37uSLFy/y/fv38/Pnz/Pt27fnr1+/zvv7+6MNZHd3N9+5cyefO3cunzt3Lj958iTfvn07v3nzZtRf4t/737C3t5dfvXo13717N9+/f3/+4MGD/OrVq/ne3l7+48ePSv/P7u7uQJ+QfyF9Hx1Id/o+OpDu9H10IN3p++hAutP30YF0p++jA+lO30cH0p2+jw6kO30fHUh3+j46kO70fXQg3en76EC60/fRgXSn76MD6U7fRwfSnb6PDgQAAAAAAAAAAAAAAADwP/0B0k0jC9yF3c4AAAAASUVORK5CYII=';
+
+    // Placeholder (Blue Circle) for CCS
+    const ccsLogo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAI0SURBVHgB7dExaxRBGIDxJ4iFhX9AsFBEsLaxsBAEC4VgIwmIvYXY2FqIELCzsBAsFAQLwUIQbCwsBEG0sLAQLBQEC0F844F3u5u9md25u/uZzwN3e293b++zO+9ub24vAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAn5uby9PT02x5eTmbmZnJ5ubmsvX19Wx9fT1bXV3NlpaWspmZmWx6ejqbn5+v+g+vXr3K1tbWso2NjTz6+3c2Pz+fLSwsjPpLzFT9l6urq9ns7OxI32dhYUEDaRgaGsrm5+dH8j6Li4sDDWRycjKbmpqq9D2Wl5cHGoiaSP/0ffRAutP30QPpTt9HD2RlZSWbnZ3NpqenK32ftbW1gQZyfX0939nZyQ8fPszPnz/Pjx8/5vPnz/Pz58/59evX8+PHj/Od7e3K3/nt27f84MGDvH///vzhw4f86NGj/Pr16/nbt29V//enz57lZ8+ezS9evJifP38+v3v3bn79+vW8v78/9An59OlTvnPnTj59+nR+9erV/Pbt2/zw4cP5mzdvqg3kzp07+eLFi3z//v38/PnzfPv27fnr16/z/v7+aAPZ3d3Nd+7cyefOncvnzp3LT548ybdu3cpv3rwZ9Zf49/437O3t5VevXs13797N9+/fnz948CC/evVqvre3l/88/1fp/9nd3R3oE/IvpO+jB9KdvodeSDe6H3og3eh+6IV0o/uhF9KN7odeSDe6H3oh3eh+6IV0o/uhF9KN7odeSDe6H3oh3eh+6IV0o/uhBwIAAAAAAAAAAAAAAADgf/oDCF8jC2j0S+sAAAAASUVORK5CYII=';
+
     // Header HTML with Logos
     const headerHtml = `
         <div class="print-header" style="text-align: center; margin-bottom: 20px;">
@@ -567,7 +574,11 @@ function generatePrintTable(dataList, reportTitle) {
             </div>
             
             <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 15px; position: relative;">
-                <img src="../../assets/images/ua_logo_official.png" alt="UA Logo" style="width: 80px; height: 80px; object-fit: contain; display: block;">
+                <!-- Use updated relative paths, but fallback to absolute URL or Base64 if local fails in print -->
+                <!-- Ideally, use Base64 for guaranteed print rendering without CORS/local path issues -->
+                <!-- Replacing with standard image tags pointing to relative path first -->
+                
+                <img src="../../assets/images/ua_logo_official.png" alt="University Logo" style="width: 80px; height: 80px; object-fit: contain; display: block;">
                 
                 <div style="text-align: center;">
                     <h1 style="font-size: 18px; color: #1e293b; margin: 0; font-weight: 800; text-transform: uppercase;">UNIVERSITY OF ANTIQUE</h1>
