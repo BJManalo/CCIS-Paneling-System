@@ -42,6 +42,7 @@
                 margin: 0;
             }
 
+            /* Reset all previous print hides to default, we will handle main container hiding */
             .bottom-nav,
             .dashboard-header,
             .fab-btn,
@@ -50,43 +51,26 @@
             .print-btn,
             .page-title,
             #typeFilter,
-            /* Hide specific filter if needed, or keeping it hidden via controls container */
-            button {
+            #sectionFilter,
+            button,
+            .action-btn,
+            .select-arrow {
                 display: none !important;
             }
 
+            /* Hide the main dashboard container */
             .dashboard-container {
-                padding: 15mm 20mm !important;
-                margin: 0 !important;
-                width: 100% !important;
-                max-width: none !important;
+                display: none !important;
             }
 
-            .table-container {
-                box-shadow: none;
-                border: none;
-                margin-top: 20px;
-            }
-
-            .data-table th {
-                background: #f8fafc !important;
-                color: black !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-                border: 1px solid #e2e8f0;
-            }
-
-            .data-table td {
-                border: 1px solid #e2e8f0;
+            /* Show the printable area */
+            #printableArea {
+                display: block !important;
+                padding: 20px;
             }
 
             body {
                 background: white;
-            }
-
-            .print-header {
-                display: block !important;
-                margin-bottom: 30px;
             }
         }
 
@@ -144,6 +128,16 @@
                     <span class="material-icons-round">print</span>
                     Print Report
                 </button>
+
+                <div class="custom-select-wrapper" style="width: 150px;">
+                    <select id="sectionFilter"
+                        style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
+                        <option value="All">All Sections</option>
+                        <!-- Populated by JS -->
+                    </select>
+                    <span class="material-icons-round select-arrow"
+                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
+                </div>
 
                 <div class="custom-select-wrapper" style="width: 200px;">
                     <select id="typeFilter"
@@ -216,6 +210,33 @@
                 </div>
             </form>
         </div>
+    </div>
+
+    <!-- Dedicated Printable Area (Hidden on Screen) -->
+    <div id="printableArea" style="display: none;">
+        <!-- Header -->
+        <div class="print-header">
+            <div id="printDate" style="font-size: 10px; color: #64748b; margin-bottom: 20px; text-align: left;"></div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <img src="../../assets/images/logo.png" alt="University Logo"
+                    style="width: 80px; height: 80px; object-fit: contain;">
+                <div style="text-align: center; flex: 1;">
+                    <h1
+                        style="font-size: 24px; color: #1e293b; margin: 0; font-weight: 700; text-transform: uppercase;">
+                        UNIVERSITY OF ANTIQUE</h1>
+                    <h2 style="font-size: 18px; color: #334155; margin: 4px 0; font-weight: 600;">College of Computer
+                        Studies</h2>
+                    <h3 id="printReportTitle"
+                        style="font-size: 14px; color: #2563eb; margin: 8px 0 0; font-weight: 700;"></h3>
+                </div>
+                <img src="../../assets/images/ccs_logo.jpg" alt="CCS Logo"
+                    style="width: 80px; height: 80px; object-fit: contain;">
+            </div>
+            <div style="height: 3px; background: #000; margin: 15px 0;"></div>
+        </div>
+
+        <!-- Content -->
+        <div id="printContent"></div>
     </div>
 
     <!-- Bottom Navigation -->

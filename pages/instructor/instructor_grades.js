@@ -17,7 +17,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Search and Filter Listeners
     document.getElementById('searchInput').addEventListener('input', renderGrades);
     document.getElementById('typeFilter').addEventListener('change', renderGrades);
+    document.getElementById('sectionFilter').addEventListener('change', renderGrades);
 });
+
+// --- Populate Section Filter ---
+function populateSectionFilter() {
+    const filter = document.getElementById('sectionFilter');
+    const sections = [...new Set(allGradesData.map(g => g.section).filter(Boolean))].sort();
+
+    // reset (keep first "All")
+    while (filter.options.length > 1) {
+        filter.remove(1);
+    }
+
+    sections.forEach(sec => {
+        const opt = document.createElement('option');
+        opt.value = sec;
+        opt.textContent = sec;
+        filter.appendChild(opt);
+    });
+}
 
 // --- Load Grades Data ---
 async function loadGrades() {
@@ -41,6 +60,7 @@ async function loadGrades() {
         if (error) throw error;
 
         allGradesData = groups || [];
+        populateSectionFilter();
         renderGrades();
 
     } catch (err) {
@@ -54,6 +74,7 @@ function renderGrades() {
     const tableBody = document.getElementById('gradesTableBody');
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('typeFilter').value;
+    const sectionFilter = document.getElementById('sectionFilter').value;
 
     tableBody.innerHTML = '';
 
@@ -69,7 +90,10 @@ function renderGrades() {
         const matchesSearch = group.group_name.toLowerCase().includes(searchTerm) ||
             group.students.some(s => s.full_name.toLowerCase().includes(searchTerm));
 
-        if (!matchesSearch) return;
+        // Section Filter
+        const matchesSection = sectionFilter === 'All' || group.section === sectionFilter;
+
+        if (!matchesSearch || !matchesSection) return;
 
         if (!group.schedules || group.schedules.length === 0) return;
 
@@ -135,9 +159,14 @@ function renderGrades() {
                     </span>
                 </td>
                 <td>
-                    <button class="action-btn edit" onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" title="Edit Grades">
-                        <span class="material-icons-round">edit</span>
-                    </button>
+                    <div style="display:flex; gap: 5px;">
+                        <button class="action-btn edit" onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" title="Edit Grades">
+                            <span class="material-icons-round">edit</span>
+                        </button>
+                        <button class="action-btn" onclick="event.stopPropagation(); printGroup(${group.id}, '${schedType}')" title="Print Group Grades" style="color: var(--primary-color); background: #eff6ff;">
+                            <span class="material-icons-round">print</span>
+                        </button>
+                    </div>
                 </td>
             `;
             tableBody.appendChild(row);
@@ -457,42 +486,130 @@ document.getElementById('gradeModal').addEventListener('click', (e) => {
     }
 });
 
-// --- Print Report ---
+// --- Print Report (Global) ---
 window.printReport = () => {
+    // 1. gather currently visible data based on filters
     const typeFilter = document.getElementById('typeFilter').value;
-    const printHeader = document.querySelector('.print-header');
+    const sectionFilter = document.getElementById('sectionFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-    // Show header
-    if (printHeader) printHeader.style.display = 'block';
+    // Filter Logic (Same as render but we need the objects)
+    const groupsToPrint = [];
 
-    if (document.getElementById('printDate')) {
-        document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+    // Re-run filter logic to get list
+    for (const group of allGradesData) {
+        const matchesSearch = group.group_name.toLowerCase().includes(searchTerm) ||
+            group.students.some(s => s.full_name.toLowerCase().includes(searchTerm));
+        const matchesSection = sectionFilter === 'All' || group.section === sectionFilter;
+
+        if (!matchesSearch || !matchesSection) continue;
+        if (!group.schedules) continue;
+
+        group.schedules.forEach(schedule => {
+            if (typeFilter !== 'All' && schedule.schedule_type !== typeFilter) return;
+
+            // Ensure we have some grades or students for this type
+            // Logic matches renderTable: "Check strict 'Show only if graded' rule"?
+            // The user might want to print partially graded too? 
+            // Let's stick to "visible in table" logic:
+            const gradedCount = group.students.filter(s =>
+                s.grades && s.grades.some(g => g.grade_type === schedule.schedule_type && g.grade !== null)
+            ).length;
+
+            if (gradedCount > 0) {
+                // Push a flattened object for the generator
+                groupsToPrint.push({
+                    group: group,
+                    scheduleType: schedule.schedule_type
+                });
+            }
+        });
     }
 
-    if (document.getElementById('printReportTitle')) {
-        let titleStr = 'Student Grades Report';
-        if (typeFilter !== 'All') {
-            titleStr += ` - ${typeFilter}`;
-        }
-        document.getElementById('printReportTitle').innerText = titleStr;
+    if (groupsToPrint.length === 0) {
+        alert("No data to print matches your filters.");
+        return;
     }
 
-    // Expand all details for print context (Optional: might be too much, but let's try to be helpful)
-    // Actually, let's just print what is seen to respect user state. 
-    // If we wanted to expand all:
-    // document.querySelectorAll('.detail-row').forEach(row => row.style.display = 'table-row');
+    // Title Construction
+    let title = "Student Grades Report";
+    if (typeFilter !== 'All') title += ` - ${typeFilter}`;
+    if (sectionFilter !== 'All') title += ` - Section ${sectionFilter}`;
 
-    const originalTitle = document.title;
-    document.title = "Grades Report";
-
+    generatePrintTable(groupsToPrint, title);
     window.print();
-
-    document.title = originalTitle;
-    if (printHeader) printHeader.style.display = 'none';
 };
+
+// --- Print Single Group ---
+window.printGroup = (groupId, scheduleType) => {
+    const group = allGradesData.find(g => g.id === groupId);
+    if (!group) return;
+
+    const data = [{
+        group: group,
+        scheduleType: scheduleType
+    }];
+
+    generatePrintTable(data, `Grade Report - ${group.group_name} (${group.section || 'N/A'}) - ${scheduleType}`);
+    window.print();
+};
+
+// --- Table Generator ---
+function generatePrintTable(dataList, reportTitle) {
+    const printContent = document.getElementById('printContent');
+    document.getElementById('printReportTitle').textContent = reportTitle;
+
+    // Set Date
+    document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleString()}`;
+
+    // Flatten to rows: Group | Student | Program | Year | Section | Grade
+    // The user requested: group name, members, program, year, section, amd grades.
+
+    let html = `
+        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px;">
+            <thead style="background: #f1f5f9;">
+                <tr>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Group Name</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Student Name</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Program</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Year</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Section</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    dataList.forEach(item => {
+        const { group, scheduleType } = item;
+        const students = group.students || [];
+
+        students.forEach(student => {
+            // Find grade for this type
+            const gradeRec = student.grades ? student.grades.find(g => g.grade_type === scheduleType) : null;
+            // If printing specific group, we might show all students even if not graded? 
+            // But 'renderGrades' filters. Let's show what we have.
+
+            const gradeVal = (gradeRec && gradeRec.grade !== null) ? gradeRec.grade : '-';
+
+            html += `
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: 600;">${group.group_name}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${student.full_name}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.program || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.year_level || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.section || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${gradeVal}</td>
+                </tr>
+             `;
+        });
+    });
+
+    html += `</tbody></table>`;
+    printContent.innerHTML = html;
+}
 
 function logout() {
     localStorage.removeItem('loginUser');
     window.location.href = '../../index.html';
 }
-
