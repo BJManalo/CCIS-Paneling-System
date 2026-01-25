@@ -8,6 +8,7 @@ let currentTab = 'Title Defense'; // Default
 let currentProgram = 'ALL';
 let searchTerm = '';
 let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
+let currentStatusFilter = 'ALL';
 
 let currentRole = 'Panel'; // Default
 
@@ -203,12 +204,32 @@ function updateTabStyles(activeTab) {
     });
 }
 
+window.filterStatus = (status) => {
+    currentStatusFilter = status;
+    document.querySelectorAll('.status-btn').forEach(btn => {
+        if (btn.id === `status-${status}`) {
+            btn.classList.add('active');
+            btn.style.opacity = '1';
+            btn.style.transform = 'scale(1.05)';
+        } else {
+            btn.classList.remove('active');
+            btn.style.opacity = '0.5';
+            btn.style.transform = 'scale(1)';
+        }
+    });
+    renderTable();
+};
+
 function renderTable() {
     const tableBody = document.getElementById('tableBody');
     const emptyState = document.getElementById('emptyState');
     tableBody.innerHTML = '';
 
     const normCurrentTab = normalizeType(currentTab);
+
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
     // Filter
     filteredGroups = allData.filter(g => {
@@ -226,7 +247,50 @@ function renderTable() {
         const roleMatch = (currentRole === 'Panel' && g.isPanelist) ||
             (currentRole === 'Adviser' && g.isAdviser);
 
-        return typeMatch && programMatch && searchMatch && roleMatch;
+        if (!typeMatch || !programMatch || !searchMatch || !roleMatch) return false;
+
+        // --- Finished/Unfinished Filter Logic ---
+        if (currentStatusFilter === 'ALL') return true;
+
+        let currentFileSet = {};
+        if (normCurrentTab.includes('title')) currentFileSet = g.files.titles;
+        else if (normCurrentTab.includes('preoral')) currentFileSet = g.files.pre_oral;
+        else if (normCurrentTab.includes('final')) currentFileSet = g.files.final;
+
+        const fileKeys = Object.keys(currentFileSet);
+        let isFinished = false;
+
+        if (fileKeys.length === 0) {
+            isFinished = false; // Blank submissions are definitely not finished
+        } else {
+            const statuses = g.currentStatusJson || {};
+            const remarks = g.currentRemarksJson || {};
+
+            if (currentRole === 'Panel') {
+                // For Panelists: Finished if THEY have evaluated all files
+                isFinished = fileKeys.every(key => {
+                    const s = statuses[key]?.[userName] || 'Pending';
+                    const r = remarks[key]?.[userName] || '';
+                    return s !== 'Pending' && r.trim() !== '';
+                });
+            } else {
+                // For Advisers: Finished if ALL assigned panelists have evaluated all files
+                const panels = g.panels || [];
+                if (panels.length === 0) {
+                    isFinished = false;
+                } else {
+                    isFinished = panels.every(pName => {
+                        return fileKeys.every(key => {
+                            const s = statuses[key]?.[pName] || 'Pending';
+                            const r = remarks[key]?.[pName] || '';
+                            return s !== 'Pending' && r.trim() !== '';
+                        });
+                    });
+                }
+            }
+        }
+
+        return currentStatusFilter === 'FINISHED' ? isFinished : !isFinished;
     });
 
     if (filteredGroups.length === 0) {
@@ -720,8 +784,14 @@ window.loadViewer = (url) => {
 };
 
 window.filterTable = (program) => {
-    if (currentProgram === program) { currentProgram = 'ALL'; document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active')); }
-    else { currentProgram = program; document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.innerText === program)); }
+    const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
+    if (currentProgram === program) {
+        currentProgram = 'ALL';
+        btns.forEach(btn => btn.classList.remove('active'));
+    } else {
+        currentProgram = program;
+        btns.forEach(btn => btn.classList.toggle('active', btn.innerText === program));
+    }
     renderTable();
 };
 
