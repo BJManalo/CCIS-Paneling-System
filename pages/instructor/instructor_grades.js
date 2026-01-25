@@ -457,6 +457,40 @@ document.getElementById('gradeModal').addEventListener('click', (e) => {
     }
 });
 
+// --- Print Report ---
+window.printReport = () => {
+    const typeFilter = document.getElementById('typeFilter').value;
+    const printHeader = document.querySelector('.print-header');
+
+    // Show header
+    if (printHeader) printHeader.style.display = 'block';
+
+    if (document.getElementById('printDate')) {
+        document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+    }
+
+    if (document.getElementById('printReportTitle')) {
+        let titleStr = 'Student Grades Report';
+        if (typeFilter !== 'All') {
+            titleStr += ` - ${typeFilter}`;
+        }
+        document.getElementById('printReportTitle').innerText = titleStr;
+    }
+
+    // Expand all details for print context (Optional: might be too much, but let's try to be helpful)
+    // Actually, let's just print what is seen to respect user state. 
+    // If we wanted to expand all:
+    // document.querySelectorAll('.detail-row').forEach(row => row.style.display = 'table-row');
+
+    const originalTitle = document.title;
+    document.title = "Grades Report";
+
+    window.print();
+
+    document.title = originalTitle;
+    if (printHeader) printHeader.style.display = 'none';
+};
+
 function logout() {
     localStorage.removeItem('loginUser');
     window.location.href = '../../index.html';

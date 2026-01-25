@@ -74,105 +74,13 @@
         color: #475569;
         min-width: 150px;
     }
-
-    .print-btn {
-        background: var(--primary-color);
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 8px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .print-btn:hover {
-        background: var(--primary-dark);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-    }
-
-    @media print {
-        @page {
-            size: portrait;
-            margin: 0;
-        }
-
-        .bottom-nav,
-        .dashboard-header,
-        .report-controls,
-        .pagination,
-        .charts-row {
-            display: none !important;
-        }
-
-        .dashboard-container {
-            padding: 15mm 20mm !important;
-            margin: 0 !important;
-            width: 100% !important;
-            max-width: none !important;
-        }
-
-        .table-container {
-            box-shadow: none;
-            border: none;
-            margin-top: 20px;
-        }
-
-        .data-table th {
-            background: #f8fafc !important;
-            color: black !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            border: 1px solid #e2e8f0;
-        }
-
-        .data-table td {
-            border: 1px solid #e2e8f0;
-        }
-
-        body {
-            background: white;
-        }
-
-        .print-header {
-            display: block;
-            margin-bottom: 30px;
-        }
-    }
-
-    .print-header {
-        display: none;
-    }
 </style>
 </head>
 
 <body class="dashboard-body">
 
     <div class="dashboard-container">
-        <!-- Print Only Header -->
-        <div class="print-header">
-            <div id="printDate" style="font-size: 10px; color: #64748b; margin-bottom: 20px; text-align: left;"></div>
 
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                <img src="../../assets/images/logo.png" alt="University Logo"
-                    style="width: 80px; height: 80px; object-fit: contain;">
-                <div style="text-align: center; flex: 1;">
-                    <h1
-                        style="font-size: 24px; color: #1e293b; margin: 0; font-weight: 700; text-transform: uppercase;">
-                        UNIVERSITY OF ANTIQUE</h1>
-                    <h2 style="font-size: 18px; color: #334155; margin: 4px 0; font-weight: 600;">College of Computer
-                        Studies</h2>
-                    <h3 id="printReportTitle"
-                        style="font-size: 14px; color: #2563eb; margin: 8px 0 0; font-weight: 700;"></h3>
-                </div>
-                <img src="../../assets/images/ccs_logo.jpg" alt="CCS Logo"
-                    style="width: 80px; height: 80px; object-fit: contain;">
-            </div>
-            <div style="height: 3px; background: #000; margin: 15px 0;"></div>
-        </div>
 
         <!-- Header -->
         <header class="dashboard-header">
@@ -224,41 +132,38 @@
                     <option value="ALL">All Sections</option>
                 </select>
             </div>
-            <button class="print-btn" onclick="printReport()">
-                <span class="material-icons-round">print</span>
-                Print Report
-            </button>
         </div>
+    </div>
 
-        <!-- Data Table -->
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Group Name</th>
-                        <th>Student Name</th>
-                        <th>Program</th>
-                        <th>Year</th>
-                        <th>Section</th>
-                        <th>Grade</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
-            <div class="empty-state" id="emptyState" style="display: none;">
-                <span class="material-icons-round">inbox</span>
-                <p>No data matches your filters</p>
-            </div>
+    <!-- Data Table -->
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Group Name</th>
+                    <th>Student Name</th>
+                    <th>Program</th>
+                    <th>Year</th>
+                    <th>Section</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <span class="material-icons-round">inbox</span>
+            <p>No data matches your filters</p>
         </div>
+    </div>
 
-        <!-- Pagination -->
-        <div class="pagination">
-            <button class="page-btn prev">Previous</button>
-            <span class="page-number active">1</span>
-            <button class="page-btn next">Next</button>
-        </div>
+    <!-- Pagination -->
+    <div class="pagination">
+        <button class="page-btn prev">Previous</button>
+        <span class="page-number active">1</span>
+        <button class="page-btn next">Next</button>
+    </div>
 
     </div>
 

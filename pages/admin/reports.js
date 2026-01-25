@@ -217,34 +217,7 @@ function renderTable() {
     });
 }
 
-window.printReport = () => {
-    const phase = document.getElementById('defenseFilter').value;
-    const prog = document.getElementById('programFilter').value;
-    const sect = document.getElementById('sectionFilter').value;
 
-    const printHeader = document.querySelector('.print-header');
-
-    // Always show header for all defense phases (Title, Pre-oral, Final)
-    printHeader.style.display = 'block';
-
-    document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-
-    let titleStr = `${phase} Academic Report`;
-    if (prog !== 'ALL') titleStr += ` - ${prog}`;
-    if (sect !== 'ALL') titleStr += ` - Section ${sect}`;
-
-    document.getElementById('printReportTitle').innerText = titleStr;
-
-    // Temporarily remove page title to hide browser-generated print headers
-    const originalTitle = document.title;
-    document.title = "";
-
-    window.print();
-
-    // Restore title and reset display for screen
-    document.title = originalTitle;
-    printHeader.style.display = 'none';
-};
 
 function logout() {
     localStorage.removeItem('loginUser');
