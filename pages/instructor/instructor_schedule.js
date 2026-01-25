@@ -295,9 +295,12 @@ function handleGroupChange() {
                 : 'No members found.';
         }
 
-        // Set Adviser
+        // Set Adviser and Program
         const adviserInput = document.getElementById('schedAdviser');
         if (adviserInput) adviserInput.value = selectedGroup.adviser || '';
+
+        const programInput = document.getElementById('schedProgram');
+        if (programInput) programInput.value = selectedGroup.program || '';
 
         updatePanelsByDefenseType();
     }
@@ -336,14 +339,20 @@ function updatePanelsByDefenseType() {
             const pKeys = ['panel1', 'panel2', 'panel3', 'panel4', 'panel5'];
             pKeys.forEach((key, index) => {
                 const select = document.getElementById(`schedPanel${index + 1}`);
-                if (select && titleDefense[key]) {
-                    select.value = titleDefense[key];
-                    lockPanel(select);
+                if (select) {
+                    select.value = titleDefense[key] || "";
+                    if (titleDefense[key]) {
+                        lockPanel(select);
+                    } else {
+                        select.disabled = false;
+                        select.style.backgroundColor = "";
+                        select.style.cursor = "";
+                    }
                 }
             });
             updatePanelOptions();
         } else {
-            // Fallback to program-based defaults for the first two panels
+            // Fallback to program-based defaults if Title Defense schedule not found
             applyDefaultPanels();
         }
     }
@@ -364,17 +373,25 @@ function applyDefaultPanels() {
     const p1Select = document.getElementById('schedPanel1');
     const p2Select = document.getElementById('schedPanel2');
 
+    // Default: May Lynn Farren is always panel 1 for these programs
     if (p1Select) {
-        p1Select.value = "May Lynn Farren";
-        lockPanel(p1Select);
+        if (program.includes('BSIS') || program.includes('BSIT') || program.includes('BSCS')) {
+            p1Select.value = "May Lynn Farren";
+            lockPanel(p1Select);
+        }
     }
-    if (p2Select) {
-        if (program.includes('BSIT')) p2Select.value = "Nolan Yumen";
-        else if (program.includes('BSIS')) p2Select.value = "Apolinario Ballenas Jr.";
-        else if (program.includes('BSCS')) p2Select.value = "Irene Robles";
-        else p2Select.value = "";
 
-        if (p2Select.value) lockPanel(p2Select);
+    if (p2Select) {
+        if (program.includes('BSIS')) {
+            p2Select.value = "Apolinario Ballenas Jr.";
+            lockPanel(p2Select);
+        } else if (program.includes('BSIT')) {
+            p2Select.value = "Nolan Yumen";
+            lockPanel(p2Select);
+        } else if (program.includes('BSCS')) {
+            p2Select.value = "Irene Robles";
+            lockPanel(p2Select);
+        }
     }
     updatePanelOptions();
 }
@@ -405,6 +422,9 @@ function updatePanelOptions() {
 function resetPanels() {
     const adviserInput = document.getElementById('schedAdviser');
     if (adviserInput) adviserInput.value = "";
+
+    const programInput = document.getElementById('schedProgram');
+    if (programInput) programInput.value = "";
 
     const ids = ['schedPanel1', 'schedPanel2', 'schedPanel3', 'schedPanel4', 'schedPanel5'];
     ids.forEach(id => {
@@ -439,12 +459,19 @@ async function openScheduleModal(preSelectedGroupId = null) {
 
 async function openEditScheduleModal(scheduleId) {
     await fetchGroupsForDropdown();
-    const { data: sched, error } = await supabaseClient.from('schedules').select('*').eq('id', scheduleId).single();
+    const { data: sched, error } = await supabaseClient
+        .from('schedules')
+        .select('*, student_groups(program)')
+        .eq('id', scheduleId)
+        .single();
     if (error) return;
 
     document.getElementById('schedType').value = sched.schedule_type || 'Title Defense';
     document.getElementById('schedGroupId').value = sched.group_id;
     handleGroupChange();
+
+    const programInput = document.getElementById('schedProgram');
+    if (programInput) programInput.value = (sched.student_groups?.program || '').toUpperCase();
 
     document.getElementById('schedPanel1').value = sched.panel1 || '';
     document.getElementById('schedPanel2').value = sched.panel2 || '';
