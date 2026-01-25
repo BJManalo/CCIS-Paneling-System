@@ -14,6 +14,39 @@
     <!-- Styles -->
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="icon" type="image/png" href="../../assets/images/favicon.png">
+    <style>
+        .role-filter-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 99px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: #64748b;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .role-filter-btn:hover {
+            background: #f8fafc;
+            color: var(--primary-dark);
+        }
+
+        .role-filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        }
+
+        .role-filter-btn .material-icons-round {
+            font-size: 18px;
+        }
+    </style>
 </head>
 
 <body class="dashboard-body">
@@ -37,12 +70,25 @@
         <!-- Title -->
         <h2 class="page-title">Defense Schedule</h2>
 
+        <!-- Role Context Tabs -->
+        <div style="display: flex; gap: 15px; margin: 0 0 25px 0;">
+            <button class="role-filter-btn active" onclick="switchRole('Panel')" id="role-Panel">
+                <span class="material-icons-round">groups</span>
+                Panel Schedule
+            </button>
+            <button class="role-filter-btn" onclick="switchRole('Adviser')" id="role-Adviser">
+                <span class="material-icons-round">school</span>
+                Advisory Schedule
+            </button>
+        </div>
+
         <!-- Schedule Table -->
         <div class="table-container">
             <table class="data-table">
                 <thead>
                     <tr>
                         <th>Type</th>
+                        <th>My Role</th>
                         <th>Group Name</th>
                         <th>Program</th>
                         <th>Date & Time</th>
