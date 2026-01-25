@@ -293,7 +293,7 @@ async function renderTable() {
     }
     if (emptyState) emptyState.style.display = 'none';
 
-    displayRows.forEach(row => {
+    displayRows.slice(0, 5).forEach(row => {
         const program = (row.program || '').toUpperCase();
         let progClass = 'prog-unknown';
         if (program.includes('BSIS')) progClass = 'prog-bsis';
