@@ -577,14 +577,18 @@ function generatePrintTable(dataList, reportTitle) {
     // Explicitly find and set the header title
     const titleEl = document.getElementById('printReportTitle');
     if (titleEl) {
-        titleEl.textContent = reportTitle;
-        titleEl.style.color = '#ef4444'; // Tailwind red-500
-        titleEl.style.fontSize = '18px';
-        titleEl.style.fontWeight = '500';
-        titleEl.style.fontFamily = 'Arial, sans-serif';
+        // Clean up old subtitle if any
+        const oldSub = document.getElementById('dynamicSubtitle');
+        if (oldSub) oldSub.remove();
+
+        titleEl.style.color = '#0f766e'; // Teal-700
+        titleEl.style.fontSize = '16px'; // Slightly smaller/sharper
+        titleEl.style.fontWeight = '700'; // Bold
         titleEl.style.marginTop = '10px';
+        titleEl.style.fontFamily = "sans-serif";
         titleEl.style.textTransform = 'none';
         titleEl.style.display = 'block'; // Ensure visibility
+        titleEl.textContent = reportTitle;
     }
 
     // Set Date
@@ -593,16 +597,18 @@ function generatePrintTable(dataList, reportTitle) {
         dateEl.innerText = `Generated on: ${new Date().toLocaleString()}`;
     }
 
-    // Table Columns: GROUP NAME | STUDENT NAME | PROGRAM | YEAR | GRADE
+    // Table Columns: GROUP NAME | DEFENSE TYPE | STUDENT NAME | PROGRAM | YEAR | SECTION | GRADE
 
     let html = `
         <table style="width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; margin-top: 20px; color: black;">
             <thead>
-                <tr style="border: 1px solid #cbd5e1;">
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 25%; color: #475569;">GROUP NAME</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 30%; color: #475569;">STUDENT NAME</th>
+                <tr style="background-color: #f8fafc; border: 1px solid #cbd5e1;">
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 15%; color: #475569;">GROUP NAME</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 15%; color: #475569;">DEFENSE TYPE</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 25%; color: #475569;">STUDENT NAME</th>
                     <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">PROGRAM</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 20%; color: #475569;">YEAR</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">YEAR</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">SECTION</th>
                     <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 15%; color: #475569;">GRADE</th>
                 </tr>
             </thead>
@@ -623,11 +629,13 @@ function generatePrintTable(dataList, reportTitle) {
 
             html += `
                 <tr>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: black;">${group.group_name}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: black;">${student.full_name}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: black;">${group.program || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: black;">${group.year_level || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; color: black;">${gradeVal}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: #1e293b;">${group.group_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b; text-transform: uppercase; font-size: 10px; font-weight: 700;">${scheduleType}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: #1e293b;">${student.full_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b;">${group.program || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b;">${group.year_level || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #1e293b;">${group.section || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; color: #2563eb;">${gradeVal}</td>
                 </tr>
              `;
         });
