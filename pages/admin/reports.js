@@ -124,7 +124,7 @@ window.applyFilters = () => {
 
         // Find individual grade for this student in this phase (match by student_id and grade_type)
         const gradeRecord = allGrades.find(gr => gr.student_id === student.id && gr.grade_type === phase);
-        const studentGrade = (gradeRecord && (gradeRecord.grade || gradeRecord.grade === 0)) ? parseFloat(gradeRecord.grade).toFixed(2) : '-';
+        const studentGrade = (gradeRecord && (gradeRecord.grade || gradeRecord.grade === 0)) ? parseFloat(gradeRecord.grade) : '-';
 
         // Phase Status Logic
         let phaseStatus = 'Pending';

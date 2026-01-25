@@ -187,7 +187,7 @@ function renderGrades() {
             const studentListHtml = gradedStudents.map(s => `
                 <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid #edf2f7;">
                     <span style="font-weight:500; color:#4a5568;">${s.name}</span>
-                    <span style="font-weight:700; color:var(--primary-color); background:#ebf4ff; padding:2px 10px; border-radius:6px; min-width:50px; text-align:center;">${s.grade !== null ? s.grade : '-'}</span>
+                    <span style="font-weight:700; color:var(--primary-color); background:#ebf4ff; padding:2px 10px; border-radius:6px; min-width:50px; text-align:center;">${s.grade !== null ? parseFloat(s.grade) : '-'}</span>
                 </div>
             `).join('');
 
@@ -365,7 +365,8 @@ function generatePrintTable(dataList, reportTitle) {
             // Ensure grade has 2 decimal places if present
             let gradeVal = '-';
             if (gradeRec && gradeRec.grade !== null) {
-                gradeVal = parseFloat(gradeRec.grade).toFixed(2);
+                // Remove .00 by just parsing it as a number
+                gradeVal = parseFloat(gradeRec.grade);
             }
 
             html += `
