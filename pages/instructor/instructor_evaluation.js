@@ -9,49 +9,150 @@ let loadedEvaluations = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadEvaluations();
+    initTooltip();
 });
 
 // Criteria Definitions
+// Criteria Definitions with Detailed Rubrics
 const individualCriteria = [
     {
         name: 'Clarity & Organization',
-        rubrics: { 4: 'Well-structured...', 3: 'Mostly clear...', 2: 'Somewhat disorganized...', 1: 'Poorly organized...' }
+        rubrics: {
+            4: 'Well-structured, clear transitions between topics, logical flow.',
+            3: 'Mostly clear, with minor disorganization or unclear transitions.',
+            2: 'Somewhat disorganized or unclear in parts, making it hard to follow.',
+            1: 'Poorly organized, hard to follow or understand.'
+        }
     },
     {
         name: 'Engagement',
-        rubrics: { 4: 'Very engaging...', 3: 'Engaging...', 2: 'Some engagement...', 1: 'Monotonous...' }
+        rubrics: {
+            4: 'The presentation is very engaging. Group members keep the audience interested throughout.',
+            3: 'The presentation is engaging for the most part, with minor lapses.',
+            2: 'The presentation has a few engaging moments but lacks consistency.',
+            1: 'The presentation is monotonous or disengaging.'
+        }
     },
     {
         name: 'Delivery',
-        rubrics: { 4: 'Confident...', 3: 'Good delivery...', 2: 'Stiff...', 1: 'Unclear...' }
+        rubrics: {
+            4: 'Confident, natural delivery. Eye contact maintained, good pace, well-practiced.',
+            3: 'Good delivery, but a bit hesitant or awkward at times.',
+            2: 'Delivery is stiff or disjointed, with awkward pauses or excessive reading.',
+            1: 'Unclear, rushed, or overly nervous delivery.'
+        }
     },
     {
         name: 'Content Knowledge',
-        rubrics: { 4: 'Highly effective visuals...', 3: 'Clear visuals...', 2: 'Adequate...', 1: 'Unclear visuals...' }
+        rubrics: {
+            4: 'Highly effective visuals that enhance understanding and support key points.',
+            3: 'Visuals are clear and relevant, with some room for improvement.',
+            2: 'Visuals are adequate but don\'t strongly support the presentation.',
+            1: 'Visuals are unclear or distracting, with little relation to content.'
+        }
     },
     {
         name: 'Team Collaboration',
-        rubrics: { 4: 'Excellent...', 3: 'Most contribute...', 2: 'Some dominate...', 1: 'Lacks cohesion...' }
+        rubrics: {
+            4: 'Excellent team coordination, each member contributes clearly and equally.',
+            3: 'Most members contribute equally, with some minor imbalances.',
+            2: 'Some members dominate the presentation, while others contribute minimally.',
+            1: 'Team lacks cohesion, with unequal contributions or visible disconnects.'
+        }
     },
     {
         name: 'Professionalism',
-        rubrics: { 4: 'Well-prepared...', 3: 'Generally professional...', 2: 'Somewhat unprofessional...', 1: 'Unprepared...' }
+        rubrics: {
+            4: 'Well-prepared, professional demeanor, answers questions confidently and competently.',
+            3: 'Generally professional, but with minor lapses in preparation or handling questions.',
+            2: 'Somewhat unprofessional or unprepared, struggles with questions.',
+            1: 'Unprepared, unprofessional behavior or failure to answer questions.'
+        }
     },
     {
         name: 'Time Management',
-        rubrics: { 4: 'Adheres strictly...', 3: 'Minor overrun...', 2: 'Exceeds time...', 1: 'Too long/short...' }
+        rubrics: {
+            4: 'Presentation adheres strictly to time limits, covering all necessary points concisely.',
+            3: 'Minor overrun or rush at the end, but overall time was well-managed.',
+            2: 'Presentation exceeds or fails to meet time expectations, lacking detail in some areas.',
+            1: 'Presentation is too long or short, missing essential content.'
+        }
     }
 ];
 
 const systemCriteria = [
-    { name: 'System Functionality', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } },
-    { name: 'Technical Complexity', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } },
-    { name: 'Usability', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } },
-    { name: 'Code Quality & Organization', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } },
-    { name: 'Innovation & Creativity', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } },
-    { name: 'Testing & Debugging', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } },
-    { name: 'Documentation & Reporting', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } },
-    { name: 'System Presentation/Demo', rubrics: { 4: 'text', 3: 'text', 2: 'text', 1: 'text' } }
+    {
+        name: 'System Functionality',
+        rubrics: {
+            4: 'System is fully functional with all key features working as intended (at least 70% complete).',
+            3: 'System is mostly functional with minor issues or missing features.',
+            2: 'System has several non-functional or incomplete features.',
+            1: 'System has major functionality issues or is incomplete.'
+        }
+    },
+    {
+        name: 'Technical Complexity',
+        rubrics: {
+            4: 'The system demonstrates a high level of technical skill and complexity (advanced features, integration, etc.).',
+            3: 'System demonstrates solid technical skills but lacks advanced features.',
+            2: 'Basic system with limited technical complexity or advanced concepts.',
+            1: 'System lacks technical depth or fails to implement basic concepts.'
+        }
+    },
+    {
+        name: 'Usability',
+        rubrics: {
+            4: 'System is intuitive and user-friendly, easy to navigate and use.',
+            3: 'System is mostly user-friendly, with minor usability issues.',
+            2: 'System has some usability issues that make it difficult to use.',
+            1: 'System is difficult to use or lacks clear user interface design.'
+        }
+    },
+    {
+        name: 'Code Quality & Organization',
+        rubrics: {
+            4: 'Code is well-structured, well-documented, and follows best practices.',
+            3: 'Code is generally well-written but lacks documentation or could be better organized.',
+            2: 'Code is functional but has readability or organizational issues.',
+            1: 'Code is poorly written, hard to understand, or lacks necessary documentation.'
+        }
+    },
+    {
+        name: 'Innovation & Creativity',
+        rubrics: {
+            4: 'The system showcases innovative ideas or creative solutions to problems.',
+            3: 'Some original ideas or creative approaches are evident.',
+            2: 'Little innovation, relying mostly on standard solutions.',
+            1: 'No creativity or innovation, very basic or copied ideas.'
+        }
+    },
+    {
+        name: 'Testing & Debugging',
+        rubrics: {
+            4: 'System is thoroughly tested with no major bugs or errors.',
+            3: 'System has been tested with few minor issues remaining.',
+            2: 'Some testing was done, but there are bugs or issues that hinder functionality.',
+            1: 'Little to no testing, system is full of bugs or crashes.'
+        }
+    },
+    {
+        name: 'Documentation & Reporting',
+        rubrics: {
+            4: 'Clear, comprehensive documentation that includes detailed explanations of system design, code, and usage.',
+            3: 'Good documentation, but may lack detail in some areas.',
+            2: 'Documentation is minimal or unclear, with gaps in explanations.',
+            1: 'No documentation, or it is incomplete and unhelpful.'
+        }
+    },
+    {
+        name: 'System Presentation/Demo',
+        rubrics: {
+            4: 'The system is demonstrated effectively, with a clear explanation of how it works and what each feature does.',
+            3: 'The system is demonstrated well but may have minor gaps in explanation.',
+            2: 'System is demonstrated, but the explanation is unclear or incomplete.',
+            1: 'System is not demonstrated, or demo fails to work properly.'
+        }
+    }
 ];
 
 async function loadEvaluations() {
@@ -123,8 +224,8 @@ async function loadEvaluations() {
                         roles: { panel: true }, // Force true for display
                         isSubmitted: true,
                         savedScores: {
-                            individual: (indScores || []).filter(s => s.schedule_id === sched.id && s.panelist_name === panelistName),
-                            system: (sysScores || []).find(s => s.schedule_id === sched.id && s.panelist_name === panelistName)
+                            individual: (indScores || []).filter(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase()),
+                            system: (sysScores || []).find(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase())
                         }
                     });
                 });
@@ -328,47 +429,58 @@ function renderSystemTable(evalItem) {
 
     let rows = '';
     systemCriteria.forEach((c, cIdx) => {
-        let inputArea = '';
-        const scoreVal = evalItem.savedScores.system ? evalItem.savedScores.system[sysCols[cIdx]] : 0;
-        inputArea = `<div style="font-weight: 800; color: var(--primary-color); text-align: center; font-size: 1.1rem;">${scoreVal || '-'}</div>`;
+        // Safe access to score
+        let scoreVal = '-';
+        if (evalItem.savedScores && evalItem.savedScores.system) {
+            scoreVal = evalItem.savedScores.system[sysCols[cIdx]];
+            if (scoreVal === undefined || scoreVal === null) scoreVal = '-';
+        }
+
+        const inputArea = `<div style="font-weight: 800; color: var(--primary-color); text-align: center; font-size: 1.1rem;">${scoreVal}</div>`;
 
         rows += `
             <tr>
-                <td style="font-weight: 700; text-align: left; background: #f8fbff; color: var(--primary-dark); width: 180px;">${c.name}</td>
-                <td style="font-size: 0.75rem; color: #475569; text-align: left; line-height: 1.4; padding: 12px 10px;">${c.rubrics[4]}</td>
-                <td style="font-size: 0.75rem; color: #475569; text-align: left; line-height: 1.4; padding: 12px 10px;">${c.rubrics[3]}</td>
-                <td style="font-size: 0.75rem; color: #475569; text-align: left; line-height: 1.4; padding: 12px 10px;">${c.rubrics[4]}</td>
-                <td style="font-size: 0.75rem; color: #475569; text-align: left; line-height: 1.4; padding: 12px 10px;">${c.rubrics[1]}</td>
-                <td style="background: #f8fbff; width: 80px;">${inputArea}</td>
+                <td class="criteria-cell" style="text-align: left; background: #fafafa;">
+                    <div style="font-weight: 600; font-size: 0.95rem; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                         <span style="flex: 1;">${c.name}</span>
+                         <span class="material-icons-round tooltip-trigger" 
+                               style="font-size: 18px; color: #cbd5e1; cursor: help;"
+                               onmouseover="showRubricTip(event, '${c.name}', true);" 
+                               onmouseout="hideRubricTip();">
+                               help_outline
+                         </span>
+                    </div>
+                </td>
+                <td style="background: #f8fbff; width: 120px;">${inputArea}</td>
             </tr>
         `;
     });
 
-    const totalVal = evalItem.savedScores.system ? evalItem.savedScores.system.total_score : 0;
+    const totalVal = (evalItem.savedScores && evalItem.savedScores.system) ? evalItem.savedScores.system.total_score : 0;
 
     return `
-        <div style="margin-bottom: 25px; border-bottom: 2px dashed #f1f5f9; padding-bottom: 20px;">
+        <div style="margin-bottom: 20px; border-bottom: 2px dashed #f1f5f9; padding-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="material-icons-round" style="color: var(--primary-color); font-size: 28px;">dvr</span>
+                <span class="material-icons-round" style="color: var(--primary-color); font-size: 26px;">dvr</span>
                 <div>
                     <h4 style="color: var(--text-main); font-size: 1.1rem; font-weight: 800; margin: 0;">System Project Evaluation</h4>
                     <p style="font-size: 0.8rem; color: #64748b; margin: 2px 0 0;">Evaluation of the project's overall implementation and documentation.</p>
                 </div>
             </div>
         </div>
-        <div class="table-responsive" style="max-width: 600px; margin: 0 auto;">
-            <table class="eval-table">
+        <div class="table-responsive" style="max-width: 700px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <table class="eval-table" style="min-width: unset; width: 100%;">
                 <thead>
-                    <tr style="background: #f8fbff;">
-                        <th class="criteria-header">Technical Criteria</th>
-                        <th style="width: 140px;">Score</th>
+                    <tr style="background: #f8fbff; border-bottom: 1px solid #e2e8f0;">
+                        <th class="criteria-header" style="font-size: 0.95rem; font-weight: 700; color: #0f172a; padding: 16px 20px;">Technical Criteria</th>
+                        <th style="width: 140px; font-size: 0.95rem; font-weight: 700; color: #0f172a; text-align: center;">Score</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${rows}
-                    <tr style="background: #f1f5f9;">
-                        <td style="text-align: right; padding-right: 25px; font-weight: 800; color: var(--primary-dark); font-size: 1rem;">TOTAL SYSTEM SCORE</td>
-                        <td style="font-weight: 900; font-size: 1.25rem; color: var(--primary-color); text-align: center;">${totalVal}</td>
+                    <tr style="background: #f1f5f9; border-top: 1px solid #e2e8f0;">
+                        <td style="text-align: right; padding: 16px 25px; font-weight: 800; color: #334155; font-size: 0.95rem; letter-spacing: 0.5px; text-transform: uppercase;">TOTAL SYSTEM SCORE</td>
+                        <td style="font-weight: 900; font-size: 1.3rem; color: var(--primary-color); text-align: center; padding: 16px;">${totalVal}</td>
                     </tr>
                 </tbody>
             </table>
@@ -409,4 +521,83 @@ window.switchPage = (id, page) => {
         btn1.classList.remove('active');
         btn2.classList.add('active');
     }
+};
+
+// --- Custom Rubric Tooltip Logic ---
+function initTooltip() {
+    if (!document.getElementById('rubricTooltip')) {
+        const tip = document.createElement('div');
+        tip.id = 'rubricTooltip';
+        tip.style.cssText = `
+            position: fixed;
+            background: rgba(44, 62, 80, 0.95);
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            max-width: 300px;
+            z-index: 10000;
+            display: none;
+            pointer-events: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            line-height: 1.5;
+            transition: opacity 0.2s;
+            border-left: 4px solid var(--accent-color);
+        `;
+        document.body.appendChild(tip);
+    }
+}
+
+window.showRubricTip = (event, criteriaName, isSystem = false) => {
+    initTooltip();
+    const criteria = isSystem
+        ? systemCriteria.find(c => c.name === criteriaName)
+        : individualCriteria.find(c => c.name === criteriaName);
+
+    if (!criteria) return;
+
+    const tip = document.getElementById('rubricTooltip');
+    tip.innerHTML = `
+        <div style="font-weight: 700; margin-bottom: 12px; color: #ffcc00; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+            ${criteriaName} Rubric
+        </div>
+        <div style="display: grid; gap: 10px;">
+            <div style="font-size: 12px;"><strong style="color: #4ade80;">4 - Excellent:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[4]}</span></div>
+            <div style="font-size: 12px;"><strong style="color: #fbbf24;">3 - Good:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[3]}</span></div>
+            <div style="font-size: 12px;"><strong style="color: #f87171;">2 - Fair:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[2]}</span></div>
+            <div style="font-size: 12px;"><strong style="color: #ef4444;">1 - Needs Improvement:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[1]}</span></div>
+        </div>
+    `;
+
+    tip.style.display = 'block';
+    tip.style.maxWidth = '380px';
+    tip.style.width = '380px';
+
+    // Position intelligently
+    const rect = event.currentTarget.getBoundingClientRect();
+    const tipWidth = 380;
+
+    // Show to the right of the hovered item
+    let x = rect.right + 20;
+    let y = event.clientY - 50;
+
+    // If it would go off the right edge, show it to the left
+    if (x + tipWidth > window.innerWidth) {
+        x = rect.left - tipWidth - 20;
+    }
+
+    // Ensure it doesn't go off bottom
+    const tipHeight = tip.offsetHeight || 300;
+    if (y + tipHeight > window.innerHeight) {
+        y = window.innerHeight - tipHeight - 20;
+    }
+    if (y < 20) y = 20;
+
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+};
+
+window.hideRubricTip = () => {
+    const tip = document.getElementById('rubricTooltip');
+    if (tip) tip.style.display = 'none';
 };
