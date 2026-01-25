@@ -575,36 +575,37 @@ function generatePrintTable(dataList, reportTitle) {
     const printContent = document.getElementById('printContent');
     const titleEl = document.getElementById('printReportTitle');
 
-    // Set Main Title (The Blue Text)
+    // Set Main Title (The Red Text as shown in image)
     // We remove any "Student Grades Report" default text and replace it completely
-    // matching the style in the image: Blue, Bold, Uppercase/Title Case
 
     // Clean up old subtitle if any
     const oldSub = document.getElementById('dynamicSubtitle');
     if (oldSub) oldSub.remove();
 
-    titleEl.style.color = '#3b82f6'; // Blue color like in image
+    titleEl.style.color = 'red'; // Red color as per image
     titleEl.style.fontSize = '18px';
-    titleEl.style.fontWeight = '700';
+    titleEl.style.fontWeight = '500'; // Regular/Medium weight
     titleEl.style.marginTop = '10px';
-    titleEl.style.textTransform = 'none'; // Allow mixed case as per image "Pre Oral Defense Academic Report"
+    titleEl.style.fontFamily = "sans-serif";
+    titleEl.style.textTransform = 'none';
     titleEl.textContent = reportTitle;
 
     // Set Date
     document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleString()}`;
 
     // Table Columns from Image: GROUP NAME | STUDENT NAME | PROGRAM | YEAR | SECTION | GRADE
+    // The image clearly shows a SECTION column with 'E' in it.
 
     let html = `
-        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 11px; margin-top: 20px;">
-            <thead style="background: #e2e8f0; color: #334155;">
-                <tr>
-                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: left; width: 15%;">GROUP NAME</th>
-                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: left; width: 25%;">STUDENT NAME</th>
-                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 10%;">PROGRAM</th>
-                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 15%;">YEAR</th>
-                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 10%;">SECTION</th>
-                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 10%;">GRADE</th>
+        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 11px; margin-top: 20px; color: black;">
+            <thead>
+                <tr style="border: 1px solid #cbd5e1;">
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 20%; color: #475569;">GROUP NAME</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; width: 25%; color: #475569;">STUDENT NAME</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">PROGRAM</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 15%; color: #475569;">YEAR</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">SECTION</th>
+                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; width: 10%; color: #475569;">GRADE</th>
                 </tr>
             </thead>
             <tbody>
@@ -624,12 +625,12 @@ function generatePrintTable(dataList, reportTitle) {
 
             html += `
                 <tr>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: #1e293b;">${group.group_name}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 600;">${student.full_name}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${group.program || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${group.year_level || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${group.section || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; color: #0f172a;">${gradeVal}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: black;">${group.group_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: black;">${student.full_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: black;">${group.program || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: black;">${group.year_level || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: black;">${group.section || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; color: black;">${gradeVal}</td>
                 </tr>
              `;
         });
