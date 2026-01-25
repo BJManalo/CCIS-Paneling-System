@@ -90,27 +90,29 @@ function renderPayers(payments) {
         detailsRow.innerHTML = `
             <td colspan="5" style="padding: 0;">
                 <div class="details-content" style="padding: 20px 25px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 250px; gap: 25px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 40px; align-items: start;">
                         <div>
-                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Academic Context</div>
-                            <p style="margin: 0; font-size: 0.9rem; color: #334155; font-weight: 500;">
-                                <strong>Type:</strong> ${p.defense_type || 'N/A'}<br>
-                                <strong>Year/Section:</strong> ${p.year_level || ''} - ${p.section || '-'}<br>
-                                <strong>Adviser:</strong> ${p.adviser || '-'}
-                            </p>
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">Academic Context</div>
+                            <div style="font-size: 0.95rem; color: #334155; line-height: 1.6;">
+                                <div style="margin-bottom: 8px;"><strong style="color: #1e293b;">Type:</strong> ${p.defense_type || 'N/A'}</div>
+                                <div style="margin-bottom: 8px;"><strong style="color: #1e293b;">Year/Section:</strong> ${p.year_level || ''} - ${p.section || '-'}</div>
+                                <div><strong style="color: #1e293b;">Adviser:</strong> ${p.adviser || '-'}</div>
+                            </div>
                         </div>
                         <div>
-                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Status Info</div>
-                            <p style="margin: 0; font-size: 0.9rem; color: #334155; font-weight: 500;">
-                                <strong>Paid For:</strong> ${p.defense_type || 'N/A'}<br>
-                                <strong>Panels:</strong> ${p.panels || '-'}
-                            </p>
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">Status Info</div>
+                            <div style="font-size: 0.95rem; color: #334155; line-height: 1.6;">
+                                <div style="margin-bottom: 8px;"><strong style="color: #1e293b;">Paid For:</strong> ${p.defense_type || 'N/A'}</div>
+                                <div><strong style="color: #1e293b;">Panels:</strong> ${p.panels || '-'}</div>
+                            </div>
                         </div>
                         <div class="receipt-column">
-                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Proof of Payment</div>
-                            <img src="${p.receipt_url}" 
-                                 style="width: 100%; max-width: 200px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; cursor: zoom-in; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"
-                                 onclick="event.stopPropagation(); window.openLightbox(this.src);">
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">Proof of Payment</div>
+                            <div style="background: white; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; display: inline-block;">
+                                <img src="${p.receipt_url}" 
+                                     style="width: 100%; max-width: 350px; height: auto; border-radius: 8px; cursor: zoom-in; display: block;"
+                                     onclick="event.stopPropagation(); window.openLightbox(this.src);">
+                            </div>
                         </div>
                     </div>
                 </div>
