@@ -99,46 +99,52 @@
                 <span class="material-icons-round">inbox</span>
                 <p>No data available</p>
             </div>
+
+            <!-- Pagination -->
+            <div class="pagination" style="justify-content: flex-end;">
+                <button class="page-btn prev">Previous</button>
+                <span class="page-number active">1</span>
+                <button class="page-btn next">Next</button>
+            </div>
+
+
+
         </div>
 
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="instructor_dashboard.html" class="nav-item">
+                <span class="material-icons-round">dashboard</span>
+                <span class="nav-label">Dashboard</span>
+            </a>
+            <a href="instructor_capstone.html" class="nav-item active">
+                <span class="material-icons-round">folder_special</span>
+                <span class="nav-label">Capstone</span>
+            </a>
+            <a href="instructor_evaluation.html" class="nav-item">
+                <span class="material-icons-round">rate_review</span>
+                <span class="nav-label">Evaluation</span>
+            </a>
+            <a href="instructor_grades.html" class="nav-item">
+                <span class="material-icons-round">grading</span>
+                <span class="nav-label">Grades</span>
+            </a>
+            <a href="instructor_payers.html" class="nav-item">
+                <span class="material-icons-round">payments</span>
+                <span class="nav-label">Payers</span>
+            </a>
+            <a href="instructor_schedule.html" class="nav-item">
+                <span class="material-icons-round">calendar_today</span>
+                <span class="nav-label">Schedule</span>
+            </a>
+            <a href="instructor_accounts.html" class="nav-item">
+                <span class="material-icons-round">people</span>
+                <span class="nav-label">Accounts</span>
+            </a>
+        </nav>
 
-
-    </div>
-
-    <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
-        <a href="instructor_dashboard.html" class="nav-item">
-            <span class="material-icons-round">dashboard</span>
-            <span class="nav-label">Dashboard</span>
-        </a>
-        <a href="instructor_capstone.html" class="nav-item active">
-            <span class="material-icons-round">folder_special</span>
-            <span class="nav-label">Capstone</span>
-        </a>
-        <a href="instructor_evaluation.html" class="nav-item">
-            <span class="material-icons-round">rate_review</span>
-            <span class="nav-label">Evaluation</span>
-        </a>
-        <a href="instructor_grades.html" class="nav-item">
-            <span class="material-icons-round">grading</span>
-            <span class="nav-label">Grades</span>
-        </a>
-        <a href="instructor_payers.html" class="nav-item">
-            <span class="material-icons-round">payments</span>
-            <span class="nav-label">Payers</span>
-        </a>
-        <a href="instructor_schedule.html" class="nav-item">
-            <span class="material-icons-round">calendar_today</span>
-            <span class="nav-label">Schedule</span>
-        </a>
-        <a href="instructor_accounts.html" class="nav-item">
-            <span class="material-icons-round">people</span>
-            <span class="nav-label">Accounts</span>
-        </a>
-    </nav>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="instructor_capstone.js?v=2"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="instructor_capstone.js?v=2"></script>
 </body>
 
 </html>
