@@ -67,20 +67,20 @@
             </button>
         </header>
 
-        <!-- Title -->
-        <h2 class="page-title">Defense Schedule</h2>
-
         <!-- Role Context Tabs -->
-        <div style="display: flex; gap: 15px; margin: 0 0 25px 0;">
+        <div style="display: flex; gap: 15px; margin: 25px 0 10px 0; padding-left: 20px;">
             <button class="role-filter-btn active" onclick="switchRole('Panel')" id="role-Panel">
                 <span class="material-icons-round">groups</span>
-                Panel Schedule
+                Panel
             </button>
             <button class="role-filter-btn" onclick="switchRole('Adviser')" id="role-Adviser">
                 <span class="material-icons-round">school</span>
-                Advisory Schedule
+                Adviser
             </button>
         </div>
+
+        <!-- Title -->
+        <h2 class="page-title">Defense Schedule</h2>
 
         <!-- Schedule Table -->
         <div class="table-container">
@@ -88,7 +88,6 @@
                 <thead>
                     <tr>
                         <th>Type</th>
-                        <th>My Role</th>
                         <th>Group Name</th>
                         <th>Program</th>
                         <th>Date & Time</th>
