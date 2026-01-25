@@ -557,25 +557,41 @@ window.printGroup = (groupId, scheduleType) => {
 
 // --- Table Generator ---
 function generatePrintTable(dataList, reportTitle) {
-    const printContent = document.getElementById('printContent');
-    document.getElementById('printReportTitle').textContent = reportTitle;
+    const printableArea = document.getElementById('printableArea');
 
-    // Set Date
-    document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleString()}`;
+    // Header HTML with Logos
+    const headerHtml = `
+        <div class="print-header" style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px; text-align: right; font-style: italic;">
+                Generated on: ${new Date().toLocaleString()}
+            </div>
+            
+            <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 15px; position: relative;">
+                <img src="../../assets/images/ua_logo_official.png" alt="UA Logo" style="width: 80px; height: 80px; object-fit: contain; display: block;">
+                
+                <div style="text-align: center;">
+                    <h1 style="font-size: 18px; color: #1e293b; margin: 0; font-weight: 800; text-transform: uppercase;">UNIVERSITY OF ANTIQUE</h1>
+                    <h2 style="font-size: 14px; color: #334155; margin: 2px 0; font-weight: 600;">College of Computer Studies</h2>
+                    <h3 style="font-size: 13px; color: #2563eb; margin: 8px 0 0; font-weight: 700; text-transform: uppercase;">${reportTitle}</h3>
+                </div>
 
-    // Flatten to rows: Group | Student | Program | Year | Section | Grade
-    // The user requested: group name, members, program, year, section, amd grades.
+                <img src="../../assets/images/ccs_logo_official.jpg" alt="CCS Logo" style="width: 80px; height: 80px; object-fit: contain; display: block;">
+            </div>
+            <div style="height: 2px; background: #334155; margin-bottom: 20px;"></div>
+        </div>
+    `;
 
-    let html = `
-        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px;">
-            <thead style="background: #f1f5f9;">
+    // Table HTML
+    let tableHtml = `
+        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 11px;">
+            <thead style="background: #f1f5f9; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                 <tr>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Group Name</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Student Name</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Program</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Year</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Section</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Grade</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: left; color: #334155;">Group Name</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: left; color: #334155;">Student Name</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Program</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Year</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Section</th>
+                    <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #334155;">Grade</th>
                 </tr>
             </thead>
             <tbody>
@@ -586,28 +602,26 @@ function generatePrintTable(dataList, reportTitle) {
         const students = group.students || [];
 
         students.forEach(student => {
-            // Find grade for this type
             const gradeRec = student.grades ? student.grades.find(g => g.grade_type === scheduleType) : null;
-            // If printing specific group, we might show all students even if not graded? 
-            // But 'renderGrades' filters. Let's show what we have.
+            const gradeVal = (gradeRec && gradeRec.grade !== null && gradeRec.grade !== undefined) ? gradeRec.grade : '-';
 
-            const gradeVal = (gradeRec && gradeRec.grade !== null) ? gradeRec.grade : '-';
-
-            html += `
+            tableHtml += `
                 <tr>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: 600;">${group.group_name}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${student.full_name}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.program || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.year_level || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.section || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${gradeVal}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; font-weight: 600; color: #0f172a;">${group.group_name}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; color: #334155;">${student.full_name}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center;">${group.program || '-'}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center;">${group.year_level || '-'}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center;">${group.section || '-'}</td>
+                    <td style="padding: 6px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700; color: #0f172a;">${gradeVal}</td>
                 </tr>
              `;
         });
     });
 
-    html += `</tbody></table>`;
-    printContent.innerHTML = html;
+    tableHtml += `</tbody></table>`;
+
+    // Inject everything
+    printableArea.innerHTML = headerHtml + tableHtml;
 }
 
 function logout() {
