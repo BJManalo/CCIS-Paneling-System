@@ -537,7 +537,6 @@ window.printReport = () => {
     if (sectionFilter !== 'All') title += ` - Section ${sectionFilter}`;
 
     generatePrintTable(groupsToPrint, title);
-    window.print();
 };
 
 // --- Print Single Group ---
@@ -552,7 +551,6 @@ window.printGroup = (groupId, scheduleType) => {
 
     const title = `Grades Report for ${scheduleType} for the ${group.group_name}`;
     generatePrintTable(data, title);
-    window.print();
 };
 
 // --- Table Generator ---
@@ -633,6 +631,23 @@ function generatePrintTable(dataList, reportTitle) {
 
     // Inject everything
     printableArea.innerHTML = headerHtml + tableHtml;
+
+    // WAIT for images to load before printing to avoid blank logos
+    const images = printableArea.querySelectorAll('img');
+    const promises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve; // Print anyway even if image fails
+        });
+    });
+
+    Promise.all(promises).then(() => {
+        // Small delay to ensure rendering frame is ready
+        setTimeout(() => {
+            window.print();
+        }, 500);
+    });
 }
 
 function logout() {
