@@ -190,3 +190,18 @@ function logout() {
     window.location.href = '../../index.html';
 }
 
+// --- Helper: Toggle Password Visibility ---
+window.toggleGenericPassword = (inputId, iconElement) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        iconElement.innerText = 'visibility'; // Show icon
+        iconElement.style.color = '#2563eb'; // Active color
+    } else {
+        input.type = 'password';
+        iconElement.innerText = 'visibility_off'; // Hide icon
+        iconElement.style.color = '#64748b'; // Inactive color
+    }
+};
