@@ -488,15 +488,19 @@ document.getElementById('gradeModal').addEventListener('click', (e) => {
 
 // --- Print Report (Global) ---
 window.printReport = () => {
-    // 1. gather currently visible data based on filters
     const typeFilter = document.getElementById('typeFilter').value;
     const sectionFilter = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-    // Filter Logic (Same as render but we need the objects)
+    // Validate filters for "Academic Report" style printing
+    if (typeFilter === 'All') {
+        alert("Please select a specific Defense Type (Title, Pre-Oral, or Final) to print an Academic Report.");
+        return;
+    }
+
+    // Filter Logic
     const groupsToPrint = [];
 
-    // Re-run filter logic to get list
     for (const group of allGradesData) {
         const matchesSearch = group.group_name.toLowerCase().includes(searchTerm) ||
             group.students.some(s => s.full_name.toLowerCase().includes(searchTerm));
@@ -506,18 +510,13 @@ window.printReport = () => {
         if (!group.schedules) continue;
 
         group.schedules.forEach(schedule => {
-            if (typeFilter !== 'All' && schedule.schedule_type !== typeFilter) return;
+            if (schedule.schedule_type !== typeFilter) return;
 
-            // Ensure we have some grades or students for this type
-            // Logic matches renderTable: "Check strict 'Show only if graded' rule"?
-            // The user might want to print partially graded too? 
-            // Let's stick to "visible in table" logic:
             const gradedCount = group.students.filter(s =>
                 s.grades && s.grades.some(g => g.grade_type === schedule.schedule_type && g.grade !== null)
             ).length;
 
             if (gradedCount > 0) {
-                // Push a flattened object for the generator
                 groupsToPrint.push({
                     group: group,
                     scheduleType: schedule.schedule_type
@@ -527,31 +526,25 @@ window.printReport = () => {
     }
 
     if (groupsToPrint.length === 0) {
-        alert("No data to print matches your filters.");
+        alert("No visible grades found for this selection to print.");
         return;
     }
 
-    // Title Construction
-    let title = "Student Grades Report";
-    let subTitle = "";
-    if (typeFilter !== 'All') {
-        // If specific type selected, use it as subtitle
-        subTitle = typeFilter;
+    // Construct Title: "[Type] Defense Academic Report - Section [Section]"
+    // If All Sections, just "Academic Report"
+    let reportTitle = `${typeFilter} Academic Report`;
+    if (sectionFilter !== 'All') {
+        reportTitle += ` - Section ${sectionFilter}`;
     } else {
-        // If All, maybe just empty or "All Phrases"
-        subTitle = "All Defense Phases";
+        reportTitle += ` - All Sections`;
     }
 
-    if (sectionFilter !== 'All') title += ` - Section ${sectionFilter}`;
-
-    // Target the specific header
     const printHeader = document.querySelector('#printableArea .print-header');
     if (printHeader) printHeader.style.display = 'block';
 
-    generatePrintTable(groupsToPrint, title, subTitle);
+    generatePrintTable(groupsToPrint, reportTitle);
     window.print();
 
-    // CSS @media print handles visibility during print, but we hide it again for screen cleanup
     if (printHeader) printHeader.style.display = 'none';
 };
 
@@ -568,76 +561,50 @@ window.printGroup = (groupId, scheduleType) => {
         scheduleType: scheduleType
     }];
 
-    // Title: Grade Report [Section]
-    // Subtitle: [Defense Type]
-    generatePrintTable(data, `Grade Report - ${group.group_name} (${group.section || 'N/A'})`, scheduleType);
+    // Similar format for single group
+    const title = `${scheduleType} Academic Report - Section ${group.section || 'N/A'}`;
+
+    generatePrintTable(data, title);
     window.print();
 
     if (printHeader) printHeader.style.display = 'none';
 };
 
 // --- Table Generator ---
-// --- Table Generator ---
-function generatePrintTable(dataList, reportTitle, subTitle = '') {
+function generatePrintTable(dataList, reportTitle) {
     const printContent = document.getElementById('printContent');
     const titleEl = document.getElementById('printReportTitle');
 
-    // Set Main Title
-    titleEl.textContent = reportTitle;
+    // Set Main Title (The Blue Text)
+    // We remove any "Student Grades Report" default text and replace it completely
+    // matching the style in the image: Blue, Bold, Uppercase/Title Case
 
-    // Remove any existing subtitle
+    // Clean up old subtitle if any
     const oldSub = document.getElementById('dynamicSubtitle');
     if (oldSub) oldSub.remove();
 
-    // Create Subtitle Element
-    // We force this to be "DEFENSE TYPE" from the argument
-    if (subTitle) {
-        const sub = document.createElement('h3');
-        sub.id = 'dynamicSubtitle';
-        sub.style.cssText = 'font-size: 16px; color: #1e293b; margin: 4px 0 10px; font-weight: 800; text-align: center; text-transform: uppercase; letter-spacing: 1px;';
-        sub.textContent = subTitle;
-
-        // Insert it directly into the header info div
-        // This ensures it is visible under the College Name
-        const headerInfoDiv = titleEl.parentNode;
-
-        // We want: H1 (Uni) -> H2 (College) -> SUBTITLE -> H3 (Report Title)
-
-        // Current DOM likely:
-        // div
-        //   h1
-        //   h2
-        //   h3#printReportTitle
-
-        // So inserting before titleEl (h3) puts it exactly where we want.
-        // BUT, if there was a previous subtitle removed, we are clean.
-
-        // Let's ensure strict order by finding H2 and inserting after it?
-        // insertBefore is safer if we know H3 exists.
-
-        if (titleEl && titleEl.parentNode) {
-            titleEl.parentNode.insertBefore(sub, titleEl);
-        } else {
-            // Fallback
-            headerInfoDiv.appendChild(sub);
-        }
-    }
+    titleEl.style.color = '#3b82f6'; // Blue color like in image
+    titleEl.style.fontSize = '18px';
+    titleEl.style.fontWeight = '700';
+    titleEl.style.marginTop = '10px';
+    titleEl.style.textTransform = 'none'; // Allow mixed case as per image "Pre Oral Defense Academic Report"
+    titleEl.textContent = reportTitle;
 
     // Set Date
     document.getElementById('printDate').innerText = `Generated on: ${new Date().toLocaleString()}`;
 
-    // Flatten to rows: Group | Student | Program | Year | Section | Grade
+    // Table Columns from Image: GROUP NAME | STUDENT NAME | PROGRAM | YEAR | SECTION | GRADE
 
     let html = `
-        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; margin-top: 10px;">
-            <thead style="background: #f1f5f9;">
+        <table style="width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 11px; margin-top: 20px;">
+            <thead style="background: #e2e8f0; color: #334155;">
                 <tr>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Group Name</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left;">Student Name</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Program</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Year</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Section</th>
-                    <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center;">Grade</th>
+                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: left; width: 15%;">GROUP NAME</th>
+                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: left; width: 25%;">STUDENT NAME</th>
+                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 10%;">PROGRAM</th>
+                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 15%;">YEAR</th>
+                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 10%;">SECTION</th>
+                    <th style="padding: 12px 8px; border: 1px solid #cbd5e1; text-align: center; width: 10%;">GRADE</th>
                 </tr>
             </thead>
             <tbody>
@@ -648,21 +615,21 @@ function generatePrintTable(dataList, reportTitle, subTitle = '') {
         const students = group.students || [];
 
         students.forEach(student => {
-            // Find grade for this type
             const gradeRec = student.grades ? student.grades.find(g => g.grade_type === scheduleType) : null;
-            // If printing specific group, we might show all students even if not graded? 
-            // But 'renderGrades' filters. Let's show what we have.
-
-            const gradeVal = (gradeRec && gradeRec.grade !== null) ? gradeRec.grade : '-';
+            // Ensure grade has 2 decimal places if present
+            let gradeVal = '-';
+            if (gradeRec && gradeRec.grade !== null) {
+                gradeVal = parseFloat(gradeRec.grade).toFixed(2);
+            }
 
             html += `
                 <tr>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: 600;">${group.group_name}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${student.full_name}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.program || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.year_level || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center;">${group.section || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">${gradeVal}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 700; color: #1e293b;">${group.group_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: 600;">${student.full_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${group.program || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${group.year_level || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${group.section || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; color: #0f172a;">${gradeVal}</td>
                 </tr>
              `;
         });
