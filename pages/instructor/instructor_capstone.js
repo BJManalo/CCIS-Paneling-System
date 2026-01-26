@@ -111,24 +111,12 @@ async function loadCapstoneData() {
             const schedules = Array.isArray(group.schedules) ? group.schedules : [group.schedules];
 
             schedules.forEach(sched => {
-                // Determine Links
-                const normType = normalizeType(sched.schedule_type);
-                let linksStr = '{}';
-                if (normType === 'titledefense') linksStr = group.title_link;
-                else if (normType === 'preoraldefense') linksStr = group.pre_oral_link;
-                else if (normType === 'finaldefense') linksStr = group.final_link;
-
-                // Parse Links
-                let linksObj = {};
-                // Handle legacy single-string or JSON 
-                if (linksStr && typeof linksStr === 'string') {
-                    if (linksStr.trim().startsWith('{')) {
-                        linksObj = safeParse(linksStr);
-                    } else if (linksStr.trim().length > 0) {
-                        linksObj = { 'Link': linksStr };
-                    }
-                }
-                const hasLinks = Object.values(linksObj).some(l => l && l.trim() !== '');
+                // Check if this instructor is part of the panel (or adviser - but adviser logic might differ)
+                // The requirements say "Panel and Panel/Adviser user".
+                // We check if instructor name is in panel1..4 or adviser column?
+                // For simplicity, we listed all. 
+                // Filter by role? The previous code had "Panel" vs "Adviser" toggle.
+                // We will keep showing all for now, but lock strictly based on logic.
 
                 allData.push({
                     id: group.id,
@@ -139,11 +127,10 @@ async function loadCapstoneData() {
                     time: `${formatTime(sched.start_time)} - ${formatTime(sched.end_time)}`,
                     venue: sched.room,
                     panels: [sched.panel1, sched.panel2, sched.panel3, sched.panel4].filter(Boolean),
-                    links: linksObj,
-                    hasLinks: hasLinks,
-                    status: 'Pending',
+                    file: 'Project-File.pdf', // Placeholder or real column if exists
+                    status: 'Pending', // Placeholder
                     // Logic Data
-                    normalizedType: normType
+                    normalizedType: normalizeType(sched.schedule_type)
                 });
             });
         });
@@ -285,15 +272,13 @@ function renderTable() {
             `;
             row.style.opacity = '0.7';
             row.style.background = '#f8fafc';
-        } else if (item.hasLinks) {
+        } else {
             actionHtml = `
                 <button onclick="viewGroup('${item.id}', '${item.type}')" 
                     style="background: none; border: 1px solid var(--primary-color); color: var(--primary-color); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; font-family: inherit; font-size: 0.85rem; transition: all 0.2s;">
-                    View Files
+                    View File
                 </button>
             `;
-        } else {
-            actionHtml = `<span style="color: #94a3b8; font-size: 0.9em; font-style: italic;">No Submission</span>`;
         }
 
         row.innerHTML = `
@@ -317,86 +302,13 @@ function initCharts() {
     // Charts placeholder - no change
 }
 
-// View Group Submission (Modal)
+// Redirect or Mock View
 window.viewGroup = (id, type) => {
-    const item = allData.find(d => d.id === id && d.type === type);
-    if (!item || !item.hasLinks) {
-        alert("No files submitted.");
-        return;
-    }
-
-    // Check if modal exists
-    let modal = document.getElementById('filesModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'filesModal';
-        modal.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
-            opacity: 0; transition: opacity 0.3s; pointer-events: none;
-        `;
-        modal.innerHTML = `
-            <div style="background: white; border-radius: 12px; padding: 25px; width: 400px; max-width: 90%; transform: scale(0.9); transition: transform 0.3s; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0; color: #1e293b;">Project Files</h3>
-                    <button onclick="closeModal()" style="background: none; border: none; cursor: pointer; color: #64748b;"><span class="material-icons-round">close</span></button>
-                </div>
-                <div id="modalLinks" style="display: flex; flex-direction: column; gap: 10px;"></div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    }
-
-    const linksContainer = document.getElementById('modalLinks');
-    linksContainer.innerHTML = '';
-
-    Object.entries(item.links).forEach(([key, url]) => {
-        if (!url) return;
-
-        let label = key;
-        // Beautify labels
-        if (key.includes('title')) label = `Title Link ${key.replace('title', '')}`;
-        else if (key.includes('ch')) label = `Chapter ${key.replace('ch', '')}`;
-        else if (key.toLowerCase() === 'link') label = 'Main Document';
-
-        const linkEl = document.createElement('a');
-        linkEl.href = url.startsWith('http') ? url : `https://${url}`;
-        linkEl.target = '_blank';
-        linkEl.style.cssText = `
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0;
-            border-radius: 8px; text-decoration: none; color: #334155; font-weight: 500;
-            transition: all 0.2s;
-        `;
-        linkEl.innerHTML = `
-            <span>${label}</span>
-            <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">open_in_new</span>
-        `;
-        linkEl.onmouseover = () => { linkEl.style.background = '#f1f5f9'; linkEl.style.borderColor = '#cbd5e1'; };
-        linkEl.onmouseout = () => { linkEl.style.background = '#f8fafc'; linkEl.style.borderColor = '#e2e8f0'; };
-
-        linksContainer.appendChild(linkEl);
-    });
-
-    // Show Modal
-    modal.style.pointerEvents = 'auto';
-    modal.style.opacity = '1';
-    modal.querySelector('div').style.transform = 'scale(1)';
-};
-
-window.closeModal = () => {
-    const modal = document.getElementById('filesModal');
-    if (modal) {
-        modal.style.opacity = '0';
-        modal.querySelector('div').style.transform = 'scale(0.9)';
-        modal.style.pointerEvents = 'none';
-        setTimeout(() => { if (modal.style.opacity === '0') modal.remove(); }, 300); // Remove after animation so we recreate cleanly next time
-    }
-};
-
-const safeParse = (str) => {
-    try { return JSON.parse(str || '{}'); } catch (e) { return {}; }
-};
+    // For now, maybe just alert or show a modal? 
+    // The requirement says "Panel... cannot view the submission".
+    // If we are here, it's unlocked.
+    alert(`Opening submission for Group ${id} (${type})... \n(File viewing to be implemented)`);
+}
 
 function logout() {
     localStorage.removeItem('loginUser');
