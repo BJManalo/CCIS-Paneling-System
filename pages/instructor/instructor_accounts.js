@@ -111,6 +111,11 @@ async function openAddGroupModal() {
         document.getElementById(`memberEdit${i}`).removeAttribute('data-student-id');
     }
 
+    document.getElementById('groupNameEdit').value = '';
+    document.getElementById('programEdit').selectedIndex = 0;
+    document.getElementById('yearEdit').value = '';
+    document.getElementById('sectionEdit').value = '';
+    document.getElementById('adviserEdit').value = '';
     document.getElementById('emailEdit').value = '';
     document.getElementById('passwordEdit').value = '';
 
