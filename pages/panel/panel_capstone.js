@@ -118,7 +118,8 @@ async function loadCapstoneData() {
                 const isAdviser = group.adviser === user.name;
                 const isPanelist = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].includes(user.name);
 
-                if (!isAdviser && !isPanelist) return;
+                // Filter removed to show all schedules
+                // if (!isAdviser && !isPanelist) return;
 
                 const normType = normalizeType(sched.schedule_type);
 
