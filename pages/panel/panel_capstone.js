@@ -142,8 +142,25 @@ async function loadCapstoneData() {
                 if (!sched && !hasFiles) return;
 
                 // 4. Construct Data Object
+                // 4. Construct Data Object
                 const isAdviser = group.adviser === user.name;
-                const panelList = sched ? [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p) : [];
+
+                let panelList = [];
+                if (sched) {
+                    panelList = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
+                } else {
+                    // Fallback: If no schedule for this specific defense, check ALL schedules for this group
+                    // to see if user is a panelist in any of them (e.g. was panel in Title Defense, so is likely panel for Final)
+                    const allGroupSchedules = schedules.filter(s => s.group_id === group.id);
+                    const allPanels = new Set();
+                    allGroupSchedules.forEach(s => {
+                        [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].forEach(p => {
+                            if (p) allPanels.add(p);
+                        });
+                    });
+                    panelList = Array.from(allPanels);
+                }
+
                 const isPanelist = panelList.includes(user.name);
 
                 // Find matching defense status row
