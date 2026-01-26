@@ -257,8 +257,9 @@ function renderTable() {
             g.groupName.toLowerCase().includes(searchTerm.toLowerCase());
 
         // Role Match
-        // Role Match - Relaxed for visibility
-        const roleMatch = true; // (currentRole === 'Panel' && g.isPanelist) || (currentRole === 'Adviser' && g.isAdviser);
+        // Role Match
+        const roleMatch = (currentRole === 'Panel' && g.isPanelist) ||
+            (currentRole === 'Adviser' && g.isAdviser);
 
         if (!typeMatch || !programMatch || !searchMatch || !roleMatch) return false;
 
