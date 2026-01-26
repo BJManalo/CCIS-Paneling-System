@@ -79,6 +79,10 @@ async function loadSubmissionData() {
             let tLinks = safeParse(group.title_link);
             if (group.title_link && typeof group.title_link === 'string' && !group.title_link.startsWith('{')) tLinks = { title1: group.title_link };
 
+            // Load Project Title
+            const projectTitleInput = document.getElementById('projectTitle');
+            if (projectTitleInput) projectTitleInput.value = group.project_title || '';
+
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
 
@@ -376,6 +380,10 @@ window.saveSubmissions = async function () {
             title3: document.getElementById('titleLink3').value.trim()
         };
         updates.title_link = JSON.stringify(activeLinks);
+
+        // Save Project Title
+        const pTitle = document.getElementById('projectTitle').value.trim();
+        updates.project_title = pTitle;
     } else if (tabId === 'preoral') {
         activeLinks = {
             ch1: document.getElementById('preOralCh1').value.trim(),

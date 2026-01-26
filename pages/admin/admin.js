@@ -169,14 +169,14 @@ window.applyDashboardFilters = () => {
 
             if (finalApproved) {
                 statusBadge = '<span class="status-badge approved">Completed</span>';
-                titleLabel = `<strong>${approvedKey || g.group_name}</strong>`;
+                titleLabel = `<strong>${g.project_title || approvedKey || g.group_name}</strong>`;
             } else if (approvedKey) {
                 statusBadge = '<span class="status-badge approved" style="background:#dbeafe; color:#2563eb;">Title Approved</span>';
-                titleLabel = `<strong>${approvedKey}</strong>`;
+                titleLabel = `<strong>${g.project_title || approvedKey}</strong>`;
             } else if (Object.values(tMap).some(v => v.toLowerCase().includes('rejected'))) {
                 const rejCount = Object.values(tMap).filter(v => v.toLowerCase().includes('rejected')).length;
                 statusBadge = `<span class="status-badge rejected">${rejCount} Rejected</span>`;
-                titleLabel = Object.keys(tMap).filter(k => tMap[k].toLowerCase().includes('rejected'))[0];
+                titleLabel = g.project_title || Object.keys(tMap).filter(k => tMap[k].toLowerCase().includes('rejected'))[0];
             }
             displayRows.push({ ...baseObj, title: titleLabel, statusHtml: statusBadge });
 
@@ -185,7 +185,7 @@ window.applyDashboardFilters = () => {
                 if (tMap[k].toLowerCase().includes('approved')) {
                     displayRows.push({
                         ...baseObj,
-                        title: `<strong>${k}</strong>`,
+                        title: `<strong>${g.project_title || k}</strong>`,
                         statusHtml: '<span class="status-badge approved">Title Approved</span>'
                     });
                 }
@@ -195,7 +195,7 @@ window.applyDashboardFilters = () => {
                 if (tMap[k].toLowerCase().includes('rejected')) {
                     displayRows.push({
                         ...baseObj,
-                        title: `<span style="color: #dc2626;">${k}</span>`,
+                        title: `<span style="color: #dc2626;">${g.project_title || k}</span>`,
                         statusHtml: '<span class="status-badge rejected">Rejected</span>'
                     });
                 }
@@ -205,7 +205,7 @@ window.applyDashboardFilters = () => {
                 const approvedKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved'));
                 displayRows.push({
                     ...baseObj,
-                    title: `<strong>${approvedKey || g.group_name}</strong>`,
+                    title: `<strong>${g.project_title || approvedKey || g.group_name}</strong>`,
                     statusHtml: '<span class="status-badge approved">Completed</span>'
                 });
             }
