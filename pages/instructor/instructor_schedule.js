@@ -44,7 +44,7 @@ async function getSchedules() {
             .from('schedules')
             .select(`
                 *,
-                student_groups ( group_name, program )
+                student_groups ( group_name, program, year_level, section, students (full_name) )
             `)
             .order('schedule_date', { ascending: true });
 
@@ -149,6 +149,11 @@ function renderSchedules(schedules) {
         `;
         tableBody.appendChild(row);
 
+        // Prepare members list
+        const membersList = (sched.student_groups && sched.student_groups.students)
+            ? sched.student_groups.students.map(s => s.full_name).join(', ')
+            : 'No members listed';
+
         // Details Row
         const detailsRow = document.createElement('tr');
         detailsRow.className = 'details-row';
@@ -157,14 +162,20 @@ function renderSchedules(schedules) {
         detailsRow.innerHTML = `
             <td colspan="7" style="padding: 0;">
                 <div class="details-content" style="padding: 15px 25px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
                         <div>
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Group Adviser</div>
                             <div style="font-weight: 500; color: #334155;">${adviser}</div>
                         </div>
                         <div>
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Academic Info</div>
-                            <div style="font-weight: 500; color: #334155;">${program} - Year level ${sched.student_groups?.year_level || '-'}</div>
+                            <div style="font-weight: 500; color: #334155;">
+                                ${program} ${sched.student_groups?.year_level || ''} - ${sched.student_groups?.section || ''}
+                            </div>
+                        </div>
+                         <div>
+                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Group Members</div>
+                            <div style="font-weight: 500; color: #334155; font-size: 0.9em; line-height: 1.4;">${membersList}</div>
                         </div>
                     </div>
                 </div>
