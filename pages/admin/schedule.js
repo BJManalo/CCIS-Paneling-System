@@ -27,7 +27,7 @@ async function loadSchedules() {
                 *,
                 student_groups ( group_name, program )
             `)
-            .order('schedule_date', { ascending: true }); // Show upcoming first
+            .order('schedule_date', { ascending: false }); // Show newest first
 
         if (error) throw error;
 

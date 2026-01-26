@@ -46,7 +46,7 @@ async function getSchedules() {
                 *,
                 student_groups ( group_name, program, year_level, section, students (full_name) )
             `)
-            .order('schedule_date', { ascending: true });
+            .order('schedule_date', { ascending: false });
 
         if (error) {
             console.error('Error fetching schedules:', error);
