@@ -415,7 +415,17 @@ function renderIndividualTable(evalItem) {
         });
         rows += `
             <tr>
-                <td style="font-weight: 600; text-align: left; background: #fafafa; color: var(--text-main);">${c.name}</td>
+                <td class="criteria-cell" style="text-align: left; background: #fafafa;">
+                    <div style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                         <span style="flex: 1;">${c.name}</span>
+                         <span class="material-icons-round tooltip-trigger" 
+                               style="font-size: 18px; color: #cbd5e1; cursor: help;"
+                               onmouseover="showRubricTip(event, '${c.name}');" 
+                               onmouseout="hideRubricTip();">
+                               help_outline
+                         </span>
+                    </div>
+                </td>
                 ${inputs}
             </tr>
         `;
