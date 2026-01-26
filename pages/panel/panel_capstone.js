@@ -109,34 +109,48 @@ async function loadCapstoneData() {
         // 5. Process Data
         allData = [];
 
+        // Defined defense types to check for
+        const defenseTypes = ['Title Defense', 'Pre-Oral Defense', 'Final Defense'];
+
         groups.forEach(group => {
-            const groupSchedules = schedules.filter(s => s.group_id === group.id);
+            // Check each defense type for this group
+            defenseTypes.forEach(defType => {
+                const normType = normalizeType(defType);
 
-            if (groupSchedules.length === 0) return;
+                // 1. Check for existing schedule
+                // We use find because typically one active schedule per type. 
+                // If multiple exist, we might just take the first one or logic needs expansion.
+                // Original logic used filter but usually 1:1.
+                const sched = schedules.find(s => s.group_id === group.id && normalizeType(s.schedule_type) === normType);
 
-            groupSchedules.forEach(sched => {
+                // 2. Check for files
+                let hasFiles = false;
+                let filesObj = {};
+                try {
+                    filesObj = {
+                        titles: group.title_link ? JSON.parse(group.title_link) : {},
+                        pre_oral: group.pre_oral_link ? JSON.parse(group.pre_oral_link) : {},
+                        final: group.final_link ? JSON.parse(group.final_link) : {}
+                    };
+                } catch (e) { console.error('JSON Parse error', e); }
+
+                if (normType.includes('title') && Object.keys(filesObj.titles).length > 0) hasFiles = true;
+                else if (normType.includes('preoral') && Object.keys(filesObj.pre_oral).length > 0) hasFiles = true;
+                else if (normType.includes('final') && Object.keys(filesObj.final).length > 0) hasFiles = true;
+
+                // 3. Skip if neither schedule nor files exist
+                if (!sched && !hasFiles) return;
+
+                // 4. Construct Data Object
                 const isAdviser = group.adviser === user.name;
-                const isPanelist = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].includes(user.name);
-
-                // Filter removed to show all schedules
-                // if (!isAdviser && !isPanelist) return;
-
-                const normType = normalizeType(sched.schedule_type);
+                const panelList = sched ? [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p) : [];
+                const isPanelist = panelList.includes(user.name);
 
                 // Find matching defense status row
                 const statusRow = defStatuses.find(ds => ds.group_id === group.id && normalizeType(ds.defense_type) === normType);
-
                 const currentStatuses = statusRow ? (statusRow.statuses || {}) : {};
                 const currentRemarks = statusRow ? (statusRow.remarks || {}) : {};
 
-                let files = {
-                    titles: group.title_link ? JSON.parse(group.title_link) : {},
-                    pre_oral: group.pre_oral_link ? JSON.parse(group.pre_oral_link) : {},
-                    final: group.final_link ? JSON.parse(group.final_link) : {}
-                };
-
-                // Map old structure to use new status source
-                // We create specific buckets for the UI to use, but they come from the generic 'statuses' json of that row
                 let titleStatus = {}, preOralStatus = {}, finalStatus = {};
                 if (normType.includes('title')) titleStatus = currentStatuses;
                 else if (normType.includes('preoral')) preOralStatus = currentStatuses;
@@ -149,15 +163,15 @@ async function loadCapstoneData() {
 
                 allData.push({
                     id: group.id,
-                    type: sched.schedule_type,
+                    type: sched ? sched.schedule_type : defType, // Use specific type string from loop if no schedule
                     normalizedType: normType,
                     groupName: group.group_name,
                     program: (group.program || '').toUpperCase(),
-                    date: sched.schedule_date,
-                    time: sched.schedule_time,
-                    venue: sched.schedule_venue,
-                    panels: [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p),
-                    files: files,
+                    date: sched ? sched.schedule_date : null,
+                    time: sched ? sched.schedule_time : null,
+                    venue: sched ? sched.schedule_venue : 'Online / TBA', // Default if no schedule
+                    panels: panelList,
+                    files: filesObj,
 
                     // Unified accessors
                     titleStatus, preOralStatus, finalStatus,
@@ -168,7 +182,7 @@ async function loadCapstoneData() {
                     currentStatusJson: currentStatuses,
                     currentRemarksJson: currentRemarks,
 
-                    status: sched.status || 'Active', // This line can be removed too if we don't need it at all, but I'll leave data processing for now.
+                    status: sched ? (sched.status || 'Active') : 'Pending Schedule',
                     isAdviser: isAdviser,
                     isPanelist: isPanelist
                 });
