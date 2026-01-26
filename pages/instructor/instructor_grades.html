@@ -108,6 +108,40 @@
         .print-header {
             display: none;
         }
+
+        /* Responsive Toolbar Styles */
+        .grades-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .grades-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+            .grades-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .grades-controls {
+                flex-direction: column;
+                width: 100%;
+                gap: 10px;
+            }
+
+            .custom-select-wrapper,
+            .print-btn {
+                width: 100% !important;
+            }
+        }
     </style>
 </head>
 
@@ -150,11 +184,11 @@
         </header>
 
         <!-- Toolbar (Filter under Logout) -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <!-- Left side spacer or additional controls if needed -->
-            <div></div>
+        <div class="grades-toolbar">
+            <!-- Left side spacer -->
+            <div class="desktop-spacer"></div>
 
-            <div style="display: flex; gap: 15px;">
+            <div class="grades-controls">
                 <button class="print-btn" onclick="printReport()">
                     <span class="material-icons-round">print</span>
                     Print Report
