@@ -273,13 +273,10 @@ function openAddPaymentModal() {
     const memberNames = currentGroupData.students ? currentGroupData.students.map(s => s.full_name).join(', ') : '';
     document.getElementById('payMembers').value = memberNames;
 
-    // Panels
+    // Panels - Removed as requested
+    /*
     let panels = [];
     if (currentGroupData.schedules) {
-        // schedules might be an array or object depending on relationship (one-to-one is assumed but Supabase returns array by default unless .single() on child?)
-        // Actually, relational queries return arrays usually. Let's check.
-        // If one-to-one relation was defined as unique, it might be object or array of 1.
-        // Safest: Check array or obj.
         const sched = Array.isArray(currentGroupData.schedules) ? currentGroupData.schedules[0] : currentGroupData.schedules;
         if (sched) {
             if (sched.panel1) panels.push(sched.panel1);
@@ -289,6 +286,7 @@ function openAddPaymentModal() {
         }
     }
     document.getElementById('payPanels').value = panels.join(', ');
+    */
 
     // Reset File
     document.getElementById('receiptFile').value = '';
@@ -383,7 +381,8 @@ async function submitPayment(e) {
                 year_level: document.getElementById('payYear').value,
                 section: document.getElementById('paySection').value,
                 adviser: document.getElementById('payAdviser').value,
-                panels: document.getElementById('payPanels').value,
+                adviser: document.getElementById('payAdviser').value,
+                // panels: document.getElementById('payPanels').value, // Removed
                 defense_type: document.getElementById('payDefenseType') ? document.getElementById('payDefenseType').value : 'Title Defense',
                 payment_date: document.getElementById('payDatePaid').value,
                 receipt_url: publicUrl
