@@ -16,6 +16,9 @@ async function loadSubmissionData() {
 
     let groupId = loginUser.id;
 
+    // Global variable linking
+    if (!window.currentLinks) window.currentLinks = {};
+
     try {
         const { data: group, error } = await supabaseClient
             .from('student_groups')
@@ -79,9 +82,19 @@ async function loadSubmissionData() {
             let tLinks = safeParse(group.title_link);
             if (group.title_link && typeof group.title_link === 'string' && !group.title_link.startsWith('{')) tLinks = { title1: group.title_link };
 
-            // Load Project Title
-            const projectTitleInput = document.getElementById('projectTitle');
-            if (projectTitleInput) projectTitleInput.value = group.project_title || '';
+            // Load Project Title(s)
+            let projectTitles = {};
+            try {
+                projectTitles = JSON.parse(group.project_title || '{}');
+            } catch (e) {
+                // Backward compatibility: if simple string
+                projectTitles = { title1: group.project_title || '' };
+            }
+
+            // Populate inputs
+            if (document.getElementById('projectTitle1')) document.getElementById('projectTitle1').value = projectTitles.title1 || '';
+            if (document.getElementById('projectTitle2')) document.getElementById('projectTitle2').value = projectTitles.title2 || '';
+            if (document.getElementById('projectTitle3')) document.getElementById('projectTitle3').value = projectTitles.title3 || '';
 
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
@@ -232,86 +245,106 @@ async function loadSubmissionData() {
             renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
             renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
 
-            // Generic Sub-tab switching (for Title, Pre-Oral, Final)
-            window.switchSubTab = (stageId, index, btn) => {
-                const parent = document.getElementById('tab-' + stageId);
-                if (!parent) return;
-
-                // Hide all sub-contents in this stage
-                parent.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
-                // Show target sub-content
-                const target = document.getElementById(`${stageId}-content-${index}`);
-                if (target) target.classList.add('active');
-
-                // Update sub-tab buttons in this stage
-                parent.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
-                btn.classList.add('active');
-            };
-
-            // Store links globally for tab switching
+            // Store links in window.currentLinks - Handled globally now
             window.currentLinks = {
                 titles: tLinks,
                 preoral: pLinks,
                 final: fLinks
             };
 
-            // Move switchSubmissionTab to global window scope and handle logic
-            window.switchSubmissionTab = (tabId, btn) => {
-                // 1. Update UI Tabs
-                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-                document.getElementById('tab-' + tabId).classList.add('active');
-                document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-                btn.classList.add('active');
-
-                // Reset sub-tabs to the first one when switching main tabs
-                const parent = document.getElementById('tab-' + tabId);
-                const firstSubBtn = parent.querySelector('.sub-tab-btn');
-                if (firstSubBtn) {
-                    const firstIndex = tabId === 'final' ? 4 : 1;
-                    window.switchSubTab(tabId, firstIndex, firstSubBtn);
-                }
-
-                // 2. Update Button & Input Locking based on this specific tab's data
-                const saveBtn = document.querySelector('.save-btn');
-                const hasAnyData = (obj) => Object.values(obj).some(val => val && val.trim() !== '');
-
-                const stageLinks = window.currentLinks[tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final'];
-                const isSubmitted = hasAnyData(stageLinks);
-
-                if (isSubmitted) {
-                    saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
-                    saveBtn.disabled = true;
-                    saveBtn.style.opacity = '0.7';
-                    saveBtn.style.cursor = 'default';
-
-                    // Lock ONLY the inputs in the active tab
-                    document.querySelector(`#tab-${tabId}`).querySelectorAll('input').forEach(input => {
-                        input.readOnly = true;
-                        input.style.backgroundColor = '#f1f5f9';
-                        input.placeholder = 'Submitted (View Only)';
-                    });
-                } else {
-                    saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
-                    saveBtn.disabled = false;
-                    saveBtn.style.opacity = '1';
-                    saveBtn.style.cursor = 'pointer';
-
-                    // Unlock inputs in the active tab
-                    document.querySelector(`#tab-${tabId}`).querySelectorAll('input').forEach(input => {
-                        input.readOnly = false;
-                        input.style.backgroundColor = '#f8fafc';
-                        input.placeholder = input.id.includes('title') ? 'Title Link' : 'Chapter Link';
-                    });
-                }
-            };
-
-            // Initial call for the active tab (Title Defense by default)
-            const activeTabBtn = document.querySelector('.tab-btn.active');
-            if (activeTabBtn) window.switchSubmissionTab('titles', activeTabBtn);
         }
-
     } catch (err) {
         console.error('Unexpected error:', err);
+    }
+}
+
+// Global Tab Switching Logic
+window.switchSubTab = (stageId, index, btn) => {
+    const parent = document.getElementById('tab-' + stageId);
+    if (!parent) return;
+
+    parent.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
+
+    const target = document.getElementById(`${stageId}-content-${index}`);
+    if (target) target.classList.add('active');
+
+    parent.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+};
+
+window.switchSubmissionTab = (tabId, btn) => {
+    // 1. Update UI Tabs
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Reset sub-tabs to the first one when switching main tabs
+    const parent = document.getElementById('tab-' + tabId);
+    const firstSubBtn = parent.querySelector('.sub-tab-btn');
+    if (firstSubBtn && tabId !== 'titles') {
+        // For titles, we don't want to auto-switch if they are clicking manually, 
+        // but initial load needs it. 
+        // Actually, just standard reset is fine.
+        const firstIndex = tabId === 'final' ? 4 : 1;
+        // logic for titles is 1, preoral 1, final 4? 
+        // Titles IDs are 1,2,3. Preoral 1,2,3. Final 4,5.
+        // Wait, preoral IDs in HTML are: preoral-content-1, 2, 3.
+        // Final IDs: final-content-4, 5.
+        // Title IDs: titles-content-1, 2, 3.
+
+        let idx = 1;
+        if (tabId === 'final') idx = 4;
+
+        window.switchSubTab(tabId, idx, firstSubBtn);
+    }
+
+    // 2. Button/Input Locking Update
+    updateSaveButtonState(tabId);
+};
+
+function updateSaveButtonState(tabId) {
+    const saveBtn = document.querySelector('.save-btn');
+    if (!saveBtn) return;
+
+    const hasAnyData = (obj) => Object.values(obj || {}).some(val => val && val.trim() !== '');
+
+    // Ensure globally stored links are available
+    if (!window.currentLinks) window.currentLinks = {};
+
+    const stageLinks = window.currentLinks[tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final'];
+    const isSubmitted = hasAnyData(stageLinks);
+
+    if (isSubmitted) {
+        saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = '0.7';
+        saveBtn.style.cursor = 'default';
+
+        // Lock inputs
+        const tabEl = document.querySelector(`#tab-${tabId}`);
+        if (tabEl) {
+            tabEl.querySelectorAll('input').forEach(input => {
+                input.readOnly = true;
+                input.style.backgroundColor = '#f1f5f9';
+                input.placeholder = 'Submitted (View Only)';
+            });
+        }
+    } else {
+        saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = '1';
+        saveBtn.style.cursor = 'pointer';
+
+        // Unlock inputs
+        const tabEl = document.querySelector(`#tab-${tabId}`);
+        if (tabEl) {
+            tabEl.querySelectorAll('input').forEach(input => {
+                input.readOnly = false;
+                input.style.backgroundColor = '#f8fafc';
+                input.placeholder = input.id.includes('title') ? 'Title Link' : 'Chapter Link';
+            });
+        }
     }
 }
 
@@ -323,13 +356,13 @@ const showToast = (message, type = 'info') => {
     msg.innerText = message;
 
     if (type === 'success') {
-        toast.style.backgroundColor = '#10b981'; // Green
+        toast.style.backgroundColor = '#10b981';
         icon.innerText = 'check_circle';
     } else if (type === 'error') {
-        toast.style.backgroundColor = '#ef4444'; // Red
+        toast.style.backgroundColor = '#ef4444';
         icon.innerText = 'error';
     } else if (type === 'warning') {
-        toast.style.backgroundColor = '#f59e0b'; // Amber
+        toast.style.backgroundColor = '#f59e0b';
         icon.innerText = 'warning';
     } else {
         toast.style.backgroundColor = '#333';
@@ -381,9 +414,13 @@ window.saveSubmissions = async function () {
         };
         updates.title_link = JSON.stringify(activeLinks);
 
-        // Save Project Title
-        const pTitle = document.getElementById('projectTitle').value.trim();
-        updates.project_title = pTitle;
+        // Save Project Titles (All 3)
+        const pTitles = {
+            title1: document.getElementById('projectTitle1') ? document.getElementById('projectTitle1').value.trim() : '',
+            title2: document.getElementById('projectTitle2') ? document.getElementById('projectTitle2').value.trim() : '',
+            title3: document.getElementById('projectTitle3') ? document.getElementById('projectTitle3').value.trim() : ''
+        };
+        updates.project_title = JSON.stringify(pTitles);
     } else if (tabId === 'preoral') {
         activeLinks = {
             ch1: document.getElementById('preOralCh1').value.trim(),

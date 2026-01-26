@@ -115,18 +115,39 @@ window.applyDashboardFilters = () => {
         return progMatch && sectMatch && searchMatch;
     });
 
+    // Helper to robustly get title text
+    const getTitleText = (pTitle, keyHint) => {
+        if (!pTitle) return keyHint || '';
+        let parsed = pTitle;
+        if (typeof parsed === 'string') {
+            try {
+                // heuristic: if it looks like JSON object
+                if (parsed.trim().startsWith('{')) {
+                    parsed = JSON.parse(parsed);
+                } else {
+                    // It's a legacy string title
+                    return parsed;
+                }
+            } catch (e) { return parsed; }
+        }
+
+        // At this point, parsed should be an object if it was a JSON string
+        // If it's still a string (failed parse), it returned above.
+
+        if (keyHint && parsed[keyHint]) return parsed[keyHint];
+        return parsed.title1 || parsed.title2 || parsed.title3 || Object.values(parsed)[0] || '';
+    };
+
     const getStatusMap = (row) => {
         if (!row || !row.statuses) return {};
         let s = row.statuses;
         if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
 
-        // Flatten for easy checking: if a key's value is an object (multi-panel), 
-        // we consider the "overall" status as the first non-Pending one or "Approved" if it exists.
+        // Flatten for easy checking
         const flat = {};
         Object.keys(s).forEach(fileKey => {
             const val = s[fileKey];
             if (typeof val === 'object' && val !== null) {
-                // Multi-panel: { "Panel A": "Approved", "Panel B": "Pending" }
                 const values = Object.values(val);
                 if (values.some(v => v.includes('Approved'))) flat[fileKey] = 'Approved';
                 else if (values.some(v => v.includes('Approve with Revisions'))) flat[fileKey] = 'Approve with Revisions';
@@ -165,18 +186,24 @@ window.applyDashboardFilters = () => {
             let statusBadge = '<span class="status-badge pending">Pending</span>';
 
             const approvedKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved'));
-            const finalApproved = Object.values(fMap).some(v => v.toLowerCase().includes('approved'));
+
+            // Final Approved requires BOTH Chapter 4 and Chapter 5 to be "Approved"
+            const ch4Status = (fMap.ch4 || '').toLowerCase();
+            const ch5Status = (fMap.ch5 || '').toLowerCase();
+            const finalApproved = ch4Status.includes('approved') && ch5Status.includes('approved');
 
             if (finalApproved) {
                 statusBadge = '<span class="status-badge approved">Completed</span>';
-                titleLabel = `<strong>${g.project_title || approvedKey || g.group_name}</strong>`;
+                titleLabel = `<strong>${getTitleText(g.project_title, approvedKey) || approvedKey || g.group_name}</strong>`;
             } else if (approvedKey) {
                 statusBadge = '<span class="status-badge approved" style="background:#dbeafe; color:#2563eb;">Title Approved</span>';
-                titleLabel = `<strong>${g.project_title || approvedKey}</strong>`;
+                titleLabel = `<strong>${getTitleText(g.project_title, approvedKey)}</strong>`;
             } else if (Object.values(tMap).some(v => v.toLowerCase().includes('rejected'))) {
                 const rejCount = Object.values(tMap).filter(v => v.toLowerCase().includes('rejected')).length;
                 statusBadge = `<span class="status-badge rejected">${rejCount} Rejected</span>`;
-                titleLabel = g.project_title || Object.keys(tMap).filter(k => tMap[k].toLowerCase().includes('rejected'))[0];
+                // Show the first rejected title name or just generic
+                const firstRejKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('rejected'));
+                titleLabel = getTitleText(g.project_title, firstRejKey) || firstRejKey;
             }
             displayRows.push({ ...baseObj, title: titleLabel, statusHtml: statusBadge });
 
@@ -185,7 +212,7 @@ window.applyDashboardFilters = () => {
                 if (tMap[k].toLowerCase().includes('approved')) {
                     displayRows.push({
                         ...baseObj,
-                        title: `<strong>${g.project_title || k}</strong>`,
+                        title: `<strong>${getTitleText(g.project_title, k)}</strong>`,
                         statusHtml: '<span class="status-badge approved">Title Approved</span>'
                     });
                 }
@@ -195,17 +222,20 @@ window.applyDashboardFilters = () => {
                 if (tMap[k].toLowerCase().includes('rejected')) {
                     displayRows.push({
                         ...baseObj,
-                        title: `<span style="color: #dc2626;">${g.project_title || k}</span>`,
+                        title: `<span style="color: #dc2626;">${getTitleText(g.project_title, k)}</span>`,
                         statusHtml: '<span class="status-badge rejected">Rejected</span>'
                     });
                 }
             });
         } else if (currentCategory === 'COMPLETED') {
-            if (Object.values(fMap).some(v => v.toLowerCase().includes('approved'))) {
+            // Strict check: Ch4 & Ch5
+            const ch4 = (fMap.ch4 || '').toLowerCase();
+            const ch5 = (fMap.ch5 || '').toLowerCase();
+            if (ch4.includes('approved') && ch5.includes('approved')) {
                 const approvedKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved'));
                 displayRows.push({
                     ...baseObj,
-                    title: `<strong>${g.project_title || approvedKey || g.group_name}</strong>`,
+                    title: `<strong>${getTitleText(g.project_title, approvedKey) || approvedKey || g.group_name}</strong>`,
                     statusHtml: '<span class="status-badge approved">Completed</span>'
                 });
             }
@@ -248,11 +278,28 @@ function updateCounts(groups) {
         const titleRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Title Defense');
         const finalRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Final Defense');
         const tVals = getVals(titleRow);
-        const fVals = getVals(finalRow);
 
         approvedTotal += tVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('approved')).length;
         rejectedTotal += tVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('rejected')).length;
-        completedTotal += fVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('approved')).length;
+
+        // Strict logic for Completed: Parse dictionary manually to check keys 'ch4' and 'ch5'
+        // getVals returns array, so we need access to the object map.
+        // Let's re-parse status for finalRow here.
+        if (finalRow && finalRow.statuses) {
+            let s = finalRow.statuses;
+            if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { s = {}; } }
+
+            const isApproved = (val) => {
+                if (!val) return false;
+                if (typeof val === 'string') return val.toLowerCase().includes('approved');
+                if (typeof val === 'object') return Object.values(val).some(v => v.toLowerCase().includes('approved'));
+                return false;
+            };
+
+            if (isApproved(s.ch4) && isApproved(s.ch5)) {
+                completedTotal += 1;
+            }
+        }
     });
 
     const titleEl = document.getElementById('countTitle');

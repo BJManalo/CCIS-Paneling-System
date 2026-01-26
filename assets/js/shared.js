@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = passwordInput.value;
 
             if (!email || !password) {
-                alert('Please fill in all fields.');
+                showErrorModal('Please fill in all fields.');
                 return;
             }
 
@@ -117,14 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // If neither found
-                alert('Invalid email or password. Please try again.');
+                showErrorModal('Invalid Credentials. Please check your email or password and try again.');
                 loginBtn.innerHTML = originalBtnText;
                 loginBtn.style.opacity = '1';
                 loginBtn.disabled = false;
 
             } catch (err) {
                 console.error('Login error:', err);
-                alert('Login failed: ' + err.message);
+                showErrorModal('Login failed: ' + err.message);
                 loginBtn.innerHTML = originalBtnText;
                 loginBtn.style.opacity = '1';
                 loginBtn.disabled = false;
@@ -133,4 +133,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Custom Error Modal Function
+window.showErrorModal = function (message) {
+    // Remove existing modal if any
+    const existing = document.querySelector('.custom-modal-overlay');
+    if (existing) existing.remove();
 
+    // Create Modal HTML
+    const modalHtml = `
+        <div class="custom-modal-overlay">
+            <div class="custom-modal">
+                <div class="modal-icon">
+                    <span class="material-icons-round">error_outline</span>
+                </div>
+                <h3 class="modal-title">Access Denied</h3>
+                <p class="modal-message">${message}</p>
+                <button class="modal-btn" onclick="document.querySelector('.custom-modal-overlay').remove()">Try Again</button>
+            </div>
+        </div>
+    `;
+
+    // Append to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}

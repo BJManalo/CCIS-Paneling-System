@@ -199,11 +199,6 @@
             </style>
 
             <div id="tab-titles" class="tab-content active">
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <label for="projectTitle" style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Project Title</label>
-                    <input type="text" id="projectTitle" placeholder="Enter your project title (e.g. Smart Farming System)">
-                </div>
-
                 <div class="sub-tabs-nav">
                     <button class="sub-tab-btn active" onclick="switchSubTab('titles', 1, this)">Title 1</button>
                     <button class="sub-tab-btn" onclick="switchSubTab('titles', 2, this)">Title 2</button>
@@ -211,13 +206,37 @@
                 </div>
 
                 <div id="titles-content-1" class="sub-tab-content active">
-                    <div class="form-group"><input type="text" id="titleLink1" placeholder="Title 1 Link"></div>
+                    <div class="form-group">
+                        <label for="projectTitle1"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Project Title
+                            1</label>
+                        <input type="text" id="projectTitle1" placeholder="Enter Project Title 1">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="titleLink1" placeholder="Title 1 Link">
+                    </div>
                 </div>
                 <div id="titles-content-2" class="sub-tab-content">
-                    <div class="form-group"><input type="text" id="titleLink2" placeholder="Title 2 Link"></div>
+                    <div class="form-group">
+                        <label for="projectTitle2"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Project Title
+                            2</label>
+                        <input type="text" id="projectTitle2" placeholder="Enter Project Title 2">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="titleLink2" placeholder="Title 2 Link">
+                    </div>
                 </div>
                 <div id="titles-content-3" class="sub-tab-content">
-                    <div class="form-group"><input type="text" id="titleLink3" placeholder="Title 3 Link"></div>
+                    <div class="form-group">
+                        <label for="projectTitle3"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Project Title
+                            3</label>
+                        <input type="text" id="projectTitle3" placeholder="Enter Project Title 3">
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="titleLink3" placeholder="Title 3 Link">
+                    </div>
                 </div>
             </div>
 
@@ -251,18 +270,7 @@
                 </div>
             </div>
 
-            <script>
-                function switchSubmissionTab(tabId, btn) {
-                    // Hide all contents
-                    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-                    // Show target
-                    document.getElementById('tab-' + tabId).classList.add('active');
 
-                    // Update buttons
-                    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-                    btn.classList.add('active');
-                }
-            </script>
 
             <button class="save-btn" onclick="saveSubmissions()">
                 <span class="material-icons-round">save</span>
