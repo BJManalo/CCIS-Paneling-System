@@ -245,13 +245,13 @@ function checkFabVisibility(payments, groupData) {
 
 
 
-function openAddPaymentModal() {
+async function openAddPaymentModal() {
     const modal = document.getElementById('paymentModal');
+    const loginUser = JSON.parse(localStorage.getItem('loginUser'));
 
     if (!currentGroupData) {
         showToast('Loading group details... please wait.', 'info');
         // Fetch again if missing
-        const loginUser = JSON.parse(localStorage.getItem('loginUser'));
         fetchGroupDetails(loginUser.id).then(() => {
             if (currentGroupData) openAddPaymentModal(); // Retry
         });
@@ -273,20 +273,47 @@ function openAddPaymentModal() {
     const memberNames = currentGroupData.students ? currentGroupData.students.map(s => s.full_name).join(', ') : '';
     document.getElementById('payMembers').value = memberNames;
 
-    // Panels - Removed as requested
-    /*
-    let panels = [];
-    if (currentGroupData.schedules) {
-        const sched = Array.isArray(currentGroupData.schedules) ? currentGroupData.schedules[0] : currentGroupData.schedules;
-        if (sched) {
-            if (sched.panel1) panels.push(sched.panel1);
-            if (sched.panel2) panels.push(sched.panel2);
-            if (sched.panel3) panels.push(sched.panel3);
-            if (sched.panel4) panels.push(sched.panel4);
+    // Filter Defense Types Logic
+    try {
+        const typeSelect = document.getElementById('payDefenseType');
+
+        // Fetch existing payments for this group to filter options
+        const { data: existingPayments, error } = await supabaseClient
+            .from('payments')
+            .select('defense_type')
+            .eq('group_id', loginUser.id);
+
+        if (!error && existingPayments) {
+            // Normalize helper
+            const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const paidTypes = existingPayments.map(p => normalize(p.defense_type));
+
+            // Reset options
+            typeSelect.innerHTML = '';
+            const allTypes = ["Title Defense", "Pre-Oral Defense", "Final Defense"];
+
+            allTypes.forEach(type => {
+                if (!paidTypes.includes(normalize(type))) {
+                    const opt = document.createElement('option');
+                    opt.value = type;
+                    opt.textContent = type;
+                    typeSelect.appendChild(opt);
+                }
+            });
+
+            if (typeSelect.options.length === 0) {
+                typeSelect.innerHTML = '<option value="">All phases paid</option>';
+                typeSelect.disabled = true;
+                document.getElementById('submitBtn').disabled = true;
+                showToast("You have already submitted payments for all defense phases.", "success");
+            } else {
+                typeSelect.disabled = false;
+                document.getElementById('submitBtn').disabled = false;
+            }
         }
+    } catch (err) {
+        console.error("Error filtering defense types:", err);
     }
-    document.getElementById('payPanels').value = panels.join(', ');
-    */
 
     // Reset File
     document.getElementById('receiptFile').value = '';

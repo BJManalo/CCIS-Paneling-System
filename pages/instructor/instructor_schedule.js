@@ -237,53 +237,146 @@ document.getElementById('searchInput')?.addEventListener('input', applyFilters);
 document.getElementById('phaseFilter')?.addEventListener('change', applyFilters);
 
 // --- Fetch Groups for Dropdown ---
+// --- Fetch Groups and Payments for Dropdown ---
 async function fetchGroupsForDropdown() {
     try {
-        // Fetch all Groups
+        console.log('Fetching groups and payments for dropdown...');
+
+        // 1. Fetch allGroups
         const { data: groups, error: groupsError } = await supabaseClient
             .from('student_groups')
             .select('*');
 
         if (groupsError) throw groupsError;
-        let allGroups = groups;
 
-        // Fetch all Payments
-        const { data: payments, error: paymentsError } = await supabaseClient
-            .from('payments')
-            .select('group_id');
-
-        if (paymentsError) throw paymentsError;
-
-        // Create a Set of Group IDs that have made payments
-        const paidGroupIds = new Set(payments.map(p => p.group_id));
-
-        // Filter groups: Only keep those that are in the paid set
-        fetchedGroups = allGroups.filter(g => paidGroupIds.has(g.id));
-
-        // Fetch students to show members
+        // 2. Fetch allMembers (optimization: fetch once) with grades
         const { data: students, error: studentsError } = await supabaseClient
             .from('students')
-            .select('*');
+            .select('*, grades(grade, grade_type)');
+        if (studentsError) throw studentsError;
 
-        if (!studentsError) {
-            fetchedGroups = fetchedGroups.map(g => {
-                const members = students.filter(s => s.group_id === g.id);
-                return { ...g, members };
-            });
-        }
-
-        const select = document.getElementById('schedGroupId');
-        if (!select) return;
-        select.innerHTML = '<option value="">Select Group</option>';
-
-        fetchedGroups.forEach(group => {
-            const option = document.createElement('option');
-            option.value = group.id;
-            option.textContent = group.group_name;
-            select.appendChild(option);
+        // Attach members to groups
+        fetchedGroups = groups.map(g => {
+            const members = students.filter(s => s.group_id === g.id);
+            return { ...g, members };
         });
+
+        // 3. Fetch allPayments
+        const { data: payments, error: paymentsError } = await supabaseClient
+            .from('payments')
+            .select('*'); // Select all to check defense_type
+
+        if (paymentsError) throw paymentsError;
+        window.allPaymentsGlobal = payments; // Store globally for filtering
+
+        // 4. Update the dropdown based on current state
+        updateGroupDropdown();
+
     } catch (err) {
         console.error("Error loading groups:", err);
+    }
+}
+
+// --- Dynamic Dropdown Update ---
+function updateGroupDropdown() {
+    const select = document.getElementById('schedGroupId');
+    if (!select) return;
+
+    // Get current Defense Type from Modal
+    const schedTypeRaw = document.getElementById('schedType').value;
+    // Normalize type specifically handling the Pre-Oral mismatch if any
+    // UI has "Pre Oral Defense", DB/Payment might have "Pre-Oral Defense"
+    // We'll try to match flexibly.
+    const targetType = schedTypeRaw;
+
+    // Get Editing ID if any
+    const editingId = document.getElementById('scheduleForm').getAttribute('data-editing-id');
+    let currentEditingGroup = null;
+
+    if (editingId) {
+        // If editing, we know the group from the schedule we are editing
+        // We find the schedule in allSchedules
+        const sched = allSchedules.find(s => s.id == editingId);
+        if (sched) currentEditingGroup = sched.group_id;
+    }
+
+    // Helper to normalize strings for comparison (remove hyphen, lowercase, spaces)
+    const normalize = (str) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+    // Filter Groups
+    const validGroups = fetchedGroups.filter(group => {
+        // Rule 1: Must have paid for this specific defense type
+        const hasPayment = window.allPaymentsGlobal.some(p =>
+            p.group_id == group.id &&
+            normalize(p.defense_type) === normalize(targetType)
+        );
+
+        if (!hasPayment) return false;
+
+        // Rule 2: Must NOT have an existing schedule for this defense type
+        const existingSchedule = allSchedules.find(s =>
+            s.group_id == group.id &&
+            normalize(s.schedule_type) === normalize(targetType)
+        );
+
+        if (existingSchedule) {
+            // Exception: If we are editing THIS schedule, allow it.
+            if (editingId && existingSchedule.id == editingId) {
+                return true;
+            }
+            // Otherwise, hide it because they already have one.
+            return false;
+        }
+
+        // Rule 3: Sequential Prerequisite Check (Title -> Pre-Oral -> Final)
+        // Groups must have been GRADED in the previous phase to be scheduled for the next.
+        const checkGraded = (requiredType) => {
+            // Check if ANY student in the group has a grade for the required type (Group Grade usually implies all, but lax check matches logic elsewhere)
+            return group.members.some(m =>
+                m.grades && m.grades.some(g => normalize(g.grade_type) === normalize(requiredType) && g.grade !== null)
+            );
+        };
+
+        if (normalize(targetType).includes('preoral')) {
+            // Prerequisite: Title Defense
+            if (!checkGraded('Title Defense')) return false;
+        } else if (normalize(targetType).includes('final')) {
+            // Prerequisite: Pre-Oral Defense
+            if (!checkGraded('Pre-Oral Defense') && !checkGraded('Pre Oral Defense')) return false;
+        }
+
+        return true;
+    });
+
+    // Populate Dropdown
+    select.innerHTML = '<option value="">Select Group</option>';
+
+    // If we are editing and the group got filtered out (e.g. maybe logic skew), force add it back?
+    // Actually, if we are editing, validGroups should capture it via the existingSchedule check above.
+    // However, if the payment was deleted? Unlikely edge case.
+
+    validGroups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.id;
+        option.textContent = group.group_name;
+        select.appendChild(option);
+    });
+
+    // If editing, ensure the current value is selected. 
+    // If for some reason the group isn't valid (e.g. no payment found but schedule exists),
+    // we should probably still show it to allow editing without breaking.
+    if (editingId && currentEditingGroup) {
+        const currentGroupInList = validGroups.find(g => g.id == currentEditingGroup);
+        if (!currentGroupInList) {
+            // Force add it
+            const group = fetchedGroups.find(g => g.id == currentEditingGroup);
+            if (group) {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.group_name + " (Issue: No Payment Found)";
+                select.appendChild(option);
+            }
+        }
     }
 }
 
@@ -318,6 +411,10 @@ function handleGroupChange() {
 }
 
 function handleTypeChange() {
+    updateGroupDropdown();
+    // After updating dropdown, the previous group selection is lost (validly so, as it might be invalid now).
+    // We should clear the panels/members view too.
+    handleGroupChange();
     updatePanelsByDefenseType();
 }
 
@@ -469,7 +566,8 @@ async function openScheduleModal(preSelectedGroupId = null) {
 }
 
 async function openEditScheduleModal(scheduleId) {
-    await fetchGroupsForDropdown();
+    document.getElementById('scheduleForm').setAttribute('data-editing-id', scheduleId);
+
     const { data: sched, error } = await supabaseClient
         .from('schedules')
         .select('*, student_groups(program)')
@@ -477,7 +575,12 @@ async function openEditScheduleModal(scheduleId) {
         .single();
     if (error) return;
 
+    // Set Type first so updateGroupDropdown knows what to filter for
     document.getElementById('schedType').value = sched.schedule_type || 'Title Defense';
+
+    // Now fetch groups - it will use the editing ID and Type to allow the current group
+    await fetchGroupsForDropdown();
+
     document.getElementById('schedGroupId').value = sched.group_id;
     handleGroupChange();
 
@@ -495,7 +598,6 @@ async function openEditScheduleModal(scheduleId) {
     document.getElementById('schedVenue').value = sched.schedule_venue;
 
     updatePanelOptions();
-    document.getElementById('scheduleForm').setAttribute('data-editing-id', scheduleId);
     document.querySelector('.modal-title').textContent = 'Edit Schedule';
     document.getElementById('scheduleModal').classList.add('active');
 }
