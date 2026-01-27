@@ -289,6 +289,24 @@
         </div>
     </div>
 
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal-overlay" style="z-index: 2000;">
+        <div class="modal-content"
+            style="max-width: 400px; text-align: center; padding: 30px 25px; border-radius: 20px; transition: all 0.3s ease;">
+            <div
+                style="width: 60px; height: 60px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                <span class="material-icons-round" style="font-size: 32px; color: var(--primary-color);">info</span>
+            </div>
+            <h3 id="alertTitle" style="font-size: 1.25rem; margin: 0 0 10px; color: #1e293b; font-weight: 700;">Notice
+            </h3>
+            <p id="alertMessage" style="color: #64748b; margin: 0 0 25px; font-size: 0.95rem; line-height: 1.6;"></p>
+            <button onclick="closeAlertModal()"
+                style="background: var(--primary-color); color: white; border: none; padding: 12px 0; width: 100%; border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06);">
+                Okay, got it
+            </button>
+        </div>
+    </div>
+
     <!-- Dedicated Printable Area (Hidden on Screen) -->
     <div id="printableArea" style="display: none;">
         <!-- Header -->

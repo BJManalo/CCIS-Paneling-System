@@ -401,7 +401,7 @@ async function saveGrades(event) {
         loadGrades();
 
     } catch (err) {
-        alert('Error saving grades: ' + err.message);
+        showCustomAlert('Error saving grades: ' + err.message, "Saving Error");
         console.error(err);
     } finally {
         saveBtn.textContent = originalBtnText;
@@ -458,6 +458,42 @@ document.getElementById('gradeModal').addEventListener('click', (e) => {
     }
 });
 
+// --- Custom Alert Modal Functions ---
+function showCustomAlert(message, title = "Notice") {
+    const modal = document.getElementById('alertModal');
+    const titleEl = document.getElementById('alertTitle');
+    const msgEl = document.getElementById('alertMessage');
+
+    if (modal && titleEl && msgEl) {
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+        modal.classList.add('active');
+
+        // Add subtle animation
+        const content = modal.querySelector('.modal-content');
+        content.style.opacity = '0';
+        content.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            content.style.opacity = '1';
+            content.style.transform = 'scale(1)';
+        }, 10);
+    } else {
+        // Fallback
+        alert(message);
+    }
+}
+
+window.closeAlertModal = () => {
+    const modal = document.getElementById('alertModal');
+    if (modal) modal.classList.remove('active');
+}
+
+document.getElementById('alertModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'alertModal') {
+        closeAlertModal();
+    }
+});
+
 // --- Print Report (Global) ---
 window.printReport = () => {
     const typeFilter = document.getElementById('typeFilter').value;
@@ -467,7 +503,7 @@ window.printReport = () => {
 
     // Validate filters for "Academic Report" style printing
     if (typeFilter === 'All') {
-        alert("Please select a specific Defense Type to print an Academic Report.");
+        showCustomAlert("Please select a specific Defense Type to print an Academic Report.", "Report Requirement");
         return;
     }
 
@@ -500,7 +536,7 @@ window.printReport = () => {
     }
 
     if (groupsToPrint.length === 0) {
-        alert("No visible grades found for this selection to print.");
+        showCustomAlert("No visible grades found for this selection to print.", "No Data Found");
         return;
     }
 

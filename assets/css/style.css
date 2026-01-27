@@ -1525,6 +1525,7 @@ button {
         height: 80px;
     }
 }
+
 /* Custom Error Modal */
 .custom-modal-overlay {
     position: fixed;
@@ -1545,7 +1546,7 @@ button {
     background: white;
     padding: 30px;
     border-radius: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     max-width: 320px;
     width: 90%;
     text-align: center;
@@ -1598,6 +1599,24 @@ button {
     transform: scale(1.02);
 }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
 
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
