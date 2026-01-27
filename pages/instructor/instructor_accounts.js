@@ -251,3 +251,16 @@ async function logout() {
     window.location.href = '../../index.html';
 }
 
+function toggleGenericPassword(inputId, icon) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    if (input.type === "password") {
+        input.type = "text";
+        icon.textContent = "visibility";
+    } else {
+        input.type = "password";
+        icon.textContent = "visibility_off";
+    }
+}
+
