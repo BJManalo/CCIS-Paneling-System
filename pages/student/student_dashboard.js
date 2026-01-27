@@ -35,6 +35,24 @@ async function loadSubmissionData() {
         }
 
         if (group) {
+            // --- Fetch Schedules to check if they are allowed to submit ---
+            const { data: schedules, error: schedError } = await supabaseClient
+                .from('schedules')
+                .select('*')
+                .eq('group_id', groupId);
+
+            if (schedError) console.error('Error fetching schedules:', schedError);
+
+            const normalize = (str) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+            const isScheduled = (type) => {
+                if (!schedules) return false;
+                return schedules.some(s => normalize(s.schedule_type).includes(normalize(type)));
+            };
+
+            const isTitleScheduled = isScheduled('Title');
+            const isPreOralScheduled = isScheduled('PreOral'); // checks 'preoral'
+            const isFinalScheduled = isScheduled('Final');
+
             // --- Check Grading Status for Tab Locking ---
             const students = group.students || [];
             const totalStudents = students.length;
@@ -52,22 +70,44 @@ async function loadSubmissionData() {
             const isPreOralGraded = checkGraded('Pre'); // Matches "Pre-Oral" or "Pre Oral"
 
             // Lock/Unlock Tabs
+            const titleBtn = document.querySelector('button[onclick*="titles"]');
             const preOralBtn = document.querySelector('button[onclick*="preoral"]');
             const finalBtn = document.querySelector('button[onclick*="final"]');
 
-            // Logic: Pre-Oral requires Title to be graded
+            // Global State for Schedule status (to use in updateSaveButtonState)
+            window.scheduleStatus = {
+                title: isTitleScheduled,
+                preoral: isPreOralScheduled,
+                final: isFinalScheduled
+            };
+
+            // Logic: Title requires Schedule
+            if (!isTitleScheduled) {
+                // If not scheduled, they can VIEW if they somehow have data, but effectively they shouldn't have data if they followed flow.
+                // We'll handled read-only in updateSaveButtonState, but visually we might want to indicate it.
+                // OPTIONAL: We can lock the tab entirely if we want, but sticking to "Can't submit" usually means read-only or save disabled.
+            }
+
+            // Logic: Pre-Oral requires Title to be graded AND Pre-Oral Schedule
             if (!isTitleGraded) {
                 preOralBtn.disabled = true;
                 preOralBtn.style.opacity = '0.5';
                 preOralBtn.style.cursor = 'not-allowed';
                 preOralBtn.title = "Locked: Title Defense grades pending.";
                 preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+            } else if (!isPreOralScheduled) {
+                // Unlock tab traversal but maybe warning? 
+                // Using the requested logic "students can't submit" -> implies maybe they can enter but not save, OR they can't even enter.
+                // Usually preventing entry is safest for specific strict phases.
+                // However, user might want to see previous stuff? 
+                // Let's rely on updateSaveButtonState to disable saving/editing, but allow tab click if previous stage passed.
             }
 
-            // Logic: Final requires Pre-Oral to be graded
+            // Logic: Final requires Pre-Oral to be graded AND Final Schedule
             if (!isPreOralGraded) {
                 finalBtn.disabled = true;
                 finalBtn.style.opacity = '0.5';
+                preOralBtn.style.cursor = 'not-allowed'; // Typo fix in logic, but standardizing
                 finalBtn.style.cursor = 'not-allowed';
                 finalBtn.title = "Locked: Pre-Oral grades pending.";
                 finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
@@ -252,6 +292,9 @@ async function loadSubmissionData() {
                 final: fLinks
             };
 
+            // Initialize Button State
+            updateSaveButtonState('titles');
+
         }
     } catch (err) {
         console.error('Unexpected error:', err);
@@ -307,6 +350,36 @@ function updateSaveButtonState(tabId) {
     const saveBtn = document.querySelector('.save-btn');
     if (!saveBtn) return;
 
+    // --- Schedule Check ---
+    let isScheduled = true;
+    if (window.scheduleStatus) {
+        if (tabId === 'titles') isScheduled = window.scheduleStatus.title;
+        else if (tabId === 'preoral') isScheduled = window.scheduleStatus.preoral;
+        else if (tabId === 'final') isScheduled = window.scheduleStatus.final;
+    }
+
+    // Helper to lock inputs
+    const lockInputs = (readonly, placeholderText) => {
+        const tabEl = document.querySelector(`#tab-${tabId}`);
+        if (tabEl) {
+            tabEl.querySelectorAll('input').forEach(input => {
+                input.readOnly = readonly;
+                input.style.backgroundColor = readonly ? '#f1f5f9' : '#f8fafc';
+                if (placeholderText) input.title = placeholderText; // Use title for hover info
+            });
+        }
+    };
+
+    if (!isScheduled) {
+        saveBtn.innerHTML = '<span class="material-icons-round">event_busy</span> Not Scheduled';
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = '0.7';
+        saveBtn.style.cursor = 'not-allowed';
+        saveBtn.title = "You have not been scheduled for this defense phase yet.";
+        lockInputs(true, "Not Scheduled yet");
+        return;
+    }
+
     const hasAnyData = (obj) => Object.values(obj || {}).some(val => val && val.trim() !== '');
 
     // Ensure globally stored links are available
@@ -320,31 +393,19 @@ function updateSaveButtonState(tabId) {
         saveBtn.disabled = true;
         saveBtn.style.opacity = '0.7';
         saveBtn.style.cursor = 'default';
+        saveBtn.title = "";
 
         // Lock inputs
-        const tabEl = document.querySelector(`#tab-${tabId}`);
-        if (tabEl) {
-            tabEl.querySelectorAll('input').forEach(input => {
-                input.readOnly = true;
-                input.style.backgroundColor = '#f1f5f9';
-                input.placeholder = 'Submitted (View Only)';
-            });
-        }
+        lockInputs(true, "Submitted (View Only)");
     } else {
         saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
         saveBtn.disabled = false;
         saveBtn.style.opacity = '1';
         saveBtn.style.cursor = 'pointer';
+        saveBtn.title = "";
 
         // Unlock inputs
-        const tabEl = document.querySelector(`#tab-${tabId}`);
-        if (tabEl) {
-            tabEl.querySelectorAll('input').forEach(input => {
-                input.readOnly = false;
-                input.style.backgroundColor = '#f8fafc';
-                input.placeholder = input.id.includes('title') ? 'Title Link' : 'Chapter Link';
-            });
-        }
+        lockInputs(false, "");
     }
 }
 
