@@ -652,7 +652,7 @@ window.submitEvaluation = async (schedId) => {
     }
 
     if (hasError) {
-        alert("Please grade ALL individual criteria for ALL students before submitting.");
+        showErrorAlert("Please grade ALL individual criteria for ALL students before submitting.");
         return;
     }
 
@@ -669,7 +669,7 @@ window.submitEvaluation = async (schedId) => {
         }
 
         if (hasError) {
-            alert("Please score ALL system criteria before submitting.");
+            showErrorAlert("Please score ALL system criteria before submitting.");
             return;
         }
     }
@@ -728,10 +728,26 @@ window.submitEvaluation = async (schedId) => {
 
     } catch (err) {
         console.error('Submission Error:', err);
-        alert('Failed to save evaluation. Please check your connection.');
+        showErrorAlert('Failed to save evaluation. Please check your connection.');
         btn.disabled = false;
         btn.innerText = originalText;
     }
+};
+
+// --- Custom Alert Logic ---
+window.showErrorAlert = (msg) => {
+    const alertBox = document.getElementById('customAlert');
+    if (alertBox) {
+        document.getElementById('customAlertMsg').innerText = msg;
+        alertBox.style.display = 'flex';
+    } else {
+        alert(msg); // Fallback
+    }
+};
+
+window.closeCustomAlert = () => {
+    const alertBox = document.getElementById('customAlert');
+    if (alertBox) alertBox.style.display = 'none';
 };
 
 function collectIndividualScores(schedId, mIdx) {

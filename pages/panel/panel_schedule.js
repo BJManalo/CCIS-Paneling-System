@@ -141,37 +141,68 @@ function renderSchedules(schedules) {
 
     schedules.forEach(sched => {
         const groupName = sched.student_groups ? sched.student_groups.group_name : 'Unknown Group';
-        const program = sched.student_groups ? sched.student_groups.program : '';
+        const program = sched.student_groups ? sched.student_groups.program : '-';
         const displayDate = sched.schedule_date ? new Date(sched.schedule_date).toLocaleDateString() : 'No Date';
         const displayTime = sched.schedule_time || '-';
         const displayVenue = sched.schedule_venue || '-';
-        const type = sched.schedule_type || 'Defense';
+        const typeRaw = (sched.schedule_type || 'Defense').toLowerCase().trim();
+        const typeDisplay = sched.schedule_type || 'Defense';
+
+        // Styling for Defense Types
+        let typeBadgeConfig = {
+            bg: '#f1f5f9',
+            color: '#475569',
+            border: '#e2e8f0'
+        };
+
+        if (typeRaw.includes('title')) {
+            typeBadgeConfig = { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' }; // Blue
+        } else if (typeRaw.includes('pre-oral') || typeRaw.includes('pre oral')) {
+            typeBadgeConfig = { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa' }; // Orange
+        } else if (typeRaw.includes('final')) {
+            typeBadgeConfig = { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' }; // Green
+        }
+
+        const typeBadge = `<span style="
+            font-weight: 700; 
+            font-size: 0.75rem; 
+            background: ${typeBadgeConfig.bg}; 
+            color: ${typeBadgeConfig.color}; 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            border: 1px solid ${typeBadgeConfig.border};
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        ">${typeDisplay}</span>`;
 
         // Panels string
         const panels = [
             sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5
         ].filter(p => p).join(', ');
 
-        // Chips for panels
-        // const panelChips = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5]
-        //    .filter(p => p)
-        //    .map(p => `<span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-right: 4px; display: inline-block;">${p}</span>`)
-        //    .join('');
-
-
         const row = document.createElement('tr');
+        row.style.borderBottom = "1px solid #f1f5f9";
+        row.style.transition = "background-color 0.2s ease";
+        row.onmouseover = function () { this.style.backgroundColor = "#f8fafc"; };
+        row.onmouseout = function () { this.style.backgroundColor = "transparent"; };
+
         row.innerHTML = `
-            <td><span style="font-weight: 600; font-size: 0.85em; background: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 4px;">${type}</span></td>
-            <td>
-                <div style="font-weight: 600; color: #334155;">${groupName}</div>
+            <td style="padding: 16px;">${typeBadge}</td>
+            <td style="padding: 16px;">
+                <div style="font-weight: 700; color: #1e293b; font-size: 0.95rem;">${groupName}</div>
             </td>
-            <td>${program}</td>
-            <td>
-                <div style="font-weight: 500;">${displayDate}</div>
-                <div style="font-size: 0.85em; color: #64748b;">${displayTime}</div>
+            <td style="padding: 16px; color: #64748b; font-weight: 500;">${program}</td>
+            <td style="padding: 16px;">
+                <div style="font-weight: 600; color: #0f172a;">${displayDate}</div>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${displayTime}</div>
             </td>
-            <td>${displayVenue}</td>
-            <td><span style="font-size: 0.85em; color: #475569;">${panels}</span></td>
+            <td style="padding: 16px; color: #334155; font-weight: 500;">${displayVenue}</td>
+            <td style="padding: 16px;">
+                <div style="font-size: 0.85rem; color: #475569; line-height: 1.5; max-width: 400px;">
+                    ${panels}
+                </div>
+            </td>
         `;
         tableBody.appendChild(row);
     });
