@@ -134,6 +134,18 @@
         <!-- Filters (Under Logout) -->
         <div style="display: flex; justify-content: flex-end; gap: 15px; margin-bottom: 20px;">
             <div class="custom-select-wrapper" style="width: 200px; position: relative;">
+                <select id="filterProgram" onchange="filterPayers()"
+                    style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
+                    <option value="">All Programs</option>
+                    <option value="BSCS">BSCS</option>
+                    <option value="BSIT">BSIT</option>
+                    <option value="BSIS">BSIS</option>
+                </select>
+                <span class="material-icons-round select-arrow"
+                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
+            </div>
+
+            <div class="custom-select-wrapper" style="width: 200px; position: relative;">
                 <select id="filterDefenseType" onchange="filterPayers()"
                     style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
                     <option value="">All Defense Types</option>

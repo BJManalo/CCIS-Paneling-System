@@ -136,17 +136,19 @@ window.togglePayerRow = function (id) {
 function filterPayers() {
     const typeFilter = document.getElementById('filterDefenseType').value;
     const sectionFilter = document.getElementById('filterSection').value;
+    const programFilter = document.getElementById('filterProgram').value;
     const searchFilter = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
 
     const filtered = allPayments.filter(p => {
         const matchesType = typeFilter ? (p.defense_type === typeFilter) : true;
         const matchesSection = sectionFilter ? (p.section === sectionFilter) : true;
+        const matchesProgram = programFilter ? (p.program === programFilter) : true;
         const matchesSearch = searchFilter ? (
             (p.group_name && p.group_name.toLowerCase().includes(searchFilter)) ||
             (p.members && p.members.toLowerCase().includes(searchFilter))
         ) : true;
 
-        return matchesType && matchesSection && matchesSearch;
+        return matchesType && matchesSection && matchesProgram && matchesSearch;
     });
 
     renderPayers(filtered);
