@@ -632,7 +632,48 @@ window.submitEvaluation = async (schedId) => {
     if (!evalItem || !loginUser) return;
 
     const btn = event.target;
+    // Store original text to restore later if needed
     const originalText = btn.innerText;
+
+    // --- Validation Start ---
+    let hasError = false;
+
+    // 1. Validate Individual Scores
+    // We can check the DOM directly for any score of "0"
+    const allIndividualSelects = document.querySelectorAll(`[class*="p-score-${schedId}"]`);
+    for (let select of allIndividualSelects) {
+        if (select.value === "0" || select.value === "") {
+            hasError = true;
+            // Optional: Highlight the missing field
+            select.style.border = "1px solid red";
+        } else {
+            select.style.border = "";
+        }
+    }
+
+    if (hasError) {
+        alert("Please grade ALL individual criteria for ALL students before submitting.");
+        return;
+    }
+
+    // 2. Validate System Scores (if present)
+    const allSystemSelects = document.querySelectorAll(`.sys-score-${schedId}`);
+    if (allSystemSelects.length > 0) {
+        for (let select of allSystemSelects) {
+            if (select.value === "0" || select.value === "") {
+                hasError = true;
+                select.style.border = "1px solid red";
+            } else {
+                select.style.border = "";
+            }
+        }
+
+        if (hasError) {
+            alert("Please score ALL system criteria before submitting.");
+            return;
+        }
+    }
+    // --- Validation End ---
 
     try {
         btn.disabled = true;
@@ -646,9 +687,8 @@ window.submitEvaluation = async (schedId) => {
 
             individualCriteria.forEach(c => {
                 const select = document.querySelector(`.p-score-${schedId}-${mIdx}`);
+                // Although we validated above, we re-parse safely here
                 const score = select ? parseInt(select.value) : 0;
-                // Map names to column slugs if needed, or use a generic approach
-                // Here we use the column names from the SQL we just provided
                 const slug = c.name.toLowerCase().split(' ')[0] + '_score';
                 scores[slug] = score;
                 studentTotal += score;
@@ -658,8 +698,7 @@ window.submitEvaluation = async (schedId) => {
                 schedule_id: schedId,
                 student_id: student.id,
                 panelist_name: loginUser.name,
-                clarity_score: parseInt(document.querySelector(`.p-score-${schedId}-${mIdx}:nth-of-type(1)`)?.value || 0), // This is tricky with current UI
-                // Let's do it more robustly by selecting each criteria row
+                // Explicitly mapping collected scores
                 ...collectIndividualScores(schedId, mIdx),
                 total_score: studentTotal
             });
