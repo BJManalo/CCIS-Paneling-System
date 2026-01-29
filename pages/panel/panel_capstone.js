@@ -874,8 +874,8 @@ function initAdobeViewer(url, divId) {
     document.getElementById(divId).innerHTML = "";
 
     const adobeDCView = new AdobeDC.View({
-        clientId: ADOBE_CLIENT_ID
-        // divId must be OMITTED for LIGHT_BOX mode
+        clientId: ADOBE_CLIENT_ID,
+        divId: divId
     });
 
     // Helper to get filename
@@ -885,13 +885,13 @@ function initAdobeViewer(url, divId) {
         content: { location: { url: url } },
         metaData: { fileName: fileName }
     }, {
-        embedMode: "LIGHT_BOX",
+        embedMode: "FULL_WINDOW",
         defaultViewMode: "FIT_WIDTH",
         dockPageControls: false,
         showAnnotationTools: true,
         enableAnnotationAPIs: true,
         includePDFAnnotations: true,
-        showLeftHandPanel: true,
+        showLeftHandPanel: false, // Hide left panel to save space for toolbar
         showDownloadPDF: true,
         showPrintPDF: true
     });
