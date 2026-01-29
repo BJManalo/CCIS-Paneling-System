@@ -945,7 +945,9 @@ window.loadViewer = async (url) => {
     // CRITICAL FIX: Google Drive 'view' links return HTML, not PDF bytes. 
     // PDF.js cannot render them directly via XHR due to CORS and content type.
     // We only enable the Custom PDF Renderer (with highlighting) for DIRECT PDF URLs (ending in .pdf).
-    const isDirectPDF = url.toLowerCase().endsWith('.pdf');
+    // UPDATE: We must strictly check the pathname, ignoring query params (e.g. ?t=...)
+    const cleanUrl = url.split('?')[0].toLowerCase();
+    const isDirectPDF = cleanUrl.endsWith('.pdf');
 
     if (isDirectPDF) {
         // Try to Render with PDF.js
