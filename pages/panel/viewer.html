@@ -108,7 +108,10 @@
 
                 adobeDCView.previewFile({
                     content: { promise: Promise.resolve(arrayBuffer) },
-                    metaData: { fileName: fileName }
+                    metaData: {
+                        fileName: fileName,
+                        id: btoa(fileUrl).substring(0, 20) // Use a derivative of URL as unique ID
+                    }
                 }, {
                     embedMode: "FULL_WINDOW",
                     showAnnotationTools: true,
