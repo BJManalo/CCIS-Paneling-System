@@ -176,10 +176,26 @@ function renderSchedules(schedules) {
             display: inline-block;
         ">${typeDisplay}</span>`;
 
-        // Panels string
-        const panels = [
+        // Panels badges
+        const panelList = [
             sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5
-        ].filter(p => p).join(', ');
+        ].filter(p => p);
+
+        const panelsHtml = panelList.map(p => `
+            <span style="
+                display: inline-block;
+                padding: 6px 12px;
+                background: #f8fafc;
+                color: #475569;
+                font-weight: 600;
+                font-size: 0.85rem;
+                border-radius: 8px;
+                border: 1px solid #cbd5e1;
+                margin-right: 4px;
+                margin-bottom: 4px;
+                font-family: 'Outfit', sans-serif;
+            ">${p}</span>
+        `).join('');
 
         const row = document.createElement('tr');
         row.style.borderBottom = "1px solid #f1f5f9";
@@ -199,8 +215,8 @@ function renderSchedules(schedules) {
             </td>
             <td style="padding: 16px; color: #334155; font-weight: 500;">${displayVenue}</td>
             <td style="padding: 16px;">
-                <div style="font-size: 0.85rem; color: #475569; line-height: 1.5; max-width: 400px;">
-                    ${panels}
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 450px;">
+                    ${panelsHtml}
                 </div>
             </td>
         `;
