@@ -169,34 +169,21 @@ async function loadSubmissionData() {
             let pRemarks = preOralDS ? (preOralDS.remarks || {}) : {};
             let fRemarks = finalDS ? (finalDS.remarks || {}) : {};
 
-            // Helper to render status badge, remarks, AND file link
-            const renderField = (linkMap, statusMap, remarksMap, key, fileElementId, linkDisplayId) => {
-                const fileEl = document.getElementById(fileElementId);
-                const linkDisplayEl = document.getElementById(linkDisplayId);
+            // Helper to render status badge and remarks
+            const renderField = (linkMap, statusMap, remarksMap, key, elementId) => {
+                const el = document.getElementById(elementId);
+                if (!el) return;
 
-                if (!fileEl) return;
-
-                const currentLink = linkMap[key] || '';
-
-                // Show existing link if available
-                if (currentLink && linkDisplayEl) {
-                    const fileName = currentLink.split('/').pop().split('?')[0].substring(0, 30) + '...';
-                    linkDisplayEl.innerHTML = `
-                        <a href="${currentLink}" target="_blank" style="text-decoration:none; color:var(--primary-color); display:flex; align-items:center; gap:5px; padding:4px 8px; background:#e0f2fe; border-radius:4px; border:1px solid #bae6fd; width:fit-content;">
-                             <span class="material-icons-round" style="font-size:14px;">description</span>
-                             <span style="font-weight:600;">View Submitted File</span>
-                        </a>
-                        <div style="font-size:10px; color:#94a3b8; margin-top:2px; margin-left:4px;">${fileName}</div>
-                    `;
-                }
+                el.value = linkMap[key] || '';
 
                 const rawStatus = statusMap[key] || 'Pending';
-                const rawRemarks = remarksMap[key] || {};
+                const rawRemarks = remarksMap[key] || {}; // Now expecting object or string
 
                 // --- Multi-Panel Logic ---
-                let feedbackData = [];
+                let feedbackData = []; // Array of { panel, status, remarks }
 
                 if (typeof rawStatus === 'object') {
+                    // Modern structure: { "Panel Name": "Approved" }
                     Object.keys(rawStatus).forEach(panel => {
                         feedbackData.push({
                             panel: panel,
@@ -205,6 +192,7 @@ async function loadSubmissionData() {
                         });
                     });
                 } else {
+                    // Compatibility with old single-string format
                     feedbackData.push({
                         panel: 'Panel',
                         status: rawStatus,
@@ -213,11 +201,12 @@ async function loadSubmissionData() {
                 }
 
                 // 1. Label & Badge Wrapper
-                // Find label previous to input
-                const label = fileEl.parentElement.querySelector('label');
-                const existingBadge = fileEl.parentElement.querySelector('.status-badge-container');
-                if (existingBadge) existingBadge.remove();
+                const prevEl = el.previousElementSibling;
+                if (prevEl && (prevEl.classList.contains('status-badge-container') || prevEl.innerText === 'Link')) {
+                    prevEl.remove();
+                }
 
+                // Prepare Badge HTML (can be multiple)
                 const badgesHtml = feedbackData.map(f => {
                     let color = '#64748b'; let icon = 'hourglass_empty'; let bg = '#f1f5f9'; let border = '#e2e8f0';
                     if (f.status.includes('Approved')) {
@@ -236,28 +225,23 @@ async function loadSubmissionData() {
                     `;
                 }).join('');
 
-                if (label) {
-                    const headerHtml = `
-                        <div class="status-badge-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                             <span></span>
-                            <div style="display: flex; flex-direction: column; align-items: flex-end;">
-                                ${badgesHtml}
-                            </div>
+                const headerHtml = `
+                    <div class="status-badge-container" style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Submission Link</span>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                            ${badgesHtml}
                         </div>
-                    `;
-                    // Insert badge inside label or right after?
-                    // Let's insert before label to be safe or append to label
-                    label.insertAdjacentHTML('beforeend', `<div style="float:right">${badgesHtml}</div>`);
-                }
+                    </div>
+                `;
+                el.insertAdjacentHTML('beforebegin', headerHtml);
 
-                // 2. Remarks
-                const existingRemarks = fileEl.parentElement.querySelector('.remarks-container');
-                if (existingRemarks) existingRemarks.remove();
+                // 2. Remarks (Clean Design)
+                const nextEl = el.nextElementSibling;
+                if (nextEl && nextEl.classList.contains('remarks-container')) nextEl.remove();
 
                 const validRemarks = feedbackData.filter(f => f.remarks && f.remarks.trim() !== '');
                 if (validRemarks.length > 0) {
                     const remarksHtml = validRemarks.map(f => {
-                        // ... styling same as before ...
                         let color = '#64748b'; let bg = '#f1f5f9';
                         if (f.status.includes('Approved')) { color = '#059669'; bg = '#f0fdf4'; }
                         else if (f.status.includes('Approve with Revisions')) { color = '#d97706'; bg = '#fffbeb'; }
@@ -272,34 +256,34 @@ async function loadSubmissionData() {
                         }
 
                         return `
-                            <div class="remarks-container" style="margin-top: 8px; background: ${bg}; opacity: 0.9; border-left: 3px solid ${color}; border-radius: 4px; padding: 10px 14px;">
-                                <div style="display: flex; align-items: center; gap: 6px; margin-bottom:4px;">
+                            <div class="remarks-container" style="margin-top: 8px; background: ${bg}; opacity: 0.9; border-left: 3px solid ${color}; border-radius: 0 6px 6px 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
                                     <span class="material-icons-round" style="font-size: 14px; color: ${color};">face</span>
                                     <span style="font-size: 0.75rem; font-weight: 700; color: ${color}; text-transform: uppercase;">${headerText}</span>
                                 </div>
-                                <div style="font-size: 0.9rem; color: #334155; line-height: 1.4;">
+                                <div style="font-size: 0.9rem; color: #334155; line-height: 1.5; margin-left: 20px;">
                                     ${bodyText}
                                 </div>
                             </div>
                         `;
                     }).join('');
-                    fileEl.parentElement.insertAdjacentHTML('beforeend', remarksHtml);
+                    el.insertAdjacentHTML('afterend', remarksHtml);
                 }
             };
 
             // Render Titles
-            renderField(tLinks, tStatus, tRemarks, 'title1', 'titleFile1', 'existing-link-1');
-            renderField(tLinks, tStatus, tRemarks, 'title2', 'titleFile2', 'existing-link-2');
-            renderField(tLinks, tStatus, tRemarks, 'title3', 'titleFile3', 'existing-link-3');
+            renderField(tLinks, tStatus, tRemarks, 'title1', 'titleLink1');
+            renderField(tLinks, tStatus, tRemarks, 'title2', 'titleLink2');
+            renderField(tLinks, tStatus, tRemarks, 'title3', 'titleLink3');
 
             // Render Pre-Oral
-            renderField(pLinks, pStatus, pRemarks, 'ch1', 'preOralFile1', 'existing-pre-1');
-            renderField(pLinks, pStatus, pRemarks, 'ch2', 'preOralFile2', 'existing-pre-2');
-            renderField(pLinks, pStatus, pRemarks, 'ch3', 'preOralFile3', 'existing-pre-3');
+            renderField(pLinks, pStatus, pRemarks, 'ch1', 'preOralCh1');
+            renderField(pLinks, pStatus, pRemarks, 'ch2', 'preOralCh2');
+            renderField(pLinks, pStatus, pRemarks, 'ch3', 'preOralCh3');
 
             // Render Final
-            renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalFile4', 'existing-final-4');
-            renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalFile5', 'existing-final-5');
+            renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
+            renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
 
             // Store links in window.currentLinks - Handled globally now
             window.currentLinks = {
@@ -470,81 +454,58 @@ window.saveSubmissions = async function () {
     }
 
     const btn = document.querySelector('.save-btn');
-    const originalContent = btn.innerHTML; // Save original HTML
+    const originalContent = btn.innerHTML; // Save original HTML (icon + text)
 
-    btn.innerHTML = '<span class="material-icons-round spin">sync</span> Uploading...';
+    btn.innerHTML = '<span class="material-icons-round spin">sync</span> Saving...';
     btn.disabled = true;
 
     const activeTab = document.querySelector('.tab-btn.active');
     const tabId = activeTab.innerText.toLowerCase().includes('title') ? 'titles' :
         activeTab.innerText.toLowerCase().includes('pre') ? 'preoral' : 'final';
 
+    // Collect data ONLY for the active tab
     let updates = {};
-    let activeLinks = {}; // This will hold the URLs to save
+    let activeLinks = {};
 
-    // Helper to upload file and get URL
-    const uploadFile = async (fileInputId, existingUrl) => {
-        const input = document.getElementById(fileInputId);
-        if (input && input.files.length > 0) {
-            const file = input.files[0];
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${loginUser.id}_${Date.now()}_${fileInputId}.${fileExt}`;
-            const filePath = `${tabId}/${fileName}`;
+    if (tabId === 'titles') {
+        activeLinks = {
+            title1: document.getElementById('titleLink1').value.trim(),
+            title2: document.getElementById('titleLink2').value.trim(),
+            title3: document.getElementById('titleLink3').value.trim()
+        };
+        updates.title_link = JSON.stringify(activeLinks);
 
-            const { data, error } = await supabaseClient.storage
-                .from('submissions')
-                .upload(filePath, file);
+        // Save Project Titles (All 3)
+        const pTitles = {
+            title1: document.getElementById('projectTitle1') ? document.getElementById('projectTitle1').value.trim() : '',
+            title2: document.getElementById('projectTitle2') ? document.getElementById('projectTitle2').value.trim() : '',
+            title3: document.getElementById('projectTitle3') ? document.getElementById('projectTitle3').value.trim() : ''
+        };
+        updates.project_title = JSON.stringify(pTitles);
+    } else if (tabId === 'preoral') {
+        activeLinks = {
+            ch1: document.getElementById('preOralCh1').value.trim(),
+            ch2: document.getElementById('preOralCh2').value.trim(),
+            ch3: document.getElementById('preOralCh3').value.trim()
+        };
+        updates.pre_oral_link = JSON.stringify(activeLinks);
+    } else if (tabId === 'final') {
+        activeLinks = {
+            ch4: document.getElementById('finalCh4').value.trim(),
+            ch5: document.getElementById('finalCh5').value.trim()
+        };
+        updates.final_link = JSON.stringify(activeLinks);
+    }
 
-            if (error) {
-                console.error(`Upload failed for ${fileInputId}:`, error);
-                throw error;
-            }
-
-            const { data: publicData } = supabaseClient.storage
-                .from('submissions')
-                .getPublicUrl(filePath);
-
-            return publicData.publicUrl;
-        }
-        return existingUrl; // Return existing if no new file
-    };
+    // Basic Validation: Ensure at least one link is provided
+    if (!Object.values(activeLinks).some(v => v !== '')) {
+        showToast('Please provide at least one link before saving.', 'warning');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        return;
+    }
 
     try {
-        // Collect existing links first to avoid overwriting with empty
-        const currentLinks = window.currentLinks[tabId] || {};
-
-        if (tabId === 'titles') {
-            activeLinks = {
-                title1: await uploadFile('titleFile1', currentLinks.title1),
-                title2: await uploadFile('titleFile2', currentLinks.title2),
-                title3: await uploadFile('titleFile3', currentLinks.title3)
-            };
-            updates.title_link = JSON.stringify(activeLinks);
-
-            const pTitles = {
-                title1: document.getElementById('projectTitle1') ? document.getElementById('projectTitle1').value.trim() : '',
-                title2: document.getElementById('projectTitle2') ? document.getElementById('projectTitle2').value.trim() : '',
-                title3: document.getElementById('projectTitle3') ? document.getElementById('projectTitle3').value.trim() : ''
-            };
-            updates.project_title = JSON.stringify(pTitles);
-
-        } else if (tabId === 'preoral') {
-            activeLinks = {
-                ch1: await uploadFile('preOralFile1', currentLinks.ch1),
-                ch2: await uploadFile('preOralFile2', currentLinks.ch2),
-                ch3: await uploadFile('preOralFile3', currentLinks.ch3)
-            };
-            updates.pre_oral_link = JSON.stringify(activeLinks);
-
-        } else if (tabId === 'final') {
-            activeLinks = {
-                ch4: await uploadFile('finalFile4', currentLinks.ch4),
-                ch5: await uploadFile('finalFile5', currentLinks.ch5)
-            };
-            updates.final_link = JSON.stringify(activeLinks);
-        }
-
-        // Save to DB
         const { error } = await supabaseClient
             .from('student_groups')
             .update(updates)
@@ -552,19 +513,24 @@ window.saveSubmissions = async function () {
 
         if (error) throw error;
 
-        showToast('Files uploaded & saved successfully!', 'success');
+        showToast('Submissions saved successfully!', 'success');
 
-        // Update local state and lock
+        // Update local state and lock current tab only
         window.currentLinks[tabId] = activeLinks;
-        // Reload to show "View File" buttons
-        loadSubmissionData();
-        // window.switchSubmissionTab(tabId, activeTab);
+        window.switchSubmissionTab(tabId, activeTab);
 
     } catch (err) {
         console.error('Submission error:', err);
+
+        // Restore button only if there was an error
         btn.innerHTML = originalContent;
         btn.disabled = false;
-        showToast('Failed to save: ' + err.message, 'error');
+
+        if (err.message && err.message.includes('schema cache')) {
+            showToast('System Error: Database schema out of sync. Please contact Administrator.', 'error');
+        } else {
+            showToast('Failed to save: ' + err.message, 'error');
+        }
     }
 }
 
