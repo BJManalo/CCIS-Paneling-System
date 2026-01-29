@@ -796,6 +796,17 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
 
 
 window.backToFileList = () => {
+    const viewerArea = document.getElementById('modalViewerArea');
+
+    // Reset from Full Screen Fixed
+    viewerArea.style.position = '';
+    viewerArea.style.top = '';
+    viewerArea.style.left = '';
+    viewerArea.style.width = '';
+    viewerArea.style.height = '';
+    viewerArea.style.zIndex = '';
+    viewerArea.style.borderRadius = '';
+
     document.getElementById('modalSidebar').style.display = 'flex';
     document.getElementById('fileViewHeader').style.display = 'none';
 
@@ -827,9 +838,20 @@ window.loadViewer = (url) => {
     const toolbar = document.getElementById('viewerToolbar');
     const header = document.getElementById('fileViewHeader');
     const sidebar = document.getElementById('modalSidebar');
+    const viewerArea = document.getElementById('modalViewerArea');
 
-    // Layout Change: Hide sidebar, show viewer fully
+    // Layout Change: Force Area to Full Screen Fixed (Manual Lightbox)
+    // This is the "Nuclear" option to guarantee Adobe sees a Desktop size container
     sidebar.style.display = 'none';
+
+    viewerArea.style.position = 'fixed';
+    viewerArea.style.top = '0';
+    viewerArea.style.left = '0';
+    viewerArea.style.width = '100vw';
+    viewerArea.style.height = '100vh';
+    viewerArea.style.zIndex = '2000'; // Above everything
+    viewerArea.style.borderRadius = '0';
+
     header.style.display = 'flex';
 
     iframe.style.display = 'none';
