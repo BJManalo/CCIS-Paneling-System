@@ -885,7 +885,7 @@ function initAdobeViewer(url, divId) {
         content: { location: { url: url } },
         metaData: { fileName: fileName }
     }, {
-        embedMode: "FULL_WINDOW",
+        embedMode: "LIGHT_BOX",
         defaultViewMode: "FIT_WIDTH",
         dockPageControls: false,
         showAnnotationTools: true,
