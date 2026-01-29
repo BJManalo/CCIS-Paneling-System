@@ -956,31 +956,52 @@ window.loadViewer = async (url) => {
         annotList.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px;">Loading annotations...</div>';
 
         try {
-            // Add a timeout to avoid stuck loading state
-            await Promise.race([
-                renderPdf(url),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
-            ]);
+            await renderPdf(url);
             loadSidebarAnnotations();
         } catch (e) {
-            console.warn('PDF Render failed (CORS or Timeout), falling back to Iframe', e);
+            console.warn('PDF Render failed (CORS or Error), falling back to Iframe', e);
             pdfContainer.style.display = 'none';
-            sidebar.style.display = 'none'; // Hide annotation sidebar if render fails
+            // sidebar.style.display = 'none'; // OLD: Hid sidebar
+            // NEW: Keep sidebar, but show warning
 
             // Fallback to Iframe
             let viewerUrl = url;
             if (isDrive) viewerUrl = url.replace('/view', '/preview');
-            // For direct PDFs that failed CORS, we can still try Google Docs Viewer in iframe
             else viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
 
             fileViewer.src = viewerUrl;
             fileViewer.style.display = 'block';
+
+            // Load comments into sidebar anyway (Read-Only list)
+            annotList.innerHTML = `
+                <div style="background:#fef2f2; color:#b91c1c; padding:10px; font-size:11px; margin-bottom:10px; border-radius:6px; border:1px solid #fca5a5;">
+                    <strong style="display:block; margin-bottom:2px;">Annotation Unavailable</strong>
+                    File could not be rendered for highlighting.
+                    <br>Standard viewing enabled.
+                </div>
+            `;
+            // Append existing comments
+            const commentsDiv = document.createElement('div');
+            annotList.appendChild(commentsDiv);
+            loadSidebarAnnotations();
+
+            // Prepend warning after loading
+            const warning = document.createElement('div');
+            warning.innerHTML = `
+                <div style="background:#fff7ed; color:#c2410c; padding:10px; font-size:11px; margin-bottom:10px; border-radius:6px; border:1px solid #fdba74;">
+                    <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">warning</span>
+                    <strong>Highlighting Mode Failed</strong><br>
+                    Load error or CORS restriction.
+                </div>
+            `;
+            annotList.prepend(warning);
         }
 
     } else {
         // Standard Iframe (Docs, Slides, or Drive PDFs)
-        // We do NOT show the custom annotation sidebar here because we can't draw on the iframe.
-        sidebar.style.display = 'none';
+        // Keep sidebar visible for consistency? 
+        // User wants comments to "flow". Even if not highlighting, seeing the list is good.
+        sidebar.style.display = 'flex';
 
         let viewerUrl = url;
         if (isDrive) {
@@ -991,6 +1012,15 @@ window.loadViewer = async (url) => {
 
         fileViewer.src = viewerUrl;
         fileViewer.style.display = 'block';
+
+        loadSidebarAnnotations();
+        const info = document.createElement('div');
+        info.innerHTML = `
+             <div style="padding:15px; text-align:center; color:#94a3b8; font-size:12px; font-style:italic;">
+                Highlighting not supported for this file type.
+             </div>
+        `;
+        annotList.prepend(info);
     }
 
     // Store context for saving
