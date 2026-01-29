@@ -861,9 +861,11 @@ function initAdobeViewer(url, divId) {
         content: { location: { url: url } },
         metaData: { fileName: fileName }
     }, {
-        embedMode: "IN_LINE",
+        embedMode: "FULL_WINDOW",
         defaultViewMode: "FIT_WIDTH",
         showAnnotationTools: true,
+        enableAnnotationAPIs: true,
+        includePDFAnnotations: true,
         showLeftHandPanel: true,
         showDownloadPDF: true,
         showPrintPDF: true
