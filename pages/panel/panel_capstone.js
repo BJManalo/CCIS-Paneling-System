@@ -1,3 +1,5 @@
+// panel_capstone.js
+// Updated to support Page-Based Comments
 const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
 const PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
 const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
@@ -592,22 +594,69 @@ window.openFileModal = (groupId) => {
 
             if (panelsToDisplay.length > 0) {
                 otherFeedbackHtml = `
-                    <div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">
-                        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Panel Evaluations</div>
-                        ${panelsToDisplay.map(panel => `
-                            <div style="font-size: 11px; margin-bottom: 4px; color: #475569;">
-                                <strong style="color: var(--primary-color);">${panel}:</strong> ${fileStatuses[panel] || 'Pending'}
-                                ${fileRemarks[panel] ? `<br><span style="color: #64748b; font-style: italic;">"${fileRemarks[panel].replace(panel + ':', '').trim()}"</span>` : ''}
+                    <div style="margin-top: 15px; border-top: 1px dashed #e2e8f0; padding-top: 15px;">
+                        <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Panel Evaluations</div>
+                        ${panelsToDisplay.map(panel => {
+                    let comments = [];
+                    const rawRem = fileRemarks[panel] || '';
+                    try {
+                        comments = JSON.parse(rawRem);
+                        if (!Array.isArray(comments)) throw new Error();
+                    } catch (e) {
+                        if (rawRem) comments = [{ page: 'General', text: rawRem.replace(new RegExp(`^${panel}:\\s*`), '') }];
+                    }
+
+                    const commentsHtml = comments.map(c => `
+                                <div style="font-size: 11px; margin-bottom: 4px; padding-left: 8px; border-left: 2px solid #cbd5e1;">
+                                    ${c.page && c.page !== 'General' ? `<span style="font-weight:600; color:#475569; background:#f1f5f9; padding:1px 4px; border-radius:4px; margin-right:4px;">Pg ${c.page}</span>` : ''}
+                                    <span style="color: #64748b;">${c.text}</span>
+                                </div>
+                             `).join('');
+
+                    return `
+                            <div style="font-size: 11px; margin-bottom: 12px; color: #475569;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                    <strong style="color: var(--primary-color);">${panel}</strong>
+                                    <span class="status-badge" style="font-size:10px; padding:2px 6px; ${fileStatuses[panel]?.includes('Approved') ? 'background:#dcfce7; color:#166534;' : 'background:#f1f5f9; color:#64748b;'}">${fileStatuses[panel] || 'Pending'}</span>
+                                </div>
+                                ${commentsHtml || '<span style="font-style:italic; color:#94a3b8;">No remarks</span>'}
                             </div>
-                        `).join('')}
+                        `;
+                }).join('')}
                     </div>
                 `;
             }
 
             let interactiveControls = '';
             if (currentRole === 'Panel') {
+
+                // Parse my existing comments
+                let myComments = [];
+                try {
+                    const parsed = JSON.parse(myRemarks);
+                    if (Array.isArray(parsed)) myComments = parsed;
+                    else if (myRemarks) myComments = [{ id: Date.now(), page: 'General', text: myRemarks.replace(new RegExp(`^${userName}:\\s*`), ''), date: new Date().toISOString() }];
+                } catch (e) {
+                    if (myRemarks) myComments = [{ id: Date.now(), page: 'General', text: myRemarks.replace(new RegExp(`^${userName}:\\s*`), ''), date: new Date().toISOString() }];
+                }
+
+                // Render Comments List HTML
+                const commentsListHtml = myComments.map((c, idx) => `
+                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 6px; position: relative;">
+                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
+                            <span style="font-size: 10px; font-weight: 700; color: #475569; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">
+                                ${c.page === 'General' || !c.page ? 'General' : `Page ${c.page}`}
+                            </span>
+                            <button onclick="deletePageRemark(${group.id}, '${categoryKey}', '${label}', ${idx})" style="background:none; border:none; cursor:pointer; color:#ef4444; padding:0;">
+                                <span class="material-icons-round" style="font-size:14px;">close</span>
+                            </button>
+                         </div>
+                         <div style="font-size: 12px; color: #334155; line-height: 1.4;">${c.text}</div>
+                    </div>
+                `).join('');
+
                 interactiveControls = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
                     <div style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
                         <span class="material-icons-round" style="font-size: 14px;">${iconText}</span>
@@ -615,18 +664,25 @@ window.openFileModal = (groupId) => {
                     </div>
                 </div>
                 <select onchange="updateStatus(${group.id}, '${categoryKey}', '${label}', this.value)" 
-                    style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; cursor: pointer; background: white; color: #334155; font-weight: 500; outline: none; margin-bottom: 5px;">
+                    style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; cursor: pointer; background: white; color: #334155; font-weight: 500; outline: none; margin-bottom: 15px;">
                     <option value="Pending" ${myStatus === 'Pending' ? 'selected' : ''}>Change Your Status...</option>
                     ${optionsHtml}
                 </select>
-                <div style="margin-top: 5px;">
-                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Your Remarks</div>
-                    <textarea id="remarks-${categoryKey}-${label}" placeholder="Add your feedback..." 
-                        style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 13px; min-height: 60px; resize: vertical;">${myRemarks.includes(':') ? myRemarks.split(':').slice(1).join(':').trim() : myRemarks}</textarea>
-                    <button onclick="saveRemarks(${group.id}, '${categoryKey}', '${label}')" 
-                        style="width: 100%; margin-top: 5px; background: ${myRemarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${myRemarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                        ${myRemarks ? 'Update Remarks' : 'Save Remarks'}
+
+                <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 15px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Add Info</div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                         <input type="text" id="page-${categoryKey}-${label}" placeholder="Pg #" style="width: 50px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; text-align: center;">
+                         <input type="text" id="new-comment-${categoryKey}-${label}" placeholder="Type your comment/correction here..." style="flex: 1; padding: 6px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
+                    </div>
+                    <button onclick="addPageRemark(${group.id}, '${categoryKey}', '${label}')" 
+                        style="width: 100%; background: var(--primary-color); color: white; border: none; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <span class="material-icons-round" style="font-size: 14px;">add</span> Add Comment
                     </button>
+                </div>
+
+                <div style="max-height: 200px; overflow-y: auto;">
+                    ${commentsListHtml || '<div style="text-align:center; font-size:11px; color:#94a3b8; padding:10px;">No comments yet</div>'}
                 </div>
                 `;
             } else {
@@ -692,7 +748,7 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
 
         let localMap = group.currentStatusJson || {};
 
-        // Multi-panel structure: { "title1": { "Panel A": "Approved" } }
+        // Multi-panel structure: {"title1": {"Panel A": "Approved" } }
         if (typeof localMap[fileKey] !== 'object') {
             localMap[fileKey] = {}; // Transition to new structure
         }
@@ -730,28 +786,85 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
     } catch (err) { console.error(err); alert('Failed to update status: ' + (err.message || err)); }
 };
 
-window.saveRemarks = async (groupId, categoryKey, fileKey) => {
+window.addPageRemark = async (groupId, categoryKey, fileKey) => {
     const userJson = localStorage.getItem('loginUser');
     if (!userJson) return;
     const user = JSON.parse(userJson);
     const userName = user.name || 'Panel';
-    const textarea = document.getElementById(`remarks-${categoryKey}-${fileKey}`);
-    const newText = textarea.value.trim();
-    if (!newText) return;
 
-    let formattedText = newText;
-    const prefix = `${userName}:`;
-    if (!formattedText.startsWith(prefix)) { formattedText = `${prefix} ${newText}`; }
+    const pageInput = document.getElementById(`page-${categoryKey}-${fileKey}`);
+    const textInput = document.getElementById(`new-comment-${categoryKey}-${fileKey}`);
 
-    // FIX: Look up using currentTab context same as other functions
+    const pageVal = pageInput.value.trim();
+    const textVal = textInput.value.trim();
+
+    if (!textVal) return; // Empty comment check
+
+    // Find Group
     const normTab = normalizeType(currentTab);
     const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+    if (!group) return;
+
+    // Get Existing Remarks JSON
+    let localMap = group.currentRemarksJson || {};
+    let myRaw = localMap[fileKey]?.[userName] || '';
+
+    let myComments = [];
+    try {
+        const parsed = JSON.parse(myRaw);
+        if (Array.isArray(parsed)) myComments = parsed;
+        else if (myRaw) myComments = [{ id: Date.now(), page: 'General', text: myRaw.replace(new RegExp(`^${userName}:\\s*`), ''), date: new Date().toISOString() }];
+    } catch (e) {
+        if (myRaw) myComments = [{ id: Date.now(), page: 'General', text: myRaw.replace(new RegExp(`^${userName}:\\s*`), ''), date: new Date().toISOString() }];
+    }
+
+    // Add New Comment
+    myComments.push({
+        id: Date.now(),
+        page: pageVal || 'General',
+        text: textVal,
+        date: new Date().toISOString()
+    });
+
+    // Save
+    await saveCommentsMap(group, categoryKey, fileKey, userName, myComments);
+
+    // Clear inputs
+    textInput.value = '';
+    pageInput.value = '';
+};
+
+window.deletePageRemark = async (groupId, categoryKey, fileKey, index) => {
+    const userJson = localStorage.getItem('loginUser');
+    if (!userJson) return;
+    const user = JSON.parse(userJson);
+    const userName = user.name || 'Panel';
+
+    const normTab = normalizeType(currentTab);
+    const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+    if (!group) return;
 
     let localMap = group.currentRemarksJson || {};
-    if (typeof localMap[fileKey] !== 'object') {
-        localMap[fileKey] = {};
+    let myRaw = localMap[fileKey]?.[userName] || '';
+
+    let myComments = [];
+    try {
+        const parsed = JSON.parse(myRaw);
+        if (Array.isArray(parsed)) myComments = parsed;
+    } catch (e) { return; } // Can't delete from legacy string cleanly without parsing first, but we assume it's array now
+
+    if (index >= 0 && index < myComments.length) {
+        myComments.splice(index, 1);
+        await saveCommentsMap(group, categoryKey, fileKey, userName, myComments);
     }
-    localMap[fileKey][userName] = formattedText;
+};
+
+async function saveCommentsMap(group, categoryKey, fileKey, userName, commentsArray) {
+    let localMap = group.currentRemarksJson || {};
+    if (typeof localMap[fileKey] !== 'object') localMap[fileKey] = {}; // safety
+
+    // Convert back to JSON string
+    localMap[fileKey][userName] = JSON.stringify(commentsArray);
 
     let defenseType = group.type;
 
@@ -764,7 +877,7 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
             error = result.error;
         } else {
             const payload = {
-                group_id: groupId,
+                group_id: group.id,
                 defense_type: defenseType,
                 statuses: group.currentStatusJson || {},
                 remarks: localMap
@@ -784,15 +897,11 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
         else if (categoryKey === 'pre_oral') group.preOralRemarks = localMap;
         else if (categoryKey === 'final') group.finalRemarks = localMap;
 
-        // Persistent visual feedback
-        if (textarea) {
-            const btn = textarea.nextElementSibling;
-            btn.innerText = 'Saved';
-            btn.style.background = '#dcfce7';
-            btn.style.color = '#166534';
-        }
-    } catch (e) { console.error(e); alert('Error saving remarks: ' + (e.message || e)); }
-};
+        // RE-RENDER MODAL to show list
+        openFileModal(group.id);
+
+    } catch (e) { console.error('Save error', e); alert('Error saving comment: ' + e.message); }
+}
 
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
