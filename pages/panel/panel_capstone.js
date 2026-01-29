@@ -923,68 +923,72 @@ window.loadViewer = async (url) => {
     if (!url) return;
 
     // Reset Views
-    document.getElementById('fileViewer').style.display = 'none';
-    document.getElementById('pdfContainer').innerHTML = '';
-    document.getElementById('pdfContainer').style.display = 'none';
-    document.getElementById('viewerPlaceholder').style.display = 'none';
-    document.getElementById('viewerToolbar').style.display = 'flex';
-    document.getElementById('commentsSidebar').style.display = 'flex';
-    document.getElementById('externalLinkBtn').href = url;
-    document.getElementById('annotationList').innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px;">Loading annotations...</div>';
+    const pdfContainer = document.getElementById('pdfContainer');
+    const fileViewer = document.getElementById('fileViewer');
+    const placeholder = document.getElementById('viewerPlaceholder');
+    const toolbar = document.getElementById('viewerToolbar');
+    const sidebar = document.getElementById('commentsSidebar');
+    const extBtn = document.getElementById('externalLinkBtn');
+    const annotList = document.getElementById('annotationList');
+
+    fileViewer.style.display = 'none';
+    pdfContainer.innerHTML = '';
+    pdfContainer.style.display = 'none';
+    placeholder.style.display = 'none';
+    toolbar.style.display = 'flex';
+    sidebar.style.display = 'none';
+    extBtn.href = url;
 
     // Check if likely PDF
     const isDrive = url.includes('drive.google.com');
-    const isPDF = url.toLowerCase().endsWith('.pdf') || (isDrive && !url.includes('/document/d/')); // Naive check for Drive PDF vs Docs
 
-    if (isPDF) {
+    // CRITICAL FIX: Google Drive 'view' links return HTML, not PDF bytes. 
+    // PDF.js cannot render them directly via XHR due to CORS and content type.
+    // We only enable the Custom PDF Renderer (with highlighting) for DIRECT PDF URLs (ending in .pdf).
+    const isDirectPDF = url.toLowerCase().endsWith('.pdf');
+
+    if (isDirectPDF) {
         // Try to Render with PDF.js
-        document.getElementById('pdfContainer').style.display = 'flex';
-        let pdfUrl = url;
-
-        // Drive Proxy Logic (Try direct link)
-        if (isDrive) {
-            // Convert /view or /preview to /uc?export=download OR use cors proxy if available. 
-            // NOTE: Direct fetch from client to drive.google.com blocks CORS usually. 
-            // We'll try the /uc method but it might fail without CORS mode 'no-cors' (which breaks canvas).
-            // Fallback: If this fails, we show iframe.
-            const idMatch = url.match(/\/d\/(.+?)(\/|$)/);
-            if (idMatch) {
-                // PDF.js cannot fetch this directly due to CORS unless generic file host
-                // We will try standard fetch. If fail, fallback.
-                // For this demo, we assume the user might have CORS friendly links OR we use a trick.
-                // Actually, without a backend proxy, we cannot render Drive PDFs in Canvas.
-                // BUT, the user asked for "API that could fit".
-
-                // CRITICAL FALLBACK: If we can't render, we use iframe and disable highlighting features visually.
-                // But let's try.
-                console.log('Attempting PDF render for Drive file...');
-                // pdfUrl = `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
-                // This usually 403s or CORS errors in JS.
-            }
-        }
+        pdfContainer.style.display = 'flex';
+        sidebar.style.display = 'flex';
+        annotList.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px;">Loading annotations...</div>';
 
         try {
-            await renderPdf(pdfUrl);
+            // Add a timeout to avoid stuck loading state
+            await Promise.race([
+                renderPdf(url),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+            ]);
             loadSidebarAnnotations();
         } catch (e) {
-            console.warn('PDF Render failed (likely CORS), falling back to Iframe', e);
-            document.getElementById('pdfContainer').style.display = 'none';
-            document.getElementById('fileViewer').src = isDrive ? url.replace('/view', '/preview') : url;
-            document.getElementById('fileViewer').style.display = 'block';
-            document.getElementById('commentsSidebar').style.display = 'none'; // Can't annotate iframe
+            console.warn('PDF Render failed (CORS or Timeout), falling back to Iframe', e);
+            pdfContainer.style.display = 'none';
+            sidebar.style.display = 'none'; // Hide annotation sidebar if render fails
+
+            // Fallback to Iframe
+            let viewerUrl = url;
+            if (isDrive) viewerUrl = url.replace('/view', '/preview');
+            // For direct PDFs that failed CORS, we can still try Google Docs Viewer in iframe
+            else viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+
+            fileViewer.src = viewerUrl;
+            fileViewer.style.display = 'block';
         }
 
     } else {
-        // Standard Iframe (Docs, Slides)
+        // Standard Iframe (Docs, Slides, or Drive PDFs)
+        // We do NOT show the custom annotation sidebar here because we can't draw on the iframe.
+        sidebar.style.display = 'none';
+
         let viewerUrl = url;
-        if (isDrive) { viewerUrl = url.replace('/view', '/preview'); }
-        else if (url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
+        if (isDrive) {
+            viewerUrl = url.replace('/view', '/preview');
+        } else if (url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
             viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
         }
 
-        document.getElementById('fileViewer').src = viewerUrl;
-        document.getElementById('fileViewer').style.display = 'block';
-        document.getElementById('commentsSidebar').style.display = 'none';
+        fileViewer.src = viewerUrl;
+        fileViewer.style.display = 'block';
     }
 
     // Store context for saving
