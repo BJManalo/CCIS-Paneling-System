@@ -840,8 +840,8 @@ window.loadViewer = (url) => {
         const driveIdMatch = url.match(/(?:\/d\/|id=)([\w-]+)/);
         if (driveIdMatch && driveIdMatch[1]) {
             const fileId = driveIdMatch[1];
-            // Use direct export link for Adobe
-            effectiveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+            // Use the most direct access link
+            effectiveUrl = `https://drive.google.com/uc?id=${fileId}`;
             fileName = "Review_Document.pdf";
             isDirectPdf = true;
         }
@@ -856,7 +856,7 @@ window.loadViewer = (url) => {
             try { username = JSON.parse(userJson).name || "Panelist"; } catch (e) { }
         }
 
-        const viewerLink = `viewer.html?url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
+        const viewerLink = `viewer.html?v=18&url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
 
         // Internal Sidebar UI stays clear
         const placeholder = document.getElementById('viewerPlaceholder');

@@ -31,12 +31,32 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background: white;
-            z-index: 10;
-            font-family: sans-serif;
-            color: #555;
+            background: #f8fafc;
+            z-index: 1000;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            color: #1e293b;
             flex-direction: column;
-            gap: 10px;
+            gap: 15px;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e2e8f0;
+            border-top: 5px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -44,8 +64,9 @@
 <body>
 
     <div id="loader">
-        <div style="font-weight: bold;">Loading Document...</div>
-        <div style="font-size: 0.9rem;">Please wait while Adobe PDF Viewer initializes.</div>
+        <div class="spinner"></div>
+        <div style="font-weight: 600; font-size: 1.1rem;">Initialing Document...</div>
+        <div id="status-text" style="font-size: 0.9rem; color: #64748b;">Connecting to secure storage...</div>
     </div>
 
     <div id="pdf-view"></div>
@@ -63,8 +84,13 @@
 
         function showStatus(msg, isError = false) {
             console.log("PDF Status:", msg);
-            const loader = document.getElementById('loader');
-            loader.innerHTML = `<div style="${isError ? 'color:red;font-weight:bold;max-width:500px;line-height:1.5;' : ''}">${msg}</div>`;
+            if (isError) {
+                const loader = document.getElementById('loader');
+                loader.innerHTML = `<div style="color:#ef4444; font-weight:bold; max-width:500px; padding: 20px; line-height:1.6;">${msg}</div>`;
+            } else {
+                const statusText = document.getElementById('status-text');
+                if (statusText) statusText.innerHTML = msg;
+            }
         }
 
         // Timeout to detect hang
@@ -80,44 +106,56 @@
                 return;
             }
 
-            const routes = [
-                fileUrl, // Route 1: Direct
-                `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`, // Route 2: Fast Proxy
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}` // Route 3: Deep Proxy
-            ];
+            showStatus("Step 1 of 2: Securing connection to Google Drive...");
+
+            const tryFetch = async (targetUrl) => {
+                try {
+                    const response = await fetch(targetUrl);
+                    if (!response.ok) return null;
+                    const buffer = await response.arrayBuffer();
+
+                    const head = String.fromCharCode(...new Uint8Array(buffer.slice(0, 4)));
+                    if (head === "%PDF") return buffer;
+
+                    // Detect Google's virus scan/confirmation page
+                    const text = new TextDecoder().decode(buffer);
+                    if (text.includes("confirm=")) {
+                        console.log("Detected virus scan confirmation page. Retrying with confirm flag...");
+                        const confirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+                        const confirmCode = confirmMatch ? confirmMatch[1] : 't';
+                        const retryUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'confirm=' + confirmCode;
+                        const retryResponse = await fetch(retryUrl);
+                        if (retryResponse.ok) {
+                            const retryBuffer = await retryResponse.arrayBuffer();
+                            if (String.fromCharCode(...new Uint8Array(retryBuffer.slice(0, 4))) === "%PDF") return retryBuffer;
+                        }
+                    }
+                    return null;
+                } catch (e) { return null; }
+            };
 
             let arrayBuffer = null;
 
-            for (let i = 0; i < routes.length; i++) {
-                try {
-                    const routeName = ["Direct Link", "Cloud Access", "Bypass Route"][i];
-                    showStatus(`Attempting ${routeName}...`);
+            // Access strategies: direct, with t-confirm, and via proxy
+            const strategies = [
+                fileUrl,
+                fileUrl + (fileUrl.includes('?') ? '&' : '?') + "confirm=t",
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl + (fileUrl.includes('?') ? '&' : '?') + "confirm=t")}`
+            ];
 
-                    const response = await fetch(routes[i]);
-                    if (!response.ok) continue;
-
-                    const buffer = await response.arrayBuffer();
-
-                    // VALIDATE PDF: Check for %PDF header
-                    const headerStr = String.fromCharCode(...new Uint8Array(buffer.slice(0, 4)));
-                    if (headerStr === "%PDF") {
-                        arrayBuffer = buffer;
-                        console.log(`Successfully retrieved PDF via Route ${i}`);
-                        break;
-                    } else {
-                        console.warn(`Route ${i} returned invalid data (likely a Google error page).`);
-                    }
-                } catch (e) {
-                    console.error(`Route ${i} error:`, e.reason || e.message);
-                }
+            for (let i = 0; i < strategies.length; i++) {
+                const names = ["Direct Route", "Deep Access", "Bypass Bridge"];
+                showStatus(`Attempting ${names[i]}...`);
+                arrayBuffer = await tryFetch(strategies[i]);
+                if (arrayBuffer) break;
             }
 
             if (!arrayBuffer) {
-                showStatus("Error: Could not retrieve document. Please check if the file is public in Google Drive.", true);
+                showStatus("System could not retrieve the PDF. This usually happens if the Google Drive file is not set to 'Public'. Please check 'Link Sharing' and ensure it is 'Anyone with the link'.", true);
                 return;
             }
 
-            showStatus("Preparing Evaluation Workspace...");
+            showStatus("Step 2 of 2: Initializing Annotation Tools...");
 
             try {
                 const adobeDCView = new AdobeDC.View({
@@ -125,14 +163,13 @@
                     divId: "pdf-view"
                 });
 
-                // Get a stable ID for Adobe sessions
-                const stableId = fileUrl.match(/id=([\w-]+)/)?.[1] || btoa(fileUrl).substring(0, 15);
+                const fileId = fileUrl.match(/id=([\w-]+)/)?.[1] || "doc_" + Date.now();
 
                 adobeDCView.previewFile({
                     content: { promise: Promise.resolve(arrayBuffer) },
                     metaData: {
                         fileName: fileName,
-                        id: stableId
+                        id: fileId
                     }
                 }, {
                     embedMode: "FULL_WINDOW",
@@ -159,7 +196,7 @@
                     });
                 });
             } catch (err) {
-                showStatus(`System Initialization Error: ${err.message}`, true);
+                showStatus(`Adobe SDK Error: ${err.message}`, true);
             }
         }
 
