@@ -503,6 +503,9 @@ window.openFileModal = (groupId) => {
                 });
                 item.style.background = '#f0f9ff';
                 itemContainer.style.borderColor = 'var(--primary-color)';
+
+                // Set Context & Load
+                setPdfContext(group.id, categoryKey, label, group);
                 loadViewer(url);
             };
 
@@ -908,20 +911,335 @@ window.closeFileModal = () => {
     document.getElementById('fileViewer').src = '';
 };
 
-window.loadViewer = (url) => {
+// --- PDF.js Logic for Annotation ---
+let pdfDoc = null;
+let pdfScale = 1.2;
+let isDrawing = false;
+let startX, startY;
+let currentRectDiv = null;
+let currentPdfParams = {}; // Store current file context
+
+window.loadViewer = async (url) => {
     if (!url) return;
-    let viewerUrl = url;
-    if (url.includes('drive.google.com')) { viewerUrl = url.replace('/view', '/preview'); }
-    else if (url.endsWith('.pdf') || url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
-        viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-    }
-    const iframe = document.getElementById('fileViewer');
-    iframe.src = viewerUrl;
-    iframe.style.display = 'block';
+
+    // Reset Views
+    document.getElementById('fileViewer').style.display = 'none';
+    document.getElementById('pdfContainer').innerHTML = '';
+    document.getElementById('pdfContainer').style.display = 'none';
     document.getElementById('viewerPlaceholder').style.display = 'none';
     document.getElementById('viewerToolbar').style.display = 'flex';
+    document.getElementById('commentsSidebar').style.display = 'flex';
     document.getElementById('externalLinkBtn').href = url;
+    document.getElementById('annotationList').innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px;">Loading annotations...</div>';
+
+    // Check if likely PDF
+    const isDrive = url.includes('drive.google.com');
+    const isPDF = url.toLowerCase().endsWith('.pdf') || (isDrive && !url.includes('/document/d/')); // Naive check for Drive PDF vs Docs
+
+    if (isPDF) {
+        // Try to Render with PDF.js
+        document.getElementById('pdfContainer').style.display = 'flex';
+        let pdfUrl = url;
+
+        // Drive Proxy Logic (Try direct link)
+        if (isDrive) {
+            // Convert /view or /preview to /uc?export=download OR use cors proxy if available. 
+            // NOTE: Direct fetch from client to drive.google.com blocks CORS usually. 
+            // We'll try the /uc method but it might fail without CORS mode 'no-cors' (which breaks canvas).
+            // Fallback: If this fails, we show iframe.
+            const idMatch = url.match(/\/d\/(.+?)(\/|$)/);
+            if (idMatch) {
+                // PDF.js cannot fetch this directly due to CORS unless generic file host
+                // We will try standard fetch. If fail, fallback.
+                // For this demo, we assume the user might have CORS friendly links OR we use a trick.
+                // Actually, without a backend proxy, we cannot render Drive PDFs in Canvas.
+                // BUT, the user asked for "API that could fit".
+
+                // CRITICAL FALLBACK: If we can't render, we use iframe and disable highlighting features visually.
+                // But let's try.
+                console.log('Attempting PDF render for Drive file...');
+                // pdfUrl = `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+                // This usually 403s or CORS errors in JS.
+            }
+        }
+
+        try {
+            await renderPdf(pdfUrl);
+            loadSidebarAnnotations();
+        } catch (e) {
+            console.warn('PDF Render failed (likely CORS), falling back to Iframe', e);
+            document.getElementById('pdfContainer').style.display = 'none';
+            document.getElementById('fileViewer').src = isDrive ? url.replace('/view', '/preview') : url;
+            document.getElementById('fileViewer').style.display = 'block';
+            document.getElementById('commentsSidebar').style.display = 'none'; // Can't annotate iframe
+        }
+
+    } else {
+        // Standard Iframe (Docs, Slides)
+        let viewerUrl = url;
+        if (isDrive) { viewerUrl = url.replace('/view', '/preview'); }
+        else if (url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
+            viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+        }
+
+        document.getElementById('fileViewer').src = viewerUrl;
+        document.getElementById('fileViewer').style.display = 'block';
+        document.getElementById('commentsSidebar').style.display = 'none';
+    }
+
+    // Store context for saving
+    // We need to know which group/file we are viewing to save annotations
+    // We can infer it from the fact the modal is open, but safer to store global context or pass it.
+    // 'currentPdfParams' is set by the caller of loadViewer usually? No, the caller is onclick of the file button.
+    // We need to pass context to loadViewer or store it globally when 'openFileModal' renders the list.
 };
+
+// Global Context setter (hacky but effective given current structure)
+window.setPdfContext = (groupId, catKey, fileKey, groupData) => {
+    currentPdfParams = { groupId, catKey, fileKey, group: groupData };
+};
+
+// --- PDF Render ---
+async function renderPdf(url) {
+    const loadingTask = pdfjsLib.getDocument(url);
+    pdfDoc = await loadingTask.promise;
+
+    const container = document.getElementById('pdfContainer');
+    container.innerHTML = ''; // clear
+    document.getElementById('pageCount').innerText = `${pdfDoc.numPages} Pages`;
+
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: pdfScale });
+
+        // Page Container
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'pdf-page';
+        pageDiv.style.position = 'relative';
+        pageDiv.style.marginBottom = '20px';
+        pageDiv.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+
+        // Canvas
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({ canvasContext: context, viewport: viewport }).promise;
+        pageDiv.appendChild(canvas);
+
+        // Overlay Div (Annotation Layer)
+        const overlay = document.createElement('div');
+        overlay.className = 'annotation-layer';
+        overlay.dataset.pageIndex = i; // 1-based
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.cursor = 'crosshair';
+
+        // Interaction Events
+        overlay.addEventListener('mousedown', handleMouseDown);
+        overlay.addEventListener('mousemove', handleMouseMove);
+        overlay.addEventListener('mouseup', handleMouseUp);
+
+        pageDiv.appendChild(overlay);
+        container.appendChild(pageDiv);
+
+        // Render Existing Annotations for this page
+        renderPageAnnotations(i, overlay);
+    }
+};
+
+// --- Annotation UI Logic ---
+function handleMouseDown(e) {
+    isDrawing = true;
+    const rect = e.target.getBoundingClientRect();
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+
+    // Create temp div
+    currentRectDiv = document.createElement('div');
+    currentRectDiv.style.border = '2px solid var(--primary-color)';
+    currentRectDiv.style.backgroundColor = 'rgba(37, 99, 235, 0.2)';
+    currentRectDiv.style.position = 'absolute';
+    currentRectDiv.style.left = startX + 'px';
+    currentRectDiv.style.top = startY + 'px';
+    e.target.appendChild(currentRectDiv);
+}
+
+function handleMouseMove(e) {
+    if (!isDrawing || !currentRectDiv) return;
+    const rect = e.target.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const width = currentX - startX;
+    const height = currentY - startY;
+
+    currentRectDiv.style.width = Math.abs(width) + 'px';
+    currentRectDiv.style.height = Math.abs(height) + 'px';
+    currentRectDiv.style.left = (width < 0 ? currentX : startX) + 'px';
+    currentRectDiv.style.top = (height < 0 ? currentY : startY) + 'px';
+}
+
+function handleMouseUp(e) {
+    if (!isDrawing || !currentRectDiv) return;
+    isDrawing = false;
+
+    const w = parseInt(currentRectDiv.style.width);
+    const h = parseInt(currentRectDiv.style.height);
+
+    // Filter accidental clicks
+    if (w < 10 || h < 10) {
+        currentRectDiv.remove();
+        currentRectDiv = null;
+        return;
+    }
+
+    // Prompt for Comment
+    // We'll create a simple inline popover
+    const comment = prompt("Add a comment for this highlight:");
+    if (comment) {
+        const pageIndex = parseInt(e.target.dataset.pageIndex);
+        const rectData = {
+            left: currentRectDiv.style.left,
+            top: currentRectDiv.style.top,
+            width: currentRectDiv.style.width,
+            height: currentRectDiv.style.height
+        };
+        saveAnnotation(pageIndex, rectData, comment);
+    } else {
+        currentRectDiv.remove();
+    }
+    currentRectDiv = null;
+}
+
+// --- Save & Render Logic ---
+async function saveAnnotation(pageIndex, rect, text) {
+    const { groupId, catKey, fileKey, group } = currentPdfParams;
+    // We reuse the existing 'addPageRemark' flow but enrich the data object
+    /* 
+       Data Structure: 
+       [ { id, page: "1", text: "...", rect: {left,top,w,h}, date } ]
+    */
+
+    const userJson = localStorage.getItem('loginUser');
+    const user = JSON.parse(userJson);
+    const userName = user.name || 'Panel';
+
+    let localMap = group.currentRemarksJson || {};
+    let myRaw = localMap[fileKey]?.[userName] || '';
+
+    let myComments = [];
+    try {
+        const parsed = JSON.parse(myRaw);
+        if (Array.isArray(parsed)) myComments = parsed;
+    } catch (e) {
+        if (myRaw) myComments = [{ id: Date.now(), page: 'General', text: myRaw.replace(`${userName}:`, '') }];
+    }
+
+    const newComment = {
+        id: Date.now(),
+        page: pageIndex,
+        text: text,
+        rect: rect, // Store CSS values
+        date: new Date().toISOString()
+    };
+
+    myComments.push(newComment);
+
+    // Optimistic Update
+    renderPageAnnotations(pageIndex, document.querySelector(`.annotation-layer[data-page-index="${pageIndex}"]`));
+    loadSidebarAnnotations();
+
+    // Save to DB
+    await saveCommentsMap(group, catKey, fileKey, userName, myComments);
+}
+
+function renderPageAnnotations(pageIndex, overlay) {
+    // Clear existing overlay boxes (except temporary drawing one)
+    Array.from(overlay.children).forEach(c => {
+        if (c !== currentRectDiv) c.remove();
+    });
+
+    const { fileKey, group } = currentPdfParams;
+    if (!group) return; // Not ready
+
+    // Gather ALL annotations from ALL panels for this file/page
+    const allRemarks = group.currentRemarksJson?.[fileKey] || {};
+
+    Object.entries(allRemarks).forEach(([panelName, remString]) => {
+        try {
+            const annotations = JSON.parse(remString);
+            if (!Array.isArray(annotations)) return;
+
+            annotations.forEach(ann => {
+                if (parseInt(ann.page) !== pageIndex || !ann.rect) return;
+
+                const box = document.createElement('div');
+                box.style.position = 'absolute';
+                box.style.left = ann.rect.left;
+                box.style.top = ann.rect.top;
+                box.style.width = ann.rect.width;
+                box.style.height = ann.rect.height;
+                box.style.backgroundColor = 'rgba(255, 255, 0, 0.2)'; // Yellow highlight
+                box.style.border = '1px solid orange';
+                box.title = `${panelName}: ${ann.text}`;
+                box.className = 'annot-box';
+                box.onclick = (e) => {
+                    e.stopPropagation();
+                    alert(`${panelName}: ${ann.text}`); // Simple feedback for now
+                }
+                overlay.appendChild(box);
+            });
+        } catch (e) { }
+    });
+}
+
+function loadSidebarAnnotations() {
+    const list = document.getElementById('annotationList');
+    list.innerHTML = '';
+
+    const { fileKey, group } = currentPdfParams;
+    if (!group) return;
+
+    const allRemarks = group.currentRemarksJson?.[fileKey] || {};
+
+    Object.entries(allRemarks).forEach(([panelName, remString]) => {
+        try {
+            const annotations = JSON.parse(remString);
+            if (!Array.isArray(annotations)) {
+                // Legacy
+                if (remString) createSidebarItem(panelName, { page: 'Gen', text: remString }, list);
+                return;
+            }
+
+            annotations.forEach(ann => {
+                createSidebarItem(panelName, ann, list);
+            });
+        } catch (e) { }
+    });
+}
+
+function createSidebarItem(panelName, ann, list) {
+    const el = document.createElement('div');
+    el.style.background = '#f8fafc';
+    el.style.border = '1px solid #e2e8f0';
+    el.style.borderRadius = '8px';
+    el.style.padding = '10px';
+    el.style.marginBottom = '10px';
+
+    el.innerHTML = `
+        <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px; display:flex; justify-content:space-between;">
+            <span>${panelName}</span>
+            <span style="background:#e2e8f0; padding:1px 5px; border-radius:4px;">Pg ${ann.page}</span>
+        </div>
+        <div style="font-size:12px; color:#334155;">${ann.text}</div>
+    `;
+    list.appendChild(el);
+}
 
 window.filterTable = (program) => {
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
