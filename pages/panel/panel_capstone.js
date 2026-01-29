@@ -942,14 +942,16 @@ window.loadViewer = async (url) => {
     // Check if likely PDF
     const isDrive = url.includes('drive.google.com');
 
-    // CRITICAL FIX: Google Drive 'view' links return HTML, not PDF bytes. 
-    // PDF.js cannot render them directly via XHR due to CORS and content type.
-    // We only enable the Custom PDF Renderer (with highlighting) for DIRECT PDF URLs (ending in .pdf).
-    // UPDATE: We must strictly check the pathname, ignoring query params (e.g. ?t=...)
+    // Check for known non-PDF types that definitely require Iframe
     const cleanUrl = url.split('?')[0].toLowerCase();
-    const isDirectPDF = cleanUrl.endsWith('.pdf');
+    const isOffice = cleanUrl.match(/\.(doc|docx|ppt|pptx|xls|xlsx|txt)$/i);
+    const isGoogleSuite = url.includes('docs.google.com') || url.includes('sheets.google.com') || url.includes('slides.google.com');
 
-    if (isDirectPDF) {
+    // We will attempt to render EVERYTHING that isn't explicitly an Office/Google Doc.
+    // If it fails (e.g. drive.google.com/view), the Catch block handles the fallback robustly.
+    const shouldTryRender = !isOffice && !isGoogleSuite;
+
+    if (shouldTryRender) {
         // Try to Render with PDF.js
         pdfContainer.style.display = 'flex';
         sidebar.style.display = 'flex';
@@ -961,28 +963,18 @@ window.loadViewer = async (url) => {
         } catch (e) {
             console.warn('PDF Render failed (CORS or Error), falling back to Iframe', e);
             pdfContainer.style.display = 'none';
-            // sidebar.style.display = 'none'; // OLD: Hid sidebar
-            // NEW: Keep sidebar, but show warning
+            // Keep sidebar visible with warning
 
             // Fallback to Iframe
             let viewerUrl = url;
-            if (isDrive) viewerUrl = url.replace('/view', '/preview');
+            if (url.includes('drive.google.com')) viewerUrl = url.replace('/view', '/preview');
+            // Ensure docs.google viewer is used for generic URLs if not drive
             else viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
 
             fileViewer.src = viewerUrl;
             fileViewer.style.display = 'block';
 
             // Load comments into sidebar anyway (Read-Only list)
-            annotList.innerHTML = `
-                <div style="background:#fef2f2; color:#b91c1c; padding:10px; font-size:11px; margin-bottom:10px; border-radius:6px; border:1px solid #fca5a5;">
-                    <strong style="display:block; margin-bottom:2px;">Annotation Unavailable</strong>
-                    File could not be rendered for highlighting.
-                    <br>Standard viewing enabled.
-                </div>
-            `;
-            // Append existing comments
-            const commentsDiv = document.createElement('div');
-            annotList.appendChild(commentsDiv);
             loadSidebarAnnotations();
 
             // Prepend warning after loading
@@ -991,7 +983,8 @@ window.loadViewer = async (url) => {
                 <div style="background:#fff7ed; color:#c2410c; padding:10px; font-size:11px; margin-bottom:10px; border-radius:6px; border:1px solid #fdba74;">
                     <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">warning</span>
                     <strong>Highlighting Mode Failed</strong><br>
-                    Load error or CORS restriction.
+                    Could not render highlight layer (likely CORS/Protected).<br>
+                    Standard viewing enabled.
                 </div>
             `;
             annotList.prepend(warning);
