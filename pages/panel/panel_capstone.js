@@ -918,6 +918,30 @@ function initAdobeViewer(url, divId) {
         showPrintPDF: true
     });
 
+    previewFilePromise.then(adobeViewer => {
+        adobeViewer.getAnnotationManager().then(annotationManager => {
+            // Get current user name for context
+            const userJson = localStorage.getItem('loginUser');
+            let username = "Panelist";
+            if (userJson) {
+                try { username = JSON.parse(userJson).name || "Panelist"; } catch (e) { }
+            }
+
+            // Registering event listeners tells Adobe we are ready to handle annotations
+            // This is often required to "unlock" the full UI
+            annotationManager.registerEventListener(
+                function (event) {
+                    console.log("Annotation Event:", event.type);
+                },
+                {
+                    listenOn: [
+                        "ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"
+                    ]
+                }
+            );
+        });
+    });
+
     // Future: Handle annotation saving here
     /*
     previewFilePromise.then(adobeViewer => {
