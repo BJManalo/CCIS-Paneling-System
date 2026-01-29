@@ -57,7 +57,8 @@
 
         // Parse Query Params
         const params = new URLSearchParams(window.location.search);
-        const fileUrl = params.get('url');
+        const rawFileUrl = params.get('url');
+        const fileUrl = rawFileUrl ? `https://corsproxy.io/?${encodeURIComponent(rawFileUrl)}` : null;
         const fileName = params.get('name') || "Document.pdf";
         const userName = params.get('user') || "Panelist";
 

@@ -857,9 +857,6 @@ window.loadViewer = (url) => {
 
         const viewerLink = `viewer.html?url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
 
-        // Open in new tab automatically
-        window.open(viewerLink, '_blank');
-
         // Internal Sidebar UI stays clear
         const placeholder = document.getElementById('viewerPlaceholder');
         const iframe = document.getElementById('fileViewer');
@@ -869,10 +866,16 @@ window.loadViewer = (url) => {
         adobeDiv.style.display = 'none';
         placeholder.style.display = 'flex';
         placeholder.innerHTML = `
-            <div style="text-align: center; padding: 30px;">
-                <div class="loader-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
-                <h3 style="margin: 0; color: #1e293b;">Opening Viewer...</h3>
-                <p style="color: #64748b; font-size: 0.9rem; margin-top: 10px;">The document is opening in a new tab for full annotation tools.</p>
+            <div style="text-align: center; padding: 40px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; max-width: 400px; margin: auto; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
+                <div style="background: #f1f5f9; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <span class="material-icons-round" style="font-size: 40px; color: #3b82f6;">edit_note</span>
+                </div>
+                <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;">Ready to Evaluate</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin: 15px 0; line-height: 1.5;">Click the button below to open the annotation tools in a new tab.</p>
+                
+                <button onclick="window.open('${viewerLink}', '_blank')" style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0 auto; transition: all 0.2s;">
+                    <span class="material-icons-round" style="font-size: 20px;">open_in_new</span> START ANNOTATION
+                </button>
             </div>
             <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
         `;
