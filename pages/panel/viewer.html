@@ -61,62 +61,80 @@
         const fileName = params.get('name') || "Document.pdf";
         const userName = params.get('user') || "Panelist";
 
-        if (!fileUrl) {
-            document.getElementById('loader').innerText = "Error: No file URL provided.";
-        } else {
-            document.addEventListener("adobe_dc_view_sdk.ready", function () {
-                const adobeDCView = new AdobeDC.View({
-                    clientId: ADOBE_CLIENT_ID,
-                    divId: "pdf-view"
-                });
+        function showStatus(msg, isError = false) {
+            const loader = document.getElementById('loader');
+            loader.innerHTML = `<div style="${isError ? 'color:red;font-weight:bold;' : ''}">${msg}</div>`;
+            if (isError) {
+                loader.innerHTML += `<br><a href="${fileUrl}" target="_blank" style="margin-top:10px; color:#3b82f6;">Try opening file directly</a>`;
+            }
+        }
 
-                const previewFilePromise = adobeDCView.previewFile({
-                    content: { location: { url: fileUrl } },
-                    metaData: { fileName: fileName }
-                }, {
-                    embedMode: "FULL_WINDOW",
-                    showAnnotationTools: true,
-                    enableAnnotationAPIs: true,
-                    includePDFAnnotations: true,
-                    showLeftHandPanel: true,
-                    showDownloadPDF: true,
-                    showPrintPDF: true,
-                    dockPageControls: false
-                });
+        // Timeout to detect hang
+        const loadingTimeout = setTimeout(() => {
+            if (document.getElementById('loader').style.display !== 'none') {
+                showStatus("Initial loading is taking longer than usual. This might be due to a slow connection or Google Drive security checks.", true);
+            }
+        }, 15000);
 
-                previewFilePromise.then(adobeViewer => {
-                    // Hide Loader
-                    document.getElementById('loader').style.display = 'none';
+        function startAdobeViewer() {
+            console.log("Initializing Adobe View...");
+            if (!fileUrl) {
+                showStatus("Error: No file URL provided.", true);
+                return;
+            }
 
-                    adobeViewer.getAnnotationManager().then(annotationManager => {
-                        // Register User Profile 
-                        const profileConfig = {
-                            userProfile: {
-                                name: userName,
-                                firstName: userName.split(' ')[0],
-                                lastName: userName.split(' ').slice(1).join(' ') || ""
-                            }
-                        };
-
-                        // Register Events to unlock UI
-                        annotationManager.registerEventListener(
-                            function (event) { console.log(event.type); },
-                            {
-                                listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"]
-                            }
-                        );
-
-                        // Set User Config if supported (older APIs might not need this explicitly if profileConfig passed to manager)
-                        // Newer API uses setConfig
-                        if (annotationManager.setConfig) {
-                            annotationManager.setConfig(profileConfig);
-                        }
-                    });
-                }).catch(err => {
-                    console.error(err);
-                    document.getElementById('loader').innerHTML = `<span style='color:red'>Error loading PDF: ${err.message}</span>`;
-                });
+            const adobeDCView = new AdobeDC.View({
+                clientId: ADOBE_CLIENT_ID,
+                divId: "pdf-view"
             });
+
+            adobeDCView.previewFile({
+                content: { location: { url: fileUrl } },
+                metaData: { fileName: fileName }
+            }, {
+                embedMode: "FULL_WINDOW",
+                showAnnotationTools: true,
+                enableAnnotationAPIs: true,
+                includePDFAnnotations: true,
+                showLeftHandPanel: true,
+                showDownloadPDF: true,
+                showPrintPDF: true,
+                dockPageControls: false
+            }).then(adobeViewer => {
+                console.log("Viewer Loaded Successfully");
+                clearTimeout(loadingTimeout);
+                document.getElementById('loader').style.display = 'none';
+
+                adobeViewer.getAnnotationManager().then(annotationManager => {
+                    const profileConfig = {
+                        userProfile: {
+                            name: userName,
+                            firstName: userName.split(' ')[0],
+                            lastName: userName.split(' ').slice(1).join(' ') || ""
+                        }
+                    };
+
+                    annotationManager.registerEventListener(
+                        function (event) { console.log("Adobe Event:", event.type); },
+                        { listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"] }
+                    );
+
+                    if (annotationManager.setConfig) {
+                        annotationManager.setConfig(profileConfig);
+                    }
+                });
+            }).catch(err => {
+                console.error("Adobe Preview Error:", err);
+                clearTimeout(loadingTimeout);
+                showStatus(`Failed to load PDF: ${err.message}`, true);
+            });
+        }
+
+        // Handle Script Loading
+        if (window.AdobeDC) {
+            startAdobeViewer();
+        } else {
+            document.addEventListener("adobe_dc_view_sdk.ready", startAdobeViewer);
         }
     </script>
 </body>
