@@ -831,59 +831,49 @@ const ADOBE_CLIENT_ID = "b965033ee6674833ba55cf84132cb88a"; // Updated for Hoste
 window.loadViewer = (url) => {
     if (!url) return;
 
-    // Reset Views
-    const iframe = document.getElementById('fileViewer');
-    const adobeDiv = document.getElementById('adobe-pdf-view');
-    const placeholder = document.getElementById('viewerPlaceholder');
-    const toolbar = document.getElementById('viewerToolbar');
-    const header = document.getElementById('fileViewHeader');
-    const sidebar = document.getElementById('modalSidebar');
-    const viewerArea = document.getElementById('modalViewerArea');
+    // Helper to get filename
+    const fileName = url.split('/').pop().split('?')[0] || "document.pdf";
 
-    // Layout Change: Force Area to Full Screen Fixed (Manual Lightbox)
-    // This is the "Nuclear" option to guarantee Adobe sees a Desktop size container
-    sidebar.style.display = 'none';
-
-    viewerArea.style.position = 'fixed';
-    viewerArea.style.top = '0';
-    viewerArea.style.left = '0';
-    viewerArea.style.width = '100vw';
-    viewerArea.style.height = '100vh';
-    viewerArea.style.zIndex = '2000'; // Above everything
-    viewerArea.style.borderRadius = '0';
-
-    header.style.display = 'flex';
-
-    iframe.style.display = 'none';
-    adobeDiv.style.display = 'none';
-    placeholder.style.display = 'none';
-    // toolbar.style.display = 'flex'; // We use internal headers now
-    document.getElementById('externalLinkBtn').href = url;
-
-    // Logic: If direct PDF (and not a Google Drive preview link), use Adobe
-    // Note: Google Drive 'view' links are HTML wrappers, not direct PDFs.
-    // Adobe needs a direct link or a binary stream.
-    // We assume if it ends in .pdf and is NOT a google drive '/view' link, it's a direct PDF.
+    // Check type
     const isDirectPdf = url.toLowerCase().endsWith('.pdf') && !url.includes('drive.google.com/file');
 
     if (isDirectPdf) {
-        // Use Adobe PDF Embed
-        adobeDiv.style.display = 'block';
-        initAdobeViewer(url, adobeDiv.id);
-    } else {
-        // Fallback: Use Iframe / Google Preview
-        let viewerUrl = url;
-        if (url.includes('drive.google.com')) {
-            // Ensure preview mode for Drive
-            viewerUrl = url.replace(/\/view.*/, '/preview');
-        } else if (url.match(/\.(doc|docx|ppt|pptx)$/i)) {
-            // Office files -> Google Docs Viewer
-            viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+        // Open Dedicated Viewer in New Tab
+        // This guarantees Full Window mode works correctly
+        const userJson = localStorage.getItem('loginUser');
+        let username = "Panelist";
+        if (userJson) {
+            try { username = JSON.parse(userJson).name || "Panelist"; } catch (e) { }
         }
 
-        iframe.src = viewerUrl;
-        iframe.style.display = 'block';
+        const viewerLink = `viewer.html?url=${encodeURIComponent(url)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
+        window.open(viewerLink, '_blank');
+        return;
     }
+
+    // --- NON-PDF FALLBACK (Google Drive, Office, etc) ---
+    // Opens in the modal iframe as before
+    const iframe = document.getElementById('fileViewer');
+    const adobeDiv = document.getElementById('adobe-pdf-view');
+    const placeholder = document.getElementById('viewerPlaceholder');
+    // Ensure Layout is reset (Sidebar VISIBLE)
+    document.getElementById('modalSidebar').style.display = 'flex';
+    document.getElementById('fileViewHeader').style.display = 'none';
+    const viewerArea = document.getElementById('modalViewerArea');
+    if (viewerArea) {
+        viewerArea.style.width = '';
+        viewerArea.style.position = '';
+        viewerArea.style.top = '';
+        viewerArea.style.left = '';
+        viewerArea.style.height = '';
+        viewerArea.style.borderRadius = '';
+        viewerArea.style.zIndex = '';
+    }
+
+    iframe.style.display = 'block';
+    adobeDiv.style.display = 'none';
+    placeholder.style.display = 'none';
+
 };
 
 function initAdobeViewer(url, divId) {

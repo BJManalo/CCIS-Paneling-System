@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Viewer - CCIS Paneling System</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #fdfdfd;
+        }
+
+        #pdf-view {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Loading Spinner */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: white;
+            z-index: 10;
+            font-family: sans-serif;
+            color: #555;
+            flex-direction: column;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loader">
+        <div style="font-weight: bold;">Loading Document...</div>
+        <div style="font-size: 0.9rem;">Please wait while Adobe PDF Viewer initializes.</div>
+    </div>
+
+    <div id="pdf-view"></div>
+
+    <script src="https://documentcloud.adobe.com/view-sdk/viewer.js"></script>
+    <script>
+        // CLIENT ID
+        const ADOBE_CLIENT_ID = "b965033ee6674833ba55cf84132cb88a";
+
+        // Parse Query Params
+        const params = new URLSearchParams(window.location.search);
+        const fileUrl = params.get('url');
+        const fileName = params.get('name') || "Document.pdf";
+        const userName = params.get('user') || "Panelist";
+
+        if (!fileUrl) {
+            document.getElementById('loader').innerText = "Error: No file URL provided.";
+        } else {
+            document.addEventListener("adobe_dc_view_sdk.ready", function () {
+                const adobeDCView = new AdobeDC.View({
+                    clientId: ADOBE_CLIENT_ID,
+                    divId: "pdf-view"
+                });
+
+                const previewFilePromise = adobeDCView.previewFile({
+                    content: { location: { url: fileUrl } },
+                    metaData: { fileName: fileName }
+                }, {
+                    embedMode: "FULL_WINDOW",
+                    showAnnotationTools: true,
+                    enableAnnotationAPIs: true,
+                    includePDFAnnotations: true,
+                    showLeftHandPanel: true,
+                    showDownloadPDF: true,
+                    showPrintPDF: true,
+                    dockPageControls: false
+                });
+
+                previewFilePromise.then(adobeViewer => {
+                    // Hide Loader
+                    document.getElementById('loader').style.display = 'none';
+
+                    adobeViewer.getAnnotationManager().then(annotationManager => {
+                        // Register User Profile 
+                        const profileConfig = {
+                            userProfile: {
+                                name: userName,
+                                firstName: userName.split(' ')[0],
+                                lastName: userName.split(' ').slice(1).join(' ') || ""
+                            }
+                        };
+
+                        // Register Events to unlock UI
+                        annotationManager.registerEventListener(
+                            function (event) { console.log(event.type); },
+                            {
+                                listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"]
+                            }
+                        );
+
+                        // Set User Config if supported (older APIs might not need this explicitly if profileConfig passed to manager)
+                        // Newer API uses setConfig
+                        if (annotationManager.setConfig) {
+                            annotationManager.setConfig(profileConfig);
+                        }
+                    });
+                }).catch(err => {
+                    console.error(err);
+                    document.getElementById('loader').innerHTML = `<span style='color:red'>Error loading PDF: ${err.message}</span>`;
+                });
+            });
+        }
+    </script>
+</body>
+
+</html>
