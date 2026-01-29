@@ -874,8 +874,8 @@ function initAdobeViewer(url, divId) {
     document.getElementById(divId).innerHTML = "";
 
     const adobeDCView = new AdobeDC.View({
-        clientId: ADOBE_CLIENT_ID,
-        divId: divId
+        clientId: ADOBE_CLIENT_ID
+        // divId must be OMITTED for LIGHT_BOX mode
     });
 
     // Helper to get filename
