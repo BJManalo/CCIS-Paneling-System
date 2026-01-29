@@ -80,37 +80,59 @@
                 return;
             }
 
-            try {
-                showStatus("Connecting to secure storage and fetching document...");
+            const routes = [
+                fileUrl, // Route 1: Direct
+                `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`, // Route 2: Fast Proxy
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}` // Route 3: Deep Proxy
+            ];
 
-                // 1. Manually fetch the bytes to bypass Adobe's CORS/Security hang-ups
-                let response;
+            let arrayBuffer = null;
+
+            for (let i = 0; i < routes.length; i++) {
                 try {
-                    response = await fetch(fileUrl);
-                    if (!response.ok) throw new Error("CORS or Connection Error");
+                    const routeName = ["Direct Link", "Cloud Access", "Bypass Route"][i];
+                    showStatus(`Attempting ${routeName}...`);
+
+                    const response = await fetch(routes[i]);
+                    if (!response.ok) continue;
+
+                    const buffer = await response.arrayBuffer();
+
+                    // VALIDATE PDF: Check for %PDF header
+                    const headerStr = String.fromCharCode(...new Uint8Array(buffer.slice(0, 4)));
+                    if (headerStr === "%PDF") {
+                        arrayBuffer = buffer;
+                        console.log(`Successfully retrieved PDF via Route ${i}`);
+                        break;
+                    } else {
+                        console.warn(`Route ${i} returned invalid data (likely a Google error page).`);
+                    }
                 } catch (e) {
-                    console.warn("Direct fetch blocked, attempting secure bypass...");
-                    showStatus("Retrying via secure bypass route...");
-                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`;
-                    response = await fetch(proxyUrl);
+                    console.error(`Route ${i} error:`, e.reason || e.message);
                 }
+            }
 
-                if (!response.ok) throw new Error("Could not retrieve document stream. The file might be private or too large.");
+            if (!arrayBuffer) {
+                showStatus("Error: Could not retrieve document. Please check if the file is public in Google Drive.", true);
+                return;
+            }
 
-                const arrayBuffer = await response.arrayBuffer();
-                console.log("File bytes successfully retrieved.");
+            showStatus("Preparing Evaluation Workspace...");
 
-                // 2. Initialize Adobe with the bytes we just downloaded
+            try {
                 const adobeDCView = new AdobeDC.View({
                     clientId: ADOBE_CLIENT_ID,
                     divId: "pdf-view"
                 });
 
+                // Get a stable ID for Adobe sessions
+                const stableId = fileUrl.match(/id=([\w-]+)/)?.[1] || btoa(fileUrl).substring(0, 15);
+
                 adobeDCView.previewFile({
                     content: { promise: Promise.resolve(arrayBuffer) },
                     metaData: {
                         fileName: fileName,
-                        id: btoa(fileUrl).substring(0, 20) // Use a derivative of URL as unique ID
+                        id: stableId
                     }
                 }, {
                     embedMode: "FULL_WINDOW",
@@ -133,22 +155,11 @@
                                 lastName: userName.split(' ').slice(1).join(' ') || ""
                             }
                         };
-
-                        annotationManager.registerEventListener(
-                            function (event) { console.log("Adobe Event:", event.type); },
-                            { listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"] }
-                        );
-
-                        if (annotationManager.setConfig) {
-                            annotationManager.setConfig(profileConfig);
-                        }
+                        if (annotationManager.setConfig) annotationManager.setConfig(profileConfig);
                     });
                 });
-
             } catch (err) {
-                console.error("Critical Viewer Error:", err);
-                clearTimeout(loadingTimeout);
-                showStatus(`Failed to fetch PDF: ${err.message}. Please try refreshing your dashboard or checking the file permissions.`, true);
+                showStatus(`System Initialization Error: ${err.message}`, true);
             }
         }
 
