@@ -847,7 +847,27 @@ window.loadViewer = (url) => {
         }
 
         const viewerLink = `viewer.html?url=${encodeURIComponent(url)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
+
+        // Try opening in new tab
         window.open(viewerLink, '_blank');
+
+        // FALLBACK UI inside the modal (In case popup is blocked)
+        const placeholder = document.getElementById('viewerPlaceholder');
+        const iframe = document.getElementById('fileViewer');
+        const adobeDiv = document.getElementById('adobe-pdf-view');
+
+        iframe.style.display = 'none';
+        adobeDiv.style.display = 'none';
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `
+            <div style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                <span class="material-icons-round" style="font-size: 64px; color: #ef4444; margin-bottom: 15px;">picture_as_pdf</span>
+                <h3 style="margin: 0; color: #1e293b; font-size: 1.25rem;">Document Ready</h3>
+                <p style="color: #64748b; font-size: 0.95rem; margin: 15px 0;">We tried to open the PDF viewer in a new tab.<br>If it didn't open, your browser might have blocked the popup.</p>
+                <a href="${viewerLink}" target="_blank" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: background 0.2s;">Open Viewer in New Tab</a>
+                <p style="margin-top: 15px; font-size: 0.8rem; color: #94a3b8;">Full annotation tools are only available in the new tab view.</p>
+            </div>
+        `;
         return;
     }
 
@@ -873,7 +893,14 @@ window.loadViewer = (url) => {
     iframe.style.display = 'block';
     adobeDiv.style.display = 'none';
     placeholder.style.display = 'none';
-
+    // Fallback URL Logic
+    let viewerUrl = url;
+    if (url.includes('drive.google.com')) {
+        viewerUrl = url.replace(/\/view.*/, '/preview');
+    } else if (url.match(/\.(doc|docx|ppt|pptx)$/i)) {
+        viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+    }
+    iframe.src = viewerUrl;
 };
 
 function initAdobeViewer(url, divId) {
