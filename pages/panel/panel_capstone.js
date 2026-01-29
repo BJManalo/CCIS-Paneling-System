@@ -800,7 +800,7 @@ window.closeFileModal = () => {
 };
 
 // --- Adobe PDF Embed API Integration ---
-const ADOBE_CLIENT_ID = "0b0f05555dd142d68210fada11b88ed6"; // TODO: Replace with your actual Adobe Client ID
+const ADOBE_CLIENT_ID = "b965033ee6674833ba55cf84132cb88a"; // Updated for Hosted Site
 
 window.loadViewer = (url) => {
     if (!url) return;
