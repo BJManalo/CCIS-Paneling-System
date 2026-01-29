@@ -187,7 +187,7 @@ function logout() {
     localStorage.removeItem('loginUser');
 
     // Redirect to login page
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 
 // --- Helper: Toggle Password Visibility ---

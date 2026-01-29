@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check Login
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     if (!loginUser || loginUser.role !== 'Admin') {
-        window.location.href = '../../index.html';
+        window.location.href = '../../';
         return;
     }
 
@@ -221,7 +221,7 @@ function renderTable() {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 
 document.getElementById('searchInput')?.addEventListener('input', applyFilters);

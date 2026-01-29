@@ -42,7 +42,7 @@ async function loadCapstoneData() {
     // Get logged in user checking
     const userJson = localStorage.getItem('loginUser');
     if (!userJson) {
-        window.location.href = '../../index.html';
+        window.location.href = '../../';
         return;
     }
     const user = JSON.parse(userJson);
@@ -833,6 +833,6 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 

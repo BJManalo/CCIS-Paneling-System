@@ -248,7 +248,7 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
 
 async function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 
 function toggleGenericPassword(inputId, icon) {

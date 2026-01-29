@@ -88,13 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('loginUser', JSON.stringify(accountData));
 
                     if (accountData.role === 'Admin') {
-                        window.location.href = 'pages/admin/admin.html';
+                        window.location.href = 'pages/admin/admin';
                     } else if (accountData.role === 'Instructor') {
-                        window.location.href = 'pages/instructor/instructor_dashboard.html';
+                        window.location.href = 'pages/instructor/instructor_dashboard';
                     } else if (accountData.role === 'Panel' || accountData.role === 'Adviser') {
-                        window.location.href = 'pages/panel/panel_capstone.html';
+                        window.location.href = 'pages/panel/panel_capstone';
                     } else {
-                        window.location.href = 'pages/panel/panel_capstone.html';
+                        window.location.href = 'pages/panel/panel_capstone';
                     }
                     return;
                 }
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Add a pseudo-role for local logic if needed
                     groupData.role = 'StudentGroup';
                     localStorage.setItem('loginUser', JSON.stringify(groupData));
-                    window.location.href = 'pages/student/student_dashboard.html';
+                    window.location.href = 'pages/student/student_dashboard';
                     return;
                 }
 

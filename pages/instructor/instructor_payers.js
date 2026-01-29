@@ -176,6 +176,6 @@ function closeLightbox() {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 

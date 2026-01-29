@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check Login
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     if (!loginUser || loginUser.role !== 'Instructor') {
-        window.location.href = '../../index.html';
+        window.location.href = '../../';
         return;
     }
     instructorName = loginUser.full_name || '';
@@ -363,7 +363,7 @@ async function renderTable() {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 
 window.filterTable = (program) => {

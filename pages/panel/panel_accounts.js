@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function loadUserProfile() {
     const userJson = localStorage.getItem('loginUser');
     if (!userJson) {
-        window.location.href = '../../index.html';
+        window.location.href = '../../';
         return;
     }
     currentUser = JSON.parse(userJson);
@@ -115,6 +115,6 @@ function showToast(message) {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 

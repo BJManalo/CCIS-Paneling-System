@@ -20,7 +20,7 @@ async function loadCapstoneData() {
 
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     if (!loginUser) {
-        window.location.href = '../../index.html';
+        window.location.href = '../../';
         return;
     }
     instructorId = loginUser.id;
@@ -312,6 +312,6 @@ window.viewGroup = (id, type) => {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 

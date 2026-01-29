@@ -664,5 +664,5 @@ function generatePrintTable(dataList, reportTitle) {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }

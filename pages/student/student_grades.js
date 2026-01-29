@@ -8,7 +8,7 @@ async function loadGrades() {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
 
     if (!loginUser) {
-        window.location.href = '../../index.html';
+        window.location.href = '../../';
         return;
     }
 

@@ -10,7 +10,7 @@ let currentGroupData = null; // Store fetched data for the modal
 async function loadPayments() {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     if (!loginUser) {
-        window.location.href = '../../index.html';
+        window.location.href = '../../';
         return;
     }
 

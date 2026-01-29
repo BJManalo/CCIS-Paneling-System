@@ -354,7 +354,7 @@ async function renderTable() {
 
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
 
 window.filterTable = (program) => {

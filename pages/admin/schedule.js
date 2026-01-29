@@ -119,5 +119,5 @@ function setupSearch() {
 // --- Logout ---
 function logout() {
     localStorage.removeItem('loginUser');
-    window.location.href = '../../index.html';
+    window.location.href = '../../';
 }
