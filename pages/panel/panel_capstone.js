@@ -939,91 +939,87 @@ window.loadViewer = async (url) => {
     sidebar.style.display = 'none';
     extBtn.href = url;
 
-    // Check if likely PDF
-    const isDrive = url.includes('drive.google.com');
-
-    // Check for known non-PDF types that definitely require Iframe
+    // --- DETECT FILE TYPE ---
     const cleanUrl = url.split('?')[0].toLowerCase();
+    const isDrive = url.includes('drive.google.com');
     const isOffice = cleanUrl.match(/\.(doc|docx|ppt|pptx|xls|xlsx|txt)$/i);
     const isGoogleSuite = url.includes('docs.google.com') || url.includes('sheets.google.com') || url.includes('slides.google.com');
 
-    // We will attempt to render EVERYTHING that isn't explicitly an Office/Google Doc.
-    // If it fails (e.g. drive.google.com/view), the Catch block handles the fallback robustly.
-    const shouldTryRender = !isOffice && !isGoogleSuite;
+    // We only try custom rendering if it LOOKS like a direct PDF and is NOT Drive/Office.
+    // This prevents the CORS errors for Drive links.
+    const shouldTryRender = cleanUrl.endsWith('.pdf') && !isDrive;
+
+    // --- SETUP SIDEBAR (Manual Input) ---
+    // We ALWAYS show this form now, so users can add comments even if drawing fails or is impossible (Drive).
+    sidebar.style.display = 'flex';
+    annotList.innerHTML = '';
+
+    // Create or Reuse header
+    const existingHeader = document.getElementById('sidebar-add-form');
+    if (existingHeader) existingHeader.remove();
+
+    const sidebarHeader = document.createElement('div');
+    sidebarHeader.id = 'sidebar-add-form';
+    sidebarHeader.style.padding = '15px';
+    sidebarHeader.style.borderBottom = '1px solid #e2e8f0';
+    sidebarHeader.style.background = '#f8fafc';
+    sidebarHeader.innerHTML = `
+        <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:8px; text-transform:uppercase;">Add Comment</div>
+        <div style="display:flex; gap:5px; margin-bottom:8px;">
+            <input type="text" id="manual-page" placeholder="Pg" style="width:40px; padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:12px; text-align:center;">
+            <input type="text" id="manual-text" placeholder="Comment..." style="flex:1; padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:12px;">
+        </div>
+        <button id="manual-add-btn" style="width:100%; background:var(--primary-color); color:white; border:none; padding:6px; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer;">
+            Add Note
+        </button>
+    `;
+    sidebar.insertBefore(sidebarHeader, annotList);
+
+    // Bind Manual Add
+    document.getElementById('manual-add-btn').onclick = () => {
+        const pg = document.getElementById('manual-page').value.trim();
+        const txt = document.getElementById('manual-text').value.trim();
+        if (!txt) return;
+        saveAnnotation(pg || 'Gen', null, txt);
+        document.getElementById('manual-text').value = '';
+        document.getElementById('manual-page').value = '';
+    };
 
     if (shouldTryRender) {
-        // Try to Render with PDF.js
+        // Try to Render with PDF.js (Direct PDFs only)
         pdfContainer.style.display = 'flex';
-        sidebar.style.display = 'flex';
-        annotList.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px;">Loading annotations...</div>';
+        annotList.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px;">Loading...</div>';
 
         try {
             await renderPdf(url);
             loadSidebarAnnotations();
         } catch (e) {
-            console.warn('PDF Render failed (CORS or Error), falling back to Iframe', e);
+            console.warn('PDF Render failed, falling back', e);
             pdfContainer.style.display = 'none';
-            // Keep sidebar visible with warning
-
-            // Fallback to Iframe
-            let viewerUrl = url;
-            if (url.includes('drive.google.com')) viewerUrl = url.replace('/view', '/preview');
-            // Ensure docs.google viewer is used for generic URLs if not drive
-            else viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-
-            fileViewer.src = viewerUrl;
-            fileViewer.style.display = 'block';
-
-            // Load comments into sidebar anyway (Read-Only list)
+            loadFallbackIframe(url, isDrive);
             loadSidebarAnnotations();
-
-            // Prepend warning after loading
-            const warning = document.createElement('div');
-            warning.innerHTML = `
-                <div style="background:#fff7ed; color:#c2410c; padding:10px; font-size:11px; margin-bottom:10px; border-radius:6px; border:1px solid #fdba74;">
-                    <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">warning</span>
-                    <strong>Highlighting Mode Failed</strong><br>
-                    Could not render highlight layer (likely CORS/Protected).<br>
-                    Standard viewing enabled.
-                </div>
-            `;
-            annotList.prepend(warning);
         }
 
     } else {
-        // Standard Iframe (Docs, Slides, or Drive PDFs)
-        // Keep sidebar visible for consistency? 
-        // User wants comments to "flow". Even if not highlighting, seeing the list is good.
-        sidebar.style.display = 'flex';
-
-        let viewerUrl = url;
-        if (isDrive) {
-            viewerUrl = url.replace('/view', '/preview');
-        } else if (url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
-            viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-        }
-
-        fileViewer.src = viewerUrl;
-        fileViewer.style.display = 'block';
-
+        // Standard Iframe (Drive, Docs, etc)
+        loadFallbackIframe(url, isDrive);
         loadSidebarAnnotations();
-        const info = document.createElement('div');
-        info.innerHTML = `
-             <div style="padding:15px; text-align:center; color:#94a3b8; font-size:12px; font-style:italic;">
-                Highlighting not supported for this file type.
-             </div>
-        `;
-        annotList.prepend(info);
     }
-
-    // Store context for saving
-    // We need to know which group/file we are viewing to save annotations
-    // We can infer it from the fact the modal is open, but safer to store global context or pass it.
-    // 'currentPdfParams' is set by the caller of loadViewer usually? No, the caller is onclick of the file button.
-    // We need to pass context to loadViewer or store it globally when 'openFileModal' renders the list.
 };
 
-// Global Context setter (hacky but effective given current structure)
+function loadFallbackIframe(url, isDrive) {
+    const fileViewer = document.getElementById('fileViewer');
+    let viewerUrl = url;
+    if (isDrive || url.includes('drive.google.com')) {
+        viewerUrl = url.replace('/view', '/preview');
+    } else {
+        viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+    }
+    fileViewer.src = viewerUrl;
+    fileViewer.style.display = 'block';
+}
+
+// Global Context setter
 window.setPdfContext = (groupId, catKey, fileKey, groupData) => {
     currentPdfParams = { groupId, catKey, fileKey, group: groupData };
 };
@@ -1173,14 +1169,17 @@ async function saveAnnotation(pageIndex, rect, text) {
         id: Date.now(),
         page: pageIndex,
         text: text,
-        rect: rect, // Store CSS values
+        rect: rect, // Store CSS values (can be null)
         date: new Date().toISOString()
     };
 
     myComments.push(newComment);
 
     // Optimistic Update
-    renderPageAnnotations(pageIndex, document.querySelector(`.annotation-layer[data-page-index="${pageIndex}"]`));
+    // Only re-render annotation box if rect exists (Drawing Mode)
+    if (rect && document.querySelector('.annotation-layer')) {
+        renderPageAnnotations(pageIndex, document.querySelector(`.annotation-layer[data-page-index="${pageIndex}"]`));
+    }
     loadSidebarAnnotations();
 
     // Save to DB
