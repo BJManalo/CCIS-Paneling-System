@@ -63,18 +63,15 @@
 
         function showStatus(msg, isError = false) {
             const loader = document.getElementById('loader');
-            loader.innerHTML = `<div style="${isError ? 'color:red;font-weight:bold;' : ''}">${msg}</div>`;
-            if (isError) {
-                loader.innerHTML += `<br><a href="${fileUrl}" target="_blank" style="margin-top:10px; color:#3b82f6;">Try opening file directly</a>`;
-            }
+            loader.innerHTML = `<div style="${isError ? 'color:red;font-weight:bold;max-width:400px;line-height:1.5;' : ''}">${msg}</div>`;
         }
 
         // Timeout to detect hang
         const loadingTimeout = setTimeout(() => {
             if (document.getElementById('loader').style.display !== 'none') {
-                showStatus("Initial loading is taking longer than usual. This might be due to a slow connection or Google Drive security checks.", true);
+                showStatus("This is taking a bit longer than expected. We are still trying to retrieve the file from the secure server...", false);
             }
-        }, 15000);
+        }, 12000);
 
         function startAdobeViewer() {
             console.log("Initializing Adobe View...");

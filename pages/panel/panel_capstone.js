@@ -838,18 +838,17 @@ window.loadViewer = (url) => {
     let isDirectPdf = url.toLowerCase().endsWith('.pdf');
     let effectiveUrl = url;
 
-    // If it's a Google Drive link, we try to convert it to a direct download link for Adobe
+    // If it's a Google Drive link, we try to convert it to a direct binary link for Adobe
     if (url.includes('drive.google.com')) {
         const match = url.match(/\/d\/([^\/]+)/);
         if (match && match[1]) {
-            effectiveUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-            isDirectPdf = true; // Force Adobe for Drive links we can convert
+            // Using a more direct link that often bypasses the scanner page
+            effectiveUrl = `https://drive.google.com/uc?id=${match[1]}`;
+            isDirectPdf = true;
         }
     }
 
     if (isDirectPdf) {
-        // Open Dedicated Viewer in New Tab
-        // This guarantees Full Window mode works correctly
         const userJson = localStorage.getItem('loginUser');
         let username = "Panelist";
         if (userJson) {
@@ -858,10 +857,10 @@ window.loadViewer = (url) => {
 
         const viewerLink = `viewer.html?url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
 
-        // Try opening in new tab
+        // Open in new tab automatically
         window.open(viewerLink, '_blank');
 
-        // FALLBACK UI inside the modal (In case popup is blocked)
+        // Internal Sidebar UI stays clear
         const placeholder = document.getElementById('viewerPlaceholder');
         const iframe = document.getElementById('fileViewer');
         const adobeDiv = document.getElementById('adobe-pdf-view');
@@ -870,13 +869,12 @@ window.loadViewer = (url) => {
         adobeDiv.style.display = 'none';
         placeholder.style.display = 'flex';
         placeholder.innerHTML = `
-            <div style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-                <span class="material-icons-round" style="font-size: 64px; color: #ef4444; margin-bottom: 15px;">picture_as_pdf</span>
-                <h3 style="margin: 0; color: #1e293b; font-size: 1.25rem;">Document Ready</h3>
-                <p style="color: #64748b; font-size: 0.95rem; margin: 15px 0;">We tried to open the PDF viewer in a new tab.<br>If it didn't open, your browser might have blocked the popup.</p>
-                <a href="${viewerLink}" target="_blank" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: background 0.2s;">Open Viewer in New Tab</a>
-                <p style="margin-top: 15px; font-size: 0.8rem; color: #94a3b8;">Full annotation tools are only available in the new tab view.</p>
+            <div style="text-align: center; padding: 30px;">
+                <div class="loader-spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>
+                <h3 style="margin: 0; color: #1e293b;">Opening Viewer...</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin-top: 10px;">The document is opening in a new tab for full annotation tools.</p>
             </div>
+            <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
         `;
         return;
     }
