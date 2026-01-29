@@ -57,22 +57,22 @@
 
         // Parse Query Params
         const params = new URLSearchParams(window.location.search);
-        const rawFileUrl = params.get('url');
-        const fileUrl = rawFileUrl ? `https://corsproxy.io/?${encodeURIComponent(rawFileUrl)}` : null;
+        const fileUrl = params.get('url');
         const fileName = params.get('name') || "Document.pdf";
         const userName = params.get('user') || "Panelist";
 
         function showStatus(msg, isError = false) {
+            console.log("PDF Status:", msg);
             const loader = document.getElementById('loader');
-            loader.innerHTML = `<div style="${isError ? 'color:red;font-weight:bold;max-width:400px;line-height:1.5;' : ''}">${msg}</div>`;
+            loader.innerHTML = `<div style="${isError ? 'color:red;font-weight:bold;max-width:500px;line-height:1.5;' : ''}">${msg}</div>`;
         }
 
         // Timeout to detect hang
         const loadingTimeout = setTimeout(() => {
             if (document.getElementById('loader').style.display !== 'none') {
-                showStatus("This is taking a bit longer than expected. We are still trying to retrieve the file from the secure server...", false);
+                showStatus(`The document is taking a while to load from Google Drive. <br><small style="color:#888;">URL: ${fileUrl}</small>`, false);
             }
-        }, 12000);
+        }, 10000);
 
         function startAdobeViewer() {
             console.log("Initializing Adobe View...");

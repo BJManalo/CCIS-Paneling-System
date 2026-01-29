@@ -831,21 +831,22 @@ const ADOBE_CLIENT_ID = "b965033ee6674833ba55cf84132cb88a"; // Updated for Hoste
 window.loadViewer = (url) => {
     if (!url) return;
 
-    // Helper to get filename
-    const fileName = url.split('/').pop().split('?')[0] || "document.pdf";
-
-    // Check type - Now allowing Google Drive files to be sent to Adobe if they are PDFs
-    let isDirectPdf = url.toLowerCase().endsWith('.pdf');
     let effectiveUrl = url;
+    let fileName = "Evaluation_Document.pdf";
+    let isDirectPdf = url.toLowerCase().endsWith('.pdf');
 
-    // If it's a Google Drive link, we try to convert it to a direct binary link for Adobe
+    // Robust Google Drive Detection & Conversion
     if (url.includes('drive.google.com')) {
-        const match = url.match(/\/d\/([^\/]+)/);
-        if (match && match[1]) {
-            // Using a more direct link that often bypasses the scanner page
-            effectiveUrl = `https://drive.google.com/uc?id=${match[1]}`;
+        const driveIdMatch = url.match(/(?:\/d\/|id=)([\w-]+)/);
+        if (driveIdMatch && driveIdMatch[1]) {
+            const fileId = driveIdMatch[1];
+            // Use direct export link for Adobe
+            effectiveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+            fileName = "Review_Document.pdf";
             isDirectPdf = true;
         }
+    } else {
+        fileName = url.split('/').pop().split('?')[0] || "document.pdf";
     }
 
     if (isDirectPdf) {
