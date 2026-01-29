@@ -74,58 +74,79 @@
             }
         }, 10000);
 
-        function startAdobeViewer() {
-            console.log("Initializing Adobe View...");
+        async function startAdobeViewer() {
             if (!fileUrl) {
                 showStatus("Error: No file URL provided.", true);
                 return;
             }
 
-            const adobeDCView = new AdobeDC.View({
-                clientId: ADOBE_CLIENT_ID,
-                divId: "pdf-view"
-            });
+            try {
+                showStatus("Connecting to secure storage and fetching document...");
 
-            adobeDCView.previewFile({
-                content: { location: { url: fileUrl } },
-                metaData: { fileName: fileName }
-            }, {
-                embedMode: "FULL_WINDOW",
-                showAnnotationTools: true,
-                enableAnnotationAPIs: true,
-                includePDFAnnotations: true,
-                showLeftHandPanel: true,
-                showDownloadPDF: true,
-                showPrintPDF: true,
-                dockPageControls: false
-            }).then(adobeViewer => {
-                console.log("Viewer Loaded Successfully");
-                clearTimeout(loadingTimeout);
-                document.getElementById('loader').style.display = 'none';
+                // 1. Manually fetch the bytes to bypass Adobe's CORS/Security hang-ups
+                let response;
+                try {
+                    response = await fetch(fileUrl);
+                    if (!response.ok) throw new Error("CORS or Connection Error");
+                } catch (e) {
+                    console.warn("Direct fetch blocked, attempting secure bypass...");
+                    showStatus("Retrying via secure bypass route...");
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`;
+                    response = await fetch(proxyUrl);
+                }
 
-                adobeViewer.getAnnotationManager().then(annotationManager => {
-                    const profileConfig = {
-                        userProfile: {
-                            name: userName,
-                            firstName: userName.split(' ')[0],
-                            lastName: userName.split(' ').slice(1).join(' ') || ""
-                        }
-                    };
+                if (!response.ok) throw new Error("Could not retrieve document stream. The file might be private or too large.");
 
-                    annotationManager.registerEventListener(
-                        function (event) { console.log("Adobe Event:", event.type); },
-                        { listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"] }
-                    );
+                const arrayBuffer = await response.arrayBuffer();
+                console.log("File bytes successfully retrieved.");
 
-                    if (annotationManager.setConfig) {
-                        annotationManager.setConfig(profileConfig);
-                    }
+                // 2. Initialize Adobe with the bytes we just downloaded
+                const adobeDCView = new AdobeDC.View({
+                    clientId: ADOBE_CLIENT_ID,
+                    divId: "pdf-view"
                 });
-            }).catch(err => {
-                console.error("Adobe Preview Error:", err);
+
+                adobeDCView.previewFile({
+                    content: { promise: Promise.resolve(arrayBuffer) },
+                    metaData: { fileName: fileName }
+                }, {
+                    embedMode: "FULL_WINDOW",
+                    showAnnotationTools: true,
+                    enableAnnotationAPIs: true,
+                    includePDFAnnotations: true,
+                    showLeftHandPanel: true,
+                    showDownloadPDF: true,
+                    showPrintPDF: true,
+                    dockPageControls: false
+                }).then(adobeViewer => {
+                    clearTimeout(loadingTimeout);
+                    document.getElementById('loader').style.display = 'none';
+
+                    adobeViewer.getAnnotationManager().then(annotationManager => {
+                        const profileConfig = {
+                            userProfile: {
+                                name: userName,
+                                firstName: userName.split(' ')[0],
+                                lastName: userName.split(' ').slice(1).join(' ') || ""
+                            }
+                        };
+
+                        annotationManager.registerEventListener(
+                            function (event) { console.log("Adobe Event:", event.type); },
+                            { listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"] }
+                        );
+
+                        if (annotationManager.setConfig) {
+                            annotationManager.setConfig(profileConfig);
+                        }
+                    });
+                });
+
+            } catch (err) {
+                console.error("Critical Viewer Error:", err);
                 clearTimeout(loadingTimeout);
-                showStatus(`Failed to load PDF: ${err.message}`, true);
-            });
+                showStatus(`Failed to fetch PDF: ${err.message}. Please try refreshing your dashboard or checking the file permissions.`, true);
+            }
         }
 
         // Handle Script Loading
