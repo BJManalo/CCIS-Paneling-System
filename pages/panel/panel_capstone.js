@@ -1069,16 +1069,54 @@ async function renderPdf(url) {
         overlay.addEventListener('mousemove', handleMouseMove);
         overlay.addEventListener('mouseup', handleMouseUp);
 
+        // ... existing renderPdf loop ...
         pageDiv.appendChild(overlay);
         container.appendChild(pageDiv);
 
         // Render Existing Annotations for this page
         renderPageAnnotations(i, overlay);
+
+        // INTERSECTION OBSERVER for Page Detection
+        observer.observe(pageDiv);
     }
+    // Initial Context
+    updateCurrentPageContext(1);
 };
 
+// --- Page Detection Logic ---
+const observer = new IntersectionObserver((entries) => {
+    // Find the page with the highest intersection ratio
+    let bestCandidate = null;
+    entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            bestCandidate = entry.target;
+        }
+    });
+
+    if (bestCandidate) {
+        const overlay = bestCandidate.querySelector('.annotation-layer');
+        if (overlay) {
+            const pageIndex = parseInt(overlay.dataset.pageIndex);
+            updateCurrentPageContext(pageIndex);
+        }
+    }
+}, { threshold: [0.1, 0.5, 0.9] });
+
+let currentPageVal = 1;
+function updateCurrentPageContext(pageIndex) {
+    if (!pageIndex) return;
+    currentPageVal = pageIndex;
+
+    // 1. Auto-fill Manual Input
+    const pgInput = document.getElementById('manual-page');
+    if (pgInput) pgInput.value = pageIndex;
+
+    // 2. Filter Sidebar List
+    loadSidebarAnnotations(pageIndex);
+}
+
 // --- Annotation UI Logic ---
-function handleMouseDown(e) {
+function handleMouseDown(e) { /* ... existing ... */
     isDrawing = true;
     const rect = e.target.getBoundingClientRect();
     startX = e.clientX - rect.left;
@@ -1113,18 +1151,13 @@ function handleMouseUp(e) {
     if (!isDrawing || !currentRectDiv) return;
     isDrawing = false;
 
-    const w = parseInt(currentRectDiv.style.width);
-    const h = parseInt(currentRectDiv.style.height);
-
-    // Filter accidental clicks
-    if (w < 10 || h < 10) {
+    // Ignore small clicks
+    if (parseInt(currentRectDiv.style.width) < 10) {
         currentRectDiv.remove();
         currentRectDiv = null;
         return;
     }
 
-    // Prompt for Comment
-    // We'll create a simple inline popover
     const comment = prompt("Add a comment for this highlight:");
     if (comment) {
         const pageIndex = parseInt(e.target.dataset.pageIndex);
@@ -1144,11 +1177,6 @@ function handleMouseUp(e) {
 // --- Save & Render Logic ---
 async function saveAnnotation(pageIndex, rect, text) {
     const { groupId, catKey, fileKey, group } = currentPdfParams;
-    // We reuse the existing 'addPageRemark' flow but enrich the data object
-    /* 
-       Data Structure: 
-       [ { id, page: "1", text: "...", rect: {left,top,w,h}, date } ]
-    */
 
     const userJson = localStorage.getItem('loginUser');
     const user = JSON.parse(userJson);
@@ -1169,18 +1197,18 @@ async function saveAnnotation(pageIndex, rect, text) {
         id: Date.now(),
         page: pageIndex,
         text: text,
-        rect: rect, // Store CSS values (can be null)
+        rect: rect,
         date: new Date().toISOString()
     };
 
     myComments.push(newComment);
 
     // Optimistic Update
-    // Only re-render annotation box if rect exists (Drawing Mode)
     if (rect && document.querySelector('.annotation-layer')) {
         renderPageAnnotations(pageIndex, document.querySelector(`.annotation-layer[data-page-index="${pageIndex}"]`));
     }
-    loadSidebarAnnotations();
+    // Reload sidebar with CURRENT page filter
+    loadSidebarAnnotations(currentPageVal);
 
     // Save to DB
     await saveCommentsMap(group, catKey, fileKey, userName, myComments);
