@@ -834,8 +834,18 @@ window.loadViewer = (url) => {
     // Helper to get filename
     const fileName = url.split('/').pop().split('?')[0] || "document.pdf";
 
-    // Check type
-    const isDirectPdf = url.toLowerCase().endsWith('.pdf') && !url.includes('drive.google.com/file');
+    // Check type - Now allowing Google Drive files to be sent to Adobe if they are PDFs
+    let isDirectPdf = url.toLowerCase().endsWith('.pdf');
+    let effectiveUrl = url;
+
+    // If it's a Google Drive link, we try to convert it to a direct download link for Adobe
+    if (url.includes('drive.google.com')) {
+        const match = url.match(/\/d\/([^\/]+)/);
+        if (match && match[1]) {
+            effectiveUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+            isDirectPdf = true; // Force Adobe for Drive links we can convert
+        }
+    }
 
     if (isDirectPdf) {
         // Open Dedicated Viewer in New Tab
@@ -846,7 +856,7 @@ window.loadViewer = (url) => {
             try { username = JSON.parse(userJson).name || "Panelist"; } catch (e) { }
         }
 
-        const viewerLink = `viewer.html?url=${encodeURIComponent(url)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
+        const viewerLink = `viewer.html?url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
 
         // Try opening in new tab
         window.open(viewerLink, '_blank');
