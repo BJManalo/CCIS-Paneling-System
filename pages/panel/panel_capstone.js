@@ -794,9 +794,24 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     } catch (e) { console.error(e); alert('Error saving remarks: ' + (e.message || e)); }
 };
 
+
+window.backToFileList = () => {
+    document.getElementById('modalSidebar').style.display = 'flex';
+    document.getElementById('fileViewHeader').style.display = 'none';
+
+    // Hide viewers
+    document.getElementById('adobe-pdf-view').style.display = 'none';
+    document.getElementById('fileViewer').style.display = 'none';
+    document.getElementById('viewerPlaceholder').style.display = 'flex';
+
+    // Clear adobe content to prevent memory leaks/state issues
+    document.getElementById('adobe-pdf-view').innerHTML = "";
+};
+
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     document.getElementById('fileViewer').src = '';
+    backToFileList(); // Reset layout for next open
 };
 
 // --- Adobe PDF Embed API Integration ---
@@ -810,11 +825,17 @@ window.loadViewer = (url) => {
     const adobeDiv = document.getElementById('adobe-pdf-view');
     const placeholder = document.getElementById('viewerPlaceholder');
     const toolbar = document.getElementById('viewerToolbar');
+    const header = document.getElementById('fileViewHeader');
+    const sidebar = document.getElementById('modalSidebar');
+
+    // Layout Change: Hide sidebar, show viewer fully
+    sidebar.style.display = 'none';
+    header.style.display = 'flex';
 
     iframe.style.display = 'none';
     adobeDiv.style.display = 'none';
     placeholder.style.display = 'none';
-    toolbar.style.display = 'flex';
+    // toolbar.style.display = 'flex'; // We use internal headers now
     document.getElementById('externalLinkBtn').href = url;
 
     // Logic: If direct PDF (and not a Google Drive preview link), use Adobe
