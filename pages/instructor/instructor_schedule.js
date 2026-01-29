@@ -102,9 +102,23 @@ function renderSchedules(schedules) {
         else if (program.includes('BSIT')) progClass = 'prog-bsit';
         else if (program.includes('BSCS')) progClass = 'prog-bscs';
 
-        // Panels list with chips
+        // Panels list with premium chips
         const panelArray = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
-        const panelsHtml = panelArray.map(p => `<span class="chip">${p}</span>`).join('');
+        const panelsHtml = panelArray.map(p => `
+            <span style="
+                display: inline-block;
+                padding: 4px 10px;
+                background: #f8fafc;
+                color: #475569;
+                font-weight: 600;
+                font-size: 0.8rem;
+                border-radius: 6px;
+                border: 1px solid #cbd5e1;
+                margin-right: 4px;
+                margin-bottom: 4px;
+                font-family: 'Outfit', sans-serif;
+            ">${p}</span>
+        `).join('');
 
         // Main Row
         const row = document.createElement('tr');
