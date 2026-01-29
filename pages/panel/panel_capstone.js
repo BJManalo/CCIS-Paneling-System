@@ -849,6 +849,9 @@ function initAdobeViewer(url, divId) {
         return;
     }
 
+    // Clear container to prevent duplicate/fallback issues
+    document.getElementById(divId).innerHTML = "";
+
     const adobeDCView = new AdobeDC.View({
         clientId: ADOBE_CLIENT_ID,
         divId: divId
@@ -863,6 +866,7 @@ function initAdobeViewer(url, divId) {
     }, {
         embedMode: "FULL_WINDOW",
         defaultViewMode: "FIT_WIDTH",
+        dockPageControls: false,
         showAnnotationTools: true,
         enableAnnotationAPIs: true,
         includePDFAnnotations: true,
