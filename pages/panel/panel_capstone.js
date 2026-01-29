@@ -794,198 +794,25 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     } catch (e) { console.error(e); alert('Error saving remarks: ' + (e.message || e)); }
 };
 
-
-window.backToFileList = () => {
-    const viewerArea = document.getElementById('modalViewerArea');
-
-    // Reset from Full Screen Fixed
-    viewerArea.style.position = '';
-    viewerArea.style.top = '';
-    viewerArea.style.left = '';
-    viewerArea.style.width = '';
-    viewerArea.style.height = '';
-    viewerArea.style.zIndex = '';
-    viewerArea.style.borderRadius = '';
-
-    document.getElementById('modalSidebar').style.display = 'flex';
-    document.getElementById('fileViewHeader').style.display = 'none';
-
-    // Hide viewers
-    document.getElementById('adobe-pdf-view').style.display = 'none';
-    document.getElementById('fileViewer').style.display = 'none';
-    document.getElementById('viewerPlaceholder').style.display = 'flex';
-
-    // Clear adobe content to prevent memory leaks/state issues
-    document.getElementById('adobe-pdf-view').innerHTML = "";
-};
-
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     document.getElementById('fileViewer').src = '';
-    backToFileList(); // Reset layout for next open
 };
-
-// --- Adobe PDF Embed API Integration ---
-const ADOBE_CLIENT_ID = "b965033ee6674833ba55cf84132cb88a"; // Updated for Hosted Site
 
 window.loadViewer = (url) => {
     if (!url) return;
-
-    let effectiveUrl = url;
-    let fileName = "Evaluation_Document.pdf";
-    let isDirectPdf = url.toLowerCase().endsWith('.pdf');
-
-    // Robust Google Drive Detection & Conversion
-    if (url.includes('drive.google.com')) {
-        const driveIdMatch = url.match(/(?:\/d\/|id=)([\w-]+)/);
-        if (driveIdMatch && driveIdMatch[1]) {
-            const fileId = driveIdMatch[1];
-            // Use the most direct access link
-            effectiveUrl = `https://drive.google.com/uc?id=${fileId}`;
-            fileName = "Review_Document.pdf";
-            isDirectPdf = true;
-        }
-    } else {
-        fileName = url.split('/').pop().split('?')[0] || "document.pdf";
-    }
-
-    if (isDirectPdf) {
-        const userJson = localStorage.getItem('loginUser');
-        let username = "Panelist";
-        if (userJson) {
-            try { username = JSON.parse(userJson).name || "Panelist"; } catch (e) { }
-        }
-
-        const viewerLink = `viewer.html?v=18&url=${encodeURIComponent(effectiveUrl)}&name=${encodeURIComponent(fileName)}&user=${encodeURIComponent(username)}`;
-
-        // Internal Sidebar UI stays clear
-        const placeholder = document.getElementById('viewerPlaceholder');
-        const iframe = document.getElementById('fileViewer');
-        const adobeDiv = document.getElementById('adobe-pdf-view');
-
-        iframe.style.display = 'none';
-        adobeDiv.style.display = 'none';
-        placeholder.style.display = 'flex';
-        placeholder.innerHTML = `
-            <div style="text-align: center; padding: 40px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; max-width: 400px; margin: auto; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
-                <div style="background: #f1f5f9; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-                    <span class="material-icons-round" style="font-size: 40px; color: #3b82f6;">edit_note</span>
-                </div>
-                <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;">Ready to Evaluate</h3>
-                <p style="color: #64748b; font-size: 0.9rem; margin: 15px 0; line-height: 1.5;">Click the button below to open the annotation tools in a new tab.</p>
-                
-                <button onclick="window.open('${viewerLink}', '_blank')" style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0 auto; transition: all 0.2s;">
-                    <span class="material-icons-round" style="font-size: 20px;">open_in_new</span> START ANNOTATION
-                </button>
-            </div>
-            <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-        `;
-        return;
-    }
-
-    // --- NON-PDF FALLBACK (Google Drive, Office, etc) ---
-    // Opens in the modal iframe as before
-    const iframe = document.getElementById('fileViewer');
-    const adobeDiv = document.getElementById('adobe-pdf-view');
-    const placeholder = document.getElementById('viewerPlaceholder');
-    // Ensure Layout is reset (Sidebar VISIBLE)
-    document.getElementById('modalSidebar').style.display = 'flex';
-    document.getElementById('fileViewHeader').style.display = 'none';
-    const viewerArea = document.getElementById('modalViewerArea');
-    if (viewerArea) {
-        viewerArea.style.width = '';
-        viewerArea.style.position = '';
-        viewerArea.style.top = '';
-        viewerArea.style.left = '';
-        viewerArea.style.height = '';
-        viewerArea.style.borderRadius = '';
-        viewerArea.style.zIndex = '';
-    }
-
-    iframe.style.display = 'block';
-    adobeDiv.style.display = 'none';
-    placeholder.style.display = 'none';
-    // Fallback URL Logic
     let viewerUrl = url;
-    if (url.includes('drive.google.com')) {
-        viewerUrl = url.replace(/\/view.*/, '/preview');
-    } else if (url.match(/\.(doc|docx|ppt|pptx)$/i)) {
+    if (url.includes('drive.google.com')) { viewerUrl = url.replace('/view', '/preview'); }
+    else if (url.endsWith('.pdf') || url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
         viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
     }
+    const iframe = document.getElementById('fileViewer');
     iframe.src = viewerUrl;
+    iframe.style.display = 'block';
+    document.getElementById('viewerPlaceholder').style.display = 'none';
+    document.getElementById('viewerToolbar').style.display = 'flex';
+    document.getElementById('externalLinkBtn').href = url;
 };
-
-function initAdobeViewer(url, divId) {
-    if (!window.AdobeDC) {
-        console.error("Adobe View SDK not loaded.");
-        return;
-    }
-
-    // Clear container to prevent duplicate/fallback issues
-    document.getElementById(divId).innerHTML = "";
-
-    const adobeDCView = new AdobeDC.View({
-        clientId: ADOBE_CLIENT_ID,
-        divId: divId
-    });
-
-    // Helper to get filename
-    const fileName = url.split('/').pop().split('?')[0] || "document.pdf";
-
-    const previewFilePromise = adobeDCView.previewFile({
-        content: { location: { url: url } },
-        metaData: { fileName: fileName }
-    }, {
-        embedMode: "IN_LINE",
-        defaultViewMode: "FIT_WIDTH",
-        dockPageControls: false,
-        showAnnotationTools: true,
-        enableAnnotationAPIs: true,
-        includePDFAnnotations: true,
-        showLeftHandPanel: true,
-        showDownloadPDF: true,
-        showPrintPDF: true
-    });
-
-    previewFilePromise.then(adobeViewer => {
-        adobeViewer.getAnnotationManager().then(annotationManager => {
-            // Get current user name for context
-            const userJson = localStorage.getItem('loginUser');
-            let username = "Panelist";
-            if (userJson) {
-                try { username = JSON.parse(userJson).name || "Panelist"; } catch (e) { }
-            }
-
-            // Registering event listeners tells Adobe we are ready to handle annotations
-            // This is often required to "unlock" the full UI
-            annotationManager.registerEventListener(
-                function (event) {
-                    console.log("Annotation Event:", event.type);
-                },
-                {
-                    listenOn: [
-                        "ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED", "ANNOTATION_SELECTED"
-                    ]
-                }
-            );
-        });
-    });
-
-    // Future: Handle annotation saving here
-    /*
-    previewFilePromise.then(adobeViewer => {
-        adobeViewer.getAnnotationManager().then(annotationManager => {
-            annotationManager.registerEventListener(
-                function (event) {
-                    console.log("Annotation Event:", event);
-                    // Save JSON to Supabase...
-                },
-                { listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"] }
-            );
-        });
-    }); 
-    */
-}
 
 window.filterTable = (program) => {
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
