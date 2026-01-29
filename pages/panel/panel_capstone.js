@@ -907,13 +907,13 @@ function initAdobeViewer(url, divId) {
         content: { location: { url: url } },
         metaData: { fileName: fileName }
     }, {
-        embedMode: "FULL_WINDOW",
+        embedMode: "IN_LINE",
         defaultViewMode: "FIT_WIDTH",
         dockPageControls: false,
         showAnnotationTools: true,
         enableAnnotationAPIs: true,
         includePDFAnnotations: true,
-        showLeftHandPanel: false, // Hide left panel to save space for toolbar
+        showLeftHandPanel: true,
         showDownloadPDF: true,
         showPrintPDF: true
     });
