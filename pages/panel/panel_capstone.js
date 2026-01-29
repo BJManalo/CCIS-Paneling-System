@@ -799,20 +799,90 @@ window.closeFileModal = () => {
     document.getElementById('fileViewer').src = '';
 };
 
+// --- Adobe PDF Embed API Integration ---
+const ADOBE_CLIENT_ID = "0b0f05555dd142d68210fada11b88ed6"; // TODO: Replace with your actual Adobe Client ID
+
 window.loadViewer = (url) => {
     if (!url) return;
-    let viewerUrl = url;
-    if (url.includes('drive.google.com')) { viewerUrl = url.replace('/view', '/preview'); }
-    else if (url.endsWith('.pdf') || url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
-        viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-    }
+
+    // Reset Views
     const iframe = document.getElementById('fileViewer');
-    iframe.src = viewerUrl;
-    iframe.style.display = 'block';
-    document.getElementById('viewerPlaceholder').style.display = 'none';
-    document.getElementById('viewerToolbar').style.display = 'flex';
+    const adobeDiv = document.getElementById('adobe-pdf-view');
+    const placeholder = document.getElementById('viewerPlaceholder');
+    const toolbar = document.getElementById('viewerToolbar');
+
+    iframe.style.display = 'none';
+    adobeDiv.style.display = 'none';
+    placeholder.style.display = 'none';
+    toolbar.style.display = 'flex';
     document.getElementById('externalLinkBtn').href = url;
+
+    // Logic: If direct PDF (and not a Google Drive preview link), use Adobe
+    // Note: Google Drive 'view' links are HTML wrappers, not direct PDFs.
+    // Adobe needs a direct link or a binary stream.
+    // We assume if it ends in .pdf and is NOT a google drive '/view' link, it's a direct PDF.
+    const isDirectPdf = url.toLowerCase().endsWith('.pdf') && !url.includes('drive.google.com/file');
+
+    if (isDirectPdf) {
+        // Use Adobe PDF Embed
+        adobeDiv.style.display = 'block';
+        initAdobeViewer(url, adobeDiv.id);
+    } else {
+        // Fallback: Use Iframe / Google Preview
+        let viewerUrl = url;
+        if (url.includes('drive.google.com')) {
+            // Ensure preview mode for Drive
+            viewerUrl = url.replace(/\/view.*/, '/preview');
+        } else if (url.match(/\.(doc|docx|ppt|pptx)$/i)) {
+            // Office files -> Google Docs Viewer
+            viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+        }
+
+        iframe.src = viewerUrl;
+        iframe.style.display = 'block';
+    }
 };
+
+function initAdobeViewer(url, divId) {
+    if (!window.AdobeDC) {
+        console.error("Adobe View SDK not loaded.");
+        return;
+    }
+
+    const adobeDCView = new AdobeDC.View({
+        clientId: ADOBE_CLIENT_ID,
+        divId: divId
+    });
+
+    // Helper to get filename
+    const fileName = url.split('/').pop().split('?')[0] || "document.pdf";
+
+    const previewFilePromise = adobeDCView.previewFile({
+        content: { location: { url: url } },
+        metaData: { fileName: fileName }
+    }, {
+        embedMode: "FULL_WINDOW",
+        showAnnotationTools: true,
+        showLeftHandPanel: true,
+        showDownloadPDF: true,
+        showPrintPDF: true
+    });
+
+    // Future: Handle annotation saving here
+    /*
+    previewFilePromise.then(adobeViewer => {
+        adobeViewer.getAnnotationManager().then(annotationManager => {
+            annotationManager.registerEventListener(
+                function (event) {
+                    console.log("Annotation Event:", event);
+                    // Save JSON to Supabase...
+                },
+                { listenOn: ["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"] }
+            );
+        });
+    }); 
+    */
+}
 
 window.filterTable = (program) => {
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
