@@ -171,16 +171,25 @@ async function loadCapstoneData() {
                 // Original logic used filter but usually 1:1.
                 const sched = schedules.find(s => s.group_id === group.id && normalizeType(s.schedule_type) === normType);
 
-                // 2. Check for files
+                // 2. Check for files (Handle both JSON objects and raw URL strings)
+                let filesObj = { titles: {}, pre_oral: {}, final: {} };
+                const parseSafe = (val, defaultLabel) => {
+                    if (!val) return {};
+                    try {
+                        const parsed = JSON.parse(val);
+                        // If it's just a string, JSON.parse might return the string itself
+                        if (typeof parsed === 'object' && parsed !== null) return parsed;
+                        return { [defaultLabel]: val };
+                    } catch (e) {
+                        return { [defaultLabel]: val };
+                    }
+                };
+
+                filesObj.titles = parseSafe(group.title_link, 'Title Proposal');
+                filesObj.pre_oral = parseSafe(group.pre_oral_link, 'Pre-Oral Document');
+                filesObj.final = parseSafe(group.final_link, 'Final Manuscript');
+
                 let hasFiles = false;
-                let filesObj = {};
-                try {
-                    filesObj = {
-                        titles: group.title_link ? JSON.parse(group.title_link) : {},
-                        pre_oral: group.pre_oral_link ? JSON.parse(group.pre_oral_link) : {},
-                        final: group.final_link ? JSON.parse(group.final_link) : {}
-                    };
-                } catch (e) { console.error('JSON Parse error', e); }
 
                 if (normType.includes('title') && Object.keys(filesObj.titles).length > 0) hasFiles = true;
                 else if (normType.includes('preoral') && Object.keys(filesObj.pre_oral).length > 0) hasFiles = true;
@@ -441,8 +450,9 @@ function renderTable() {
              `;
             row.style.background = '#fafafa';
         } else {
+            // Enhanced debug logging in the button itself
             actionBtn = `
-                <button onclick="${hasFiles ? `openFileModal('${g.id}')` : ''}" 
+                <button onclick="console.log('View Files clicked for group:', '${g.id}'); openFileModal('${g.id}')" 
                     style="background: ${hasFiles ? 'var(--primary-light)' : '#f1f5f9'}; opacity: ${hasFiles ? '1' : '0.6'}; border: none; color: ${hasFiles ? 'var(--primary-color)' : '#94a3b8'}; cursor: ${hasFiles ? 'pointer' : 'default'}; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; transition: all 0.2s;">
                     <span class="material-icons-round" style="font-size: 18px;">${hasFiles ? 'folder_open' : 'folder_off'}</span>
                     <span style="font-size: 12px; font-weight: 600;">${hasFiles ? 'View Files' : 'No Files'}</span>
@@ -482,164 +492,166 @@ function renderTable() {
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 window.openFileModal = (groupId) => {
-    console.log('Opening Modal for Group:', groupId, 'Current Tab:', currentTab);
-    const normTab = normalizeType(currentTab);
-    const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
+    try {
+        console.log('DEBUG: openFileModal triggered with ID:', groupId);
+        const normTab = normalizeType(currentTab);
+        const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
 
-    if (!group) {
-        console.error('Group not found in allData for ID:', groupId, 'Match Tab:', normTab);
-        alert('Data Error: Could not find group details for this tab.');
-        return;
-    }
+        if (!group) {
+            console.error('DEBUG ERROR: Could not find group in allData Matching Tab:', normTab, 'Target ID:', groupId);
+            console.table(allData.slice(0, 5)); // Log first 5 entries for inspection
+            alert('Cannot open: Group data not found for the ' + currentTab + ' phase.');
+            return;
+        }
 
-    document.getElementById('modalGroupName').innerText = group.groupName;
-    const fileList = document.getElementById('fileList');
-    fileList.innerHTML = '';
+        document.getElementById('modalGroupName').innerText = group.groupName;
+        const fileList = document.getElementById('fileList');
+        fileList.innerHTML = '';
 
-    // reset viewer
-    document.getElementById('fileViewer').style.display = 'none';
-    document.getElementById('viewerPlaceholder').style.display = 'flex';
-    document.getElementById('viewerToolbar').style.display = 'none';
+        // reset viewer
+        document.getElementById('fileViewer').style.display = 'none';
+        document.getElementById('viewerPlaceholder').style.display = 'flex';
+        document.getElementById('viewerToolbar').style.display = 'none';
 
-    // Helper to create sections
-    const createSection = (sectionTitle, fileObj, icon, categoryKey) => {
-        if (!fileObj || Object.keys(fileObj).length === 0) return;
+        // Helper to create sections
+        const createSection = (sectionTitle, fileObj, icon, categoryKey) => {
+            if (!fileObj || Object.keys(fileObj).length === 0) return;
 
-        const section = document.createElement('div');
-        section.style.marginBottom = '20px';
+            const section = document.createElement('div');
+            section.style.marginBottom = '20px';
 
-        const header = document.createElement('h4');
-        header.innerHTML = `<span class="material-icons-round" style="font-size:16px; vertical-align:middle; margin-right:4px;">${icon}</span> ${sectionTitle}`;
-        header.style.fontSize = '0.85rem';
-        header.style.textTransform = 'uppercase';
-        header.style.color = '#64748b';
-        header.style.letterSpacing = '0.5px';
-        header.style.marginBottom = '10px';
-        section.appendChild(header);
+            const header = document.createElement('h4');
+            header.innerHTML = `<span class="material-icons-round" style="font-size:16px; vertical-align:middle; margin-right:4px;">${icon}</span> ${sectionTitle}`;
+            header.style.fontSize = '0.85rem';
+            header.style.textTransform = 'uppercase';
+            header.style.color = '#64748b';
+            header.style.letterSpacing = '0.5px';
+            header.style.marginBottom = '10px';
+            section.appendChild(header);
 
-        Object.entries(fileObj).forEach(([label, url]) => {
-            const itemContainer = document.createElement('div');
-            itemContainer.style.background = 'white';
-            itemContainer.style.border = '1px solid #e2e8f0';
-            itemContainer.style.borderRadius = '8px';
-            itemContainer.style.marginBottom = '8px';
-            itemContainer.style.overflow = 'hidden';
+            Object.entries(fileObj).forEach(([label, url]) => {
+                const itemContainer = document.createElement('div');
+                itemContainer.style.background = 'white';
+                itemContainer.style.border = '1px solid #e2e8f0';
+                itemContainer.style.borderRadius = '8px';
+                itemContainer.style.marginBottom = '8px';
+                itemContainer.style.overflow = 'hidden';
 
-            // File Item
-            const item = document.createElement('div');
-            item.className = 'file-item';
-            item.style.padding = '10px 12px';
-            item.style.cursor = 'pointer';
-            item.style.display = 'flex';
-            item.style.alignItems = 'center';
-            item.style.justifyContent = 'space-between';
-            item.style.transition = 'all 0.2s';
+                // File Item
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.style.padding = '10px 12px';
+                item.style.cursor = 'pointer';
+                item.style.display = 'flex';
+                item.style.alignItems = 'center';
+                item.style.justifyContent = 'space-between';
+                item.style.transition = 'all 0.2s';
 
-            const displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                const displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
-            item.innerHTML = `
+                item.innerHTML = `
                 <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
                 <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">arrow_forward_ios</span>
             `;
 
-            item.onclick = () => {
-                document.querySelectorAll('.file-item').forEach(el => {
-                    el.style.background = 'white';
-                    el.parentElement.style.borderColor = '#e2e8f0';
-                });
-                item.style.background = '#f0f9ff';
-                itemContainer.style.borderColor = 'var(--primary-color)';
-                loadViewer(url, groupId, label);
-            };
+                item.onclick = () => {
+                    document.querySelectorAll('.file-item').forEach(el => {
+                        el.style.background = 'white';
+                        el.parentElement.style.borderColor = '#e2e8f0';
+                    });
+                    item.style.background = '#f0f9ff';
+                    itemContainer.style.borderColor = 'var(--primary-color)';
+                    loadViewer(url, groupId, label);
+                };
 
-            itemContainer.appendChild(item);
+                itemContainer.appendChild(item);
 
-            // Approval Controls logic (same as before)
-            // ... (We assume the status/remarks update logic remains valid)
-            // Re-implement simplified version here to save space or reuse if function available
+                // Approval Controls logic (same as before)
+                // ... (We assume the status/remarks update logic remains valid)
+                // Re-implement simplified version here to save space or reuse if function available
 
-            // To ensure it works, I'll inject the controls logic directly again (safest)
-            const userJson = localStorage.getItem('loginUser');
-            const user = userJson ? JSON.parse(userJson) : null;
-            const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+                // To ensure it works, I'll inject the controls logic directly again (safest)
+                const userJson = localStorage.getItem('loginUser');
+                const user = userJson ? JSON.parse(userJson) : null;
+                const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
-            let currentStatusMap = {};
-            let currentRemarksMap = {};
+                let currentStatusMap = {};
+                let currentRemarksMap = {};
 
-            if (categoryKey === 'titles') {
-                currentStatusMap = group.titleStatus || {};
-                currentRemarksMap = group.titleRemarks || {};
-            } else if (categoryKey === 'pre_oral') {
-                currentStatusMap = group.preOralStatus || {};
-                currentRemarksMap = group.preOralRemarks || {};
-            } else if (categoryKey === 'final') {
-                currentStatusMap = group.finalStatus || {};
-                currentRemarksMap = group.finalRemarks || {};
-            }
+                if (categoryKey === 'titles') {
+                    currentStatusMap = group.titleStatus || {};
+                    currentRemarksMap = group.titleRemarks || {};
+                } else if (categoryKey === 'pre_oral') {
+                    currentStatusMap = group.preOralStatus || {};
+                    currentRemarksMap = group.preOralRemarks || {};
+                } else if (categoryKey === 'final') {
+                    currentStatusMap = group.finalStatus || {};
+                    currentRemarksMap = group.finalRemarks || {};
+                }
 
-            // --- Multi-Panel Logic ---
-            // If the map value is a string (old version), we ignore it for multi-panel or try to adapt.
-            // New structure: currentStatusMap[label] = { "Panel Name": "Status" }
-            const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
-            const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
+                // --- Multi-Panel Logic ---
+                // If the map value is a string (old version), we ignore it for multi-panel or try to adapt.
+                // New structure: currentStatusMap[label] = { "Panel Name": "Status" }
+                const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
+                const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
 
-            const myStatus = fileStatuses[userName] || 'Pending';
-            const myRemarks = fileRemarks[userName] || '';
+                const myStatus = fileStatuses[userName] || 'Pending';
+                const myRemarks = fileRemarks[userName] || '';
 
-            // ... (Controls Rendering Code) ...
-            const controls = document.createElement('div');
-            controls.style.padding = '12px';
-            controls.style.background = '#f8fafc';
-            controls.style.borderTop = '1px solid #e2e8f0';
-            controls.style.display = 'flex';
-            controls.style.flexDirection = 'column';
-            controls.style.gap = '8px';
+                // ... (Controls Rendering Code) ...
+                const controls = document.createElement('div');
+                controls.style.padding = '12px';
+                controls.style.background = '#f8fafc';
+                controls.style.borderTop = '1px solid #e2e8f0';
+                controls.style.display = 'flex';
+                controls.style.flexDirection = 'column';
+                controls.style.gap = '8px';
 
-            let statusColor = '#64748b';
-            let statusBg = '#f1f5f9';
-            let iconText = 'hourglass_empty';
+                let statusColor = '#64748b';
+                let statusBg = '#f1f5f9';
+                let iconText = 'hourglass_empty';
 
-            if (myStatus.includes('Approved')) {
-                statusColor = '#059669'; statusBg = '#dcfce7'; iconText = 'check_circle';
-            } else if (myStatus.includes('Approve with Revisions')) {
-                statusColor = '#d97706'; statusBg = '#fef3c7'; iconText = 'warning';
-            } else if (myStatus.includes('Rejected') || myStatus.includes('Redefense')) {
-                statusColor = '#dc2626'; statusBg = '#fee2e2'; iconText = 'cancel';
-            }
+                if (myStatus.includes('Approved')) {
+                    statusColor = '#059669'; statusBg = '#dcfce7'; iconText = 'check_circle';
+                } else if (myStatus.includes('Approve with Revisions')) {
+                    statusColor = '#d97706'; statusBg = '#fef3c7'; iconText = 'warning';
+                } else if (myStatus.includes('Rejected') || myStatus.includes('Redefense')) {
+                    statusColor = '#dc2626'; statusBg = '#fee2e2'; iconText = 'cancel';
+                }
 
-            let optionsHtml = '';
-            // ... (option generation omitted for brevity if not used in read-only)
+                let optionsHtml = '';
+                // ... (option generation omitted for brevity if not used in read-only)
 
-            if (categoryKey === 'titles') {
-                optionsHtml = `
+                if (categoryKey === 'titles') {
+                    optionsHtml = `
                     <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
                     <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
                     <option value="Rejected" ${myStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
                 `;
-            } else {
-                optionsHtml = `
+                } else {
+                    optionsHtml = `
                     <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
                     <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
                     <option value="Redefense" ${myStatus === 'Redefense' ? 'selected' : ''}>Redefense</option>
                 `;
-            }
+                }
 
-            // Other Panel Feedback HTML (Visible to everyone)
-            let otherFeedbackHtml = '';
-            // For Adviser, we want to see ALL panel feedback, not just "others".
-            // Since Adviser name isn't in the status map as a KEY usually (unless they are also a panel), 
-            // "others" logic works fine if we consider Adviser is not a panel key.
-            // But if currentRole is Adviser, we want to see ALL entries in fileStatuses.
+                // Other Panel Feedback HTML (Visible to everyone)
+                let otherFeedbackHtml = '';
+                // For Adviser, we want to see ALL panel feedback, not just "others".
+                // Since Adviser name isn't in the status map as a KEY usually (unless they are also a panel), 
+                // "others" logic works fine if we consider Adviser is not a panel key.
+                // But if currentRole is Adviser, we want to see ALL entries in fileStatuses.
 
-            let panelsToDisplay = [];
-            if (currentRole === 'Adviser') {
-                panelsToDisplay = Object.keys(fileStatuses);
-            } else {
-                panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
-            }
+                let panelsToDisplay = [];
+                if (currentRole === 'Adviser') {
+                    panelsToDisplay = Object.keys(fileStatuses);
+                } else {
+                    panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
+                }
 
-            if (panelsToDisplay.length > 0) {
-                otherFeedbackHtml = `
+                if (panelsToDisplay.length > 0) {
+                    otherFeedbackHtml = `
                     <div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">
                         <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Panel Evaluations</div>
                         ${panelsToDisplay.map(panel => `
@@ -650,11 +662,11 @@ window.openFileModal = (groupId) => {
                         `).join('')}
                     </div>
                 `;
-            }
+                }
 
-            let interactiveControls = '';
-            if (currentRole === 'Panel') {
-                interactiveControls = `
+                let interactiveControls = '';
+                if (currentRole === 'Panel') {
+                    interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
                     <div style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
@@ -677,45 +689,49 @@ window.openFileModal = (groupId) => {
                     </button>
                 </div>
                 `;
-            } else {
-                // Adviser View (Read Only)
-                interactiveControls = `
+                } else {
+                    // Adviser View (Read Only)
+                    interactiveControls = `
                     <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
                         <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
                         Viewing as Adviser (Read Only)
                     </div>
                 `;
-            }
+                }
 
-            controls.innerHTML = `
+                controls.innerHTML = `
                 ${interactiveControls}
                 ${otherFeedbackHtml}
             `;
-            itemContainer.appendChild(controls);
-            section.appendChild(itemContainer);
-        });
+                itemContainer.appendChild(controls);
+                section.appendChild(itemContainer);
+            });
 
-        fileList.appendChild(section);
-    };
+            fileList.appendChild(section);
+        };
 
-    // Filter which sections to show based on locking/tab? 
-    // Usually if I open the "Title Defense" group row, I might want to see ONLY Title files?
-    // Or see all history?
-    // Let's show ONLY the current tab's files to be focused. 
-    // Or allow seeing previous approved ones?
-    // Generally, context is "grading this stage".
-    // I will show ALL for context, but maybe collapse others?
-    // For simplicity, showing all is safer so they can reference previous docs.
+        // Filter which sections to show based on locking/tab? 
+        // Usually if I open the "Title Defense" group row, I might want to see ONLY Title files?
+        // Or see all history?
+        // Let's show ONLY the current tab's files to be focused. 
+        // Or allow seeing previous approved ones?
+        // Generally, context is "grading this stage".
+        // I will show ALL for context, but maybe collapse others?
+        // For simplicity, showing all is safer so they can reference previous docs.
 
-    if (normTab.includes('title')) {
-        createSection('Title Defense', group.files.titles, 'article', 'titles');
-    } else if (normTab.includes('preoral')) {
-        createSection('Pre-Oral Defense', group.files.pre_oral, 'description', 'pre_oral');
-    } else if (normTab.includes('final')) {
-        createSection('Final Defense', group.files.final, 'menu_book', 'final');
+        if (normTab.includes('title')) {
+            createSection('Title Defense', group.files.titles, 'article', 'titles');
+        } else if (normTab.includes('preoral')) {
+            createSection('Pre-Oral Defense', group.files.pre_oral, 'description', 'pre_oral');
+        } else if (normTab.includes('final')) {
+            createSection('Final Defense', group.files.final, 'menu_book', 'final');
+        }
+
+        document.getElementById('fileModal').style.display = 'flex';
+    } catch (err) {
+        console.error('CRITICAL UI ERROR in openFileModal:', err);
+        alert('An error occurred while opening the file viewer. Check console for details.');
     }
-
-    document.getElementById('fileModal').style.display = 'flex';
 };
 
 // Re-attach other globals (updateStatus, saveRemarks, loadViewer, etc.)
