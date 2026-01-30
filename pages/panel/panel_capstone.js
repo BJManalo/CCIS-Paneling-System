@@ -801,17 +801,61 @@ window.closeFileModal = () => {
 
 window.loadViewer = (url) => {
     if (!url) return;
-    let viewerUrl = url;
-    if (url.includes('drive.google.com')) { viewerUrl = url.replace('/view', '/preview'); }
-    else if (url.endsWith('.pdf') || url.endsWith('.doc') || url.endsWith('.docx') || url.endsWith('.ppt') || url.endsWith('.pptx')) {
-        viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+
+    // Ensure absolute protocol to prevent relative URL 404s
+    let absoluteUrl = url.trim();
+    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) {
+        absoluteUrl = 'https://' + absoluteUrl;
     }
+
+    let viewerUrl = absoluteUrl;
+    const lowerUrl = absoluteUrl.toLowerCase();
+
+    // 1. Google Drive handling
+    if (lowerUrl.includes('drive.google.com')) {
+        // Handle various Drive link formats and convert to preview
+        if (lowerUrl.includes('/view') || lowerUrl.includes('/edit') || lowerUrl.includes('/open') || lowerUrl.includes('/d/')) {
+            // Extract file ID if possible or just replace the end
+            if (absoluteUrl.includes('/view')) viewerUrl = absoluteUrl.replace(/\/view.*/, '/preview');
+            else if (absoluteUrl.includes('/edit')) viewerUrl = absoluteUrl.replace(/\/edit.*/, '/preview');
+            else if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                viewerUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+            }
+        }
+    }
+    // 2. Direct PDF / Office Docs via Google Viewer (more reliable for these types)
+    else if (lowerUrl.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx)(\?.*)?$/) || lowerUrl.includes('supabase.co/storage/v1/object/public')) {
+        viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
+    }
+
     const iframe = document.getElementById('fileViewer');
-    iframe.src = viewerUrl;
-    iframe.style.display = 'block';
-    document.getElementById('viewerPlaceholder').style.display = 'none';
-    document.getElementById('viewerToolbar').style.display = 'flex';
-    document.getElementById('externalLinkBtn').href = url;
+    const placeholder = document.getElementById('viewerPlaceholder');
+    const toolbar = document.getElementById('viewerToolbar');
+    const linkBtn = document.getElementById('externalLinkBtn');
+
+    // Show loading state
+    iframe.style.display = 'none';
+    placeholder.style.display = 'flex';
+    placeholder.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <div class="viewer-loader" style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+            <p style="font-size: 1.1rem; font-weight: 500; color: #64748b;">Loading document preview...</p>
+            <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">This may take a few seconds.</p>
+        </div>
+    `;
+
+    iframe.onload = () => {
+        iframe.style.display = 'block';
+        placeholder.style.display = 'none';
+    };
+
+    // Use a small timeout to ensure UI updates before src change (which can be heavy)
+    setTimeout(() => {
+        iframe.src = viewerUrl;
+        toolbar.style.display = 'flex';
+        linkBtn.href = absoluteUrl;
+    }, 100);
 };
 
 window.filterTable = (program) => {
