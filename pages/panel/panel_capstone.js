@@ -585,6 +585,9 @@ window.openFileModal = (groupId) => {
                 }
             }
 
+            // Exclude processing the _revised keys directly in the main loop
+            if (label.endsWith('_revised')) return;
+
             let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
             if (categoryKey === 'titles' && projectTitles[label]) {
                 displayLabel = projectTitles[label];
@@ -606,6 +609,37 @@ window.openFileModal = (groupId) => {
             };
 
             itemContainer.appendChild(item);
+
+            // CHECK FOR REVISED VERSION
+            if (fileObj[label + '_revised']) {
+                const revisedUrl = fileObj[label + '_revised'];
+                const revItem = document.createElement('div');
+                revItem.className = 'file-item';
+                revItem.style.padding = '8px 12px';
+                revItem.style.cursor = 'pointer';
+                revItem.style.display = 'flex';
+                revItem.style.alignItems = 'center';
+                revItem.style.justifyContent = 'space-between';
+                revItem.style.background = '#fffbeb'; // Amber-50
+                revItem.style.borderTop = '1px dashed #fcd34d'; // Amber-300
+                revItem.style.transition = 'all 0.2s';
+
+                revItem.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="material-icons-round" style="font-size: 16px; color: #b45309;">history_edu</span>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: #b45309;">Revised Version</span>
+                    </div>
+                    <span class="material-icons-round" style="font-size: 16px; color: #b45309;">arrow_forward</span>
+                `;
+
+                revItem.onclick = () => {
+                    document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
+                    revItem.style.background = '#fcd34d'; // Amber-300 active
+                    loadViewer(revisedUrl, groupId, label + '_revised');
+                };
+
+                itemContainer.appendChild(revItem);
+            }
 
             // Approval Controls logic (same as before)
             // ... (We assume the status/remarks update logic remains valid)
