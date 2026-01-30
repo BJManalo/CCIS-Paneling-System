@@ -1020,16 +1020,34 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
                         // Manual Save Logic
                         const saveAnnotations = async (annotations) => {
+                            // Enforce Author Name in the data being saved
+                            // This ensures that even if local UI shows 'A', the student sees the correct name
+                            const processedAnnotations = annotations.map(annot => {
+                                // 1. Force the Title (Author Name)
+                                // If name is missing, generic, or just initials, overwrite it
+                                if (!annot.title || annot.title === 'Guest' || annot.title === 'A' || annot.title.length <= 2) {
+                                    annot.title = userName;
+                                }
+
+                                // 2. Hard-bake name into text content (Double-Fail-Safe)
+                                // "I wanted that in any way it wil display the name of the panel in comment"
+                                if (annot.bodyValue && !annot.bodyValue.startsWith(`[`) && !annot.bodyValue.includes(`${userName}:`)) {
+                                    annot.bodyValue = `[${userName}]: ${annot.bodyValue}`;
+                                }
+
+                                return annot;
+                            });
+
                             try {
                                 const { error } = await supabaseClient.from('pdf_annotations').upsert({
                                     group_id: groupId,
                                     file_key: fileKey,
-                                    annotation_data: annotations,
+                                    annotation_data: processedAnnotations,
                                     user_name: userName,
                                     updated_at: new Date().toISOString()
                                 }, { onConflict: ['group_id', 'file_key'] });
                                 if (error) throw error;
-                                console.log('SAVE SUCCESSful:', annotations.length);
+                                console.log('SAVE SUCCESSful:', processedAnnotations.length);
                             } catch (err) {
                                 console.error('SAVE FAILED:', err);
                             }
