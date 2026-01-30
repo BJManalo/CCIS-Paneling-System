@@ -171,17 +171,26 @@ async function loadCapstoneData() {
                 // Original logic used filter but usually 1:1.
                 const sched = schedules.find(s => s.group_id === group.id && normalizeType(s.schedule_type) === normType);
 
-                // 2. Check for files
-                let hasFiles = false;
-                let filesObj = {};
-                try {
-                    filesObj = {
-                        titles: group.title_link ? JSON.parse(group.title_link) : {},
-                        pre_oral: group.pre_oral_link ? JSON.parse(group.pre_oral_link) : {},
-                        final: group.final_link ? JSON.parse(group.final_link) : {}
-                    };
-                } catch (e) { console.error('JSON Parse error', e); }
+                // 2. Check for files (Handle both JSON objects and direct URL strings)
+                let filesObj = { titles: {}, pre_oral: {}, final: {} };
 
+                const parseFileField = (val, defaultLabel) => {
+                    if (!val) return {};
+                    try {
+                        // If it's a JSON object string: {"Label": "URL"}
+                        if (val.trim().startsWith('{')) return JSON.parse(val);
+                        // If it's a direct URL string
+                        return { [defaultLabel]: val };
+                    } catch (e) {
+                        return { [defaultLabel]: val };
+                    }
+                };
+
+                filesObj.titles = parseFileField(group.title_link, 'Title Proposal');
+                filesObj.pre_oral = parseFileField(group.pre_oral_link, 'Pre-Oral Document');
+                filesObj.final = parseFileField(group.final_link, 'Final Manuscript');
+
+                let hasFiles = false;
                 if (normType.includes('title') && Object.keys(filesObj.titles).length > 0) hasFiles = true;
                 else if (normType.includes('preoral') && Object.keys(filesObj.pre_oral).length > 0) hasFiles = true;
                 else if (normType.includes('final') && Object.keys(filesObj.final).length > 0) hasFiles = true;
@@ -441,11 +450,14 @@ function renderTable() {
              `;
             row.style.background = '#fafafa';
         } else {
+            // Enhanced Clickable Style
             actionBtn = `
                 <button onclick="${hasFiles ? `openFileModal('${g.id}')` : ''}" 
-                    style="background: ${hasFiles ? 'var(--primary-light)' : '#f1f5f9'}; opacity: ${hasFiles ? '1' : '0.6'}; border: none; color: ${hasFiles ? 'var(--primary-color)' : '#94a3b8'}; cursor: ${hasFiles ? 'pointer' : 'default'}; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; transition: all 0.2s;">
+                    style="background: ${hasFiles ? 'var(--primary-color)' : '#f1f5f9'}; color: ${hasFiles ? 'white' : '#94a3b8'}; border: none; cursor: ${hasFiles ? 'pointer' : 'default'}; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; box-shadow: ${hasFiles ? '0 4px 10px rgba(37, 99, 235, 0.2)' : 'none'}; transition: all 0.2s; transition: all 0.2s;"
+                    onmouseover="${hasFiles ? 'this.style.transform=\'translateY(-2px)\'; this.style.boxShadow=\'0 6px 15px rgba(37, 99, 235, 0.3)\'' : ''}"
+                    onmouseout="${hasFiles ? 'this.style.transform=\'translateY(0)\'; this.style.boxShadow=\'0 4px 10px rgba(37, 99, 235, 0.2)\'' : ''}">
                     <span class="material-icons-round" style="font-size: 18px;">${hasFiles ? 'folder_open' : 'folder_off'}</span>
-                    <span style="font-size: 12px; font-weight: 600;">${hasFiles ? 'View Files' : 'No Files'}</span>
+                    <span>${hasFiles ? 'View Files' : 'No Files'}</span>
                 </button>
              `;
         }
@@ -482,12 +494,21 @@ function renderTable() {
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 window.openFileModal = (groupId) => {
+    console.log('Opening Modal for Group ID:', groupId);
     const stringGroupId = String(groupId);
     const normTab = normalizeType(currentTab);
-    const group = allData.find(g => String(g.id) === stringGroupId && normalizeType(g.type) === normTab);
+
+    // Attempt 1: Exact Match (ID + Current Tab)
+    let group = allData.find(g => String(g.id) === stringGroupId && normalizeType(g.type) === normTab);
+
+    // Attempt 2: ID Match Fallback (If tab mismatch occurred)
+    if (!group) {
+        group = allData.find(g => String(g.id) === stringGroupId);
+    }
 
     if (!group) {
-        console.error('Group not found for this tab context', { stringGroupId, normTab });
+        console.error('Group not found in allData:', { stringGroupId, normTab });
+        alert('Data Error: Could not find group information. Try refreshing the page.');
         return;
     }
 
