@@ -814,14 +814,12 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     try {
         const normTab = normalizeType(currentTab);
         const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
-        if (!group) throw new Error('Could not find group in local data. Try refreshing.');
+        if (!group) throw new Error('Data context error.');
 
         const statusSelect = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
         const currentSelectedStatus = statusSelect ? statusSelect.value : 'Pending';
 
-        console.log('ATTEMPTING SAVE:', { groupId, type: group.type, fileKey, user: userName, text: newText, status: currentSelectedStatus });
-
-        // 1. Save to individual feedback table (Using upsert with the New Constraint Rule)
+        // 1. Save to Database
         const { error: fError } = await supabaseClient
             .from('capstone_feedback')
             .upsert({
@@ -834,12 +832,9 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
                 updated_at: new Date()
             }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
-        if (fError) {
-            console.error('Supabase Feedback Error:', fError);
-            throw new Error(`DB Write Error: ${fError.message}`);
-        }
+        if (fError) throw fError;
 
-        // 2. Update Legacy/Group Status mapping
+        // 2. Sync Legacy/Group Status mapping
         let localStatusMap = group.currentStatusJson || {};
         if (typeof localStatusMap[fileKey] !== 'object') localStatusMap[fileKey] = {};
         localStatusMap[fileKey][userName] = currentSelectedStatus;
@@ -848,7 +843,7 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
         if (typeof localRemarksMap[fileKey] !== 'object') localRemarksMap[fileKey] = {};
         localRemarksMap[fileKey][userName] = `${userName}: ${newText}`;
 
-        const { error: dsError } = await supabaseClient
+        await supabaseClient
             .from('defense_statuses')
             .upsert({
                 group_id: groupId,
@@ -858,39 +853,31 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
                 updated_at: new Date()
             }, { onConflict: 'group_id, defense_type' });
 
-        if (dsError) console.error('Legacy sync error (non-critical):', dsError);
-
         // Success Feedback
         group.currentRemarksJson = localRemarksMap;
         group.currentStatusJson = localStatusMap;
 
-        // Ensure stage-specific maps stay in sync
-        if (normTab.includes('title')) { group.titleRemarks = localRemarksMap; group.titleStatus = localStatusMap; }
-        else if (normTab.includes('preoral')) { group.preOralRemarks = localRemarksMap; group.preOralStatus = localStatusMap; }
-        else if (normTab.includes('final')) { group.finalRemarks = localRemarksMap; group.finalStatus = localStatusMap; }
-
         if (btn) {
-            btn.innerText = '✅ SAVED TO DATABASE';
-            btn.style.background = '#059669';
-            btn.style.color = 'white';
+            btn.innerText = 'Updated';
+            btn.style.background = '#dcfce7';
+            btn.style.color = '#166534';
             setTimeout(() => {
                 btn.disabled = false;
                 btn.innerText = 'Update Remarks';
                 btn.style.background = '';
                 btn.style.color = '';
-            }, 3000);
+            }, 2000);
         }
-
         // Refresh the table UI
         renderTable();
 
     } catch (e) {
-        console.error('SAVING FAILED:', e);
-        alert('❌ FAILED TO SAVE: ' + e.message + '\n\nCheck your internet and make sure you ran the SQL script.');
+        console.error('SAVE ERROR:', e);
+        alert('Could not save remarks. Please check your connection.');
         if (btn) {
             btn.disabled = false;
-            btn.innerText = 'RETRY SAVING';
-            btn.style.background = '#dc2626';
+            btn.innerText = 'Update Remarks';
+            btn.style.background = '#ef4444';
             btn.style.color = 'white';
         }
     }
@@ -1037,28 +1024,42 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 });
 
                 adobeFilePromise.then(adobeViewer => {
-                    if (placeholder) placeholder.style.display = 'none';
+                    // 1. Handle Annotations (Loading)
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
                         try {
-                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
-                                .eq('group_id', groupId).eq('file_key', fileKey).single();
+                            const { data } = await supabaseClient.from('pdf_annotations')
+                                .select('annotation_data')
+                                .eq('group_id', groupId)
+                                .eq('file_key', fileKey)
+                                .maybeSingle();
                             if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
-                        } catch (e) { }
+                        } catch (e) { console.error('Load Annotations Error:', e); }
 
+                        // Note: Author name setup
                         annotationManager.setConfig({ showAuthorName: true, authorName: userName });
-                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
-                            try {
-                                await supabaseClient.from('pdf_annotations').upsert({
-                                    group_id: groupId, file_key: fileKey, annotation_data: annotations,
-                                    user_name: userName, updated_at: new Date()
-                                }, { onConflict: 'group_id, file_key' });
-                                return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                            } catch (err) {
-                                console.error('PDF SAVE FAILED:', err);
-                                return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
-                            }
-                        }, { autoSaveFrequency: 2 });
                     });
+
+                    // 2. Register Global Save Callback (Correct Signature)
+                    adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (metaData, content) => {
+                        try {
+                            console.log('PDF SAVE TRIGGERED:', { groupId, fileKey });
+                            const { error } = await supabaseClient.from('pdf_annotations').upsert({
+                                group_id: groupId,
+                                file_key: fileKey,
+                                annotation_data: content,
+                                user_name: userName,
+                                updated_at: new Date()
+                            }, { onConflict: 'group_id, file_key' });
+
+                            if (error) throw error;
+                            return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                        } catch (err) {
+                            console.error('PDF DB SAVE FAILED:', err);
+                            return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
+                        }
+                    }, { autoSaveFrequency: 2 });
+
+                    if (placeholder) placeholder.style.display = 'none';
                 }).catch(err => {
                     console.error('CRITICAL ADOBE ERROR:', err);
                     let specificError = 'Check Console';
