@@ -643,13 +643,19 @@ window.openFileViewer = async (url, fileKey) => {
             adobeContainer.appendChild(iframe);
             adobeContainer.style.display = 'block';
 
-            // Add Retry button for Adobe
+            // Add Retry and Direct Link buttons
             if (placeholder) {
                 placeholder.innerHTML += `
-                    <button onclick="delete document.getElementById('adobe-dc-view').dataset.activeUrl; window.openFileViewer('${url}', '${fileKey}')" style="margin-top: 15px; background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-left: auto; margin-right: auto; transition: all 0.2s;">
-                        <span class="material-icons-round" style="font-size: 16px;">refresh</span>
-                        Retry Annotation View
-                    </button>
+                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                        <button onclick="delete document.getElementById('adobe-dc-view').dataset.activeUrl; window.openFileViewer('${url}', '${fileKey}')" style="background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                            <span class="material-icons-round" style="font-size: 16px;">refresh</span>
+                            Retry
+                        </button>
+                        <a href="${url}" target="_blank" style="background: var(--primary-color); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                            <span class="material-icons-round" style="font-size: 16px;">open_in_new</span>
+                            Open Original Link
+                        </a>
+                    </div>
                 `;
             }
         }
@@ -667,8 +673,8 @@ window.openFileViewer = async (url, fileKey) => {
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
                     const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    // Using docs.google.com subdomain which is often more reliable for CORS requests in Adobe SDK
-                    finalUrl = `https://docs.google.com/uc?export=download&id=${fileId}`;
+                    // Direct file stream
+                    finalUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
                 }
 
                 const adobeFilePromise = adobeDCView.previewFile({

@@ -892,22 +892,23 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         `;
 
         let finalFallbackUrl = absoluteUrl;
-        if (lowerUrl.includes('drive.google.com')) {
-            if (absoluteUrl.includes('/view')) finalFallbackUrl = absoluteUrl.replace(/\/view.*/, '/preview');
-            else if (absoluteUrl.includes('/edit')) finalFallbackUrl = absoluteUrl.replace(/\/edit.*/, '/preview');
-            else if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                const fId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                finalFallbackUrl = `https://drive.google.com/file/d/${fId}/preview`;
-            }
+        if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+            finalFallbackUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
         } else {
             finalFallbackUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
         }
 
         placeholder.innerHTML += `
-            <button onclick="window.loadViewer('${absoluteUrl}', '${groupId}', '${fileKey}')" style="margin-top: 15px; background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-left: auto; margin-right: auto; transition: all 0.2s;">
-                <span class="material-icons-round" style="font-size: 16px;">refresh</span>
-                Retry Annotation View
-            </button>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                <button onclick="window.loadViewer('${absoluteUrl}', '${groupId}', '${fileKey}')" style="background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                    <span class="material-icons-round" style="font-size: 16px;">refresh</span>
+                    Retry
+                </button>
+                <a href="${absoluteUrl}" target="_blank" style="background: var(--primary-color); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                    <span class="material-icons-round" style="font-size: 16px;">open_in_new</span>
+                    Open Original Link
+                </a>
+            </div>
         `;
 
         setTimeout(() => {
@@ -944,8 +945,8 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
                     const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    // Using docs.google.com subdomain which is often more reliable for CORS requests in Adobe SDK
-                    finalUrl = `https://docs.google.com/uc?export=download&id=${fileId}`;
+                    // Using drive.google.com with export=download to maximize direct file stream access
+                    finalUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
                 }
 
                 const adobeFilePromise = adobeDCView.previewFile({
