@@ -442,7 +442,7 @@ function renderTable() {
             row.style.background = '#fafafa';
         } else {
             actionBtn = `
-                <button onclick="${hasFiles ? `openFileModal(${g.id})` : ''}" 
+                <button onclick="${hasFiles ? `openFileModal('${g.id}')` : ''}" 
                     style="background: ${hasFiles ? 'var(--primary-light)' : '#f1f5f9'}; opacity: ${hasFiles ? '1' : '0.6'}; border: none; color: ${hasFiles ? 'var(--primary-color)' : '#94a3b8'}; cursor: ${hasFiles ? 'pointer' : 'default'}; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; transition: all 0.2s;">
                     <span class="material-icons-round" style="font-size: 18px;">${hasFiles ? 'folder_open' : 'folder_off'}</span>
                     <span style="font-size: 12px; font-weight: 600;">${hasFiles ? 'View Files' : 'No Files'}</span>
@@ -482,13 +482,13 @@ function renderTable() {
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 window.openFileModal = (groupId) => {
-    // FIX: Find group matching ID AND the current active tab (Defense Type)
-    // This ensures we get the correct object (Title, Pre, or Final) from allData
+    console.log('Opening Modal for Group:', groupId, 'Current Tab:', currentTab);
     const normTab = normalizeType(currentTab);
-    const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+    const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
 
     if (!group) {
-        console.error('Group not found for this tab context');
+        console.error('Group not found in allData for ID:', groupId, 'Match Tab:', normTab);
+        alert('Data Error: Could not find group details for this tab.');
         return;
     }
 
@@ -662,7 +662,7 @@ window.openFileModal = (groupId) => {
                         ${myStatus}
                     </div>
                 </div>
-                <select onchange="updateStatus(${group.id}, '${categoryKey}', '${label}', this.value)" 
+                <select onchange="updateStatus('${group.id}', '${categoryKey}', '${label}', this.value)" 
                     style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; cursor: pointer; background: white; color: #334155; font-weight: 500; outline: none; margin-bottom: 5px;">
                     <option value="Pending" ${myStatus === 'Pending' ? 'selected' : ''}>Change Your Status...</option>
                     ${optionsHtml}
@@ -671,7 +671,7 @@ window.openFileModal = (groupId) => {
                     <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Your Remarks</div>
                     <textarea id="remarks-${categoryKey}-${label}" placeholder="Add your feedback..." 
                         style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 13px; min-height: 60px; resize: vertical;">${myRemarks.includes(':') ? myRemarks.split(':').slice(1).join(':').trim() : myRemarks}</textarea>
-                    <button onclick="saveRemarks(${group.id}, '${categoryKey}', '${label}')" 
+                    <button onclick="saveRemarks('${group.id}', '${categoryKey}', '${label}')" 
                         style="width: 100%; margin-top: 5px; background: ${myRemarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${myRemarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
                         ${myRemarks ? 'Update Remarks' : 'Save Remarks'}
                     </button>
@@ -898,6 +898,13 @@ let currentSelection = { text: '', page: 0 };
 
 window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) return;
+    console.log('Loading Viewer for:', url);
+
+    // Initialize PDF.js worker
+    if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    }
+
     currentViewerGroupId = groupId;
     currentViewerFileKey = fileKey;
 
