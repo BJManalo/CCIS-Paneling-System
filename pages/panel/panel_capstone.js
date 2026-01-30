@@ -853,182 +853,129 @@ window.closeFileModal = () => {
 
 window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) return;
-
     currentViewerGroupId = groupId;
     currentViewerFileKey = fileKey;
 
-    // Ensure absolute protocol to prevent relative URL 404s
     let absoluteUrl = url.trim();
-    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) {
-        absoluteUrl = 'https://' + absoluteUrl;
-    }
+    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
 
     const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = (lowerUrl.includes('.pdf') ||
-        lowerUrl.includes('supabase.co/storage/v1/object/public') ||
-        lowerUrl.includes('drive.google.com')) &&
-        !lowerUrl.includes('docs.google.com/viewer');
+    const isPDF = (lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co') || lowerUrl.includes('drive.google.com')) && !lowerUrl.includes('docs.google.com/viewer');
 
     const iframe = document.getElementById('fileViewer');
     const adobeContainer = document.getElementById('adobe-dc-view');
     const placeholder = document.getElementById('viewerPlaceholder');
     const toolbar = document.getElementById('viewerToolbar');
-    // Prevent redundant reloads
+    const linkBtn = document.getElementById('externalLinkBtn');
+
     if (adobeContainer.dataset.activeUrl === absoluteUrl && adobeContainer.innerHTML !== '') {
         adobeContainer.style.display = 'block';
-        placeholder.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'none';
         if (iframe) iframe.style.display = 'none';
-        toolbar.style.display = 'flex';
+        if (toolbar) toolbar.style.display = 'flex';
         return;
     }
     adobeContainer.dataset.activeUrl = absoluteUrl;
 
-    // Reset visibility logic (Improved to prevent flicker)
-    if (iframe) iframe.style.display = 'none';
+    const showCompatibilityMode = (reason) => {
+        console.warn('Adobe View Restricted:', reason);
+        adobeContainer.style.display = 'none';
+        if (iframe) iframe.style.display = 'none';
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `
+            <div style="text-align: center; color: #64748b; padding: 20px;">
+                <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; display: inline-block;"></div>
+                <p style="font-weight: 600;">Switching to Compatibility Mode...</p>
+                <p style="font-size: 0.8rem; margin-top: 4px;">Google Drive security has restricted direct Adobe access.</p>
+            </div>
+        `;
 
-    // If it's a PDF, use Adobe
+        let finalFallbackUrl = absoluteUrl;
+        if (lowerUrl.includes('drive.google.com')) {
+            if (absoluteUrl.includes('/view')) finalFallbackUrl = absoluteUrl.replace(/\/view.*/, '/preview');
+            else if (absoluteUrl.includes('/edit')) finalFallbackUrl = absoluteUrl.replace(/\/edit.*/, '/preview');
+            else if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                const fId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                finalFallbackUrl = `https://drive.google.com/file/d/${fId}/preview`;
+            }
+        } else {
+            finalFallbackUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
+        }
+
+        setTimeout(() => {
+            if (iframe) {
+                iframe.src = finalFallbackUrl;
+                iframe.onload = () => {
+                    placeholder.style.display = 'none';
+                    iframe.style.display = 'block';
+                };
+            }
+            if (toolbar) toolbar.style.display = 'flex';
+            if (linkBtn) linkBtn.href = absoluteUrl;
+        }, 600);
+    };
+
     if (isPDF) {
-        const userJson = localStorage.getItem('loginUser');
-        const user = userJson ? JSON.parse(userJson) : { name: 'Guest' };
+        const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
         const userName = user.name || user.full_name || 'Panelist';
 
-        // Show Adobe Container immediately, hide placeholder 
-        // Adobe has its own better loading indicator so we don't need a custom overlay
         adobeContainer.style.display = 'block';
-        placeholder.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'none';
         if (iframe) iframe.style.display = 'none';
 
         const initAdobe = async () => {
             try {
                 if (!adobeDCView || !adobeContainer.innerHTML) {
-                    adobeDCView = new AdobeDC.View({
-                        clientId: ADOBE_CLIENT_ID,
-                        divId: "adobe-dc-view"
-                    });
+                    adobeDCView = new AdobeDC.View({ clientId: ADOBE_CLIENT_ID, divId: "adobe-dc-view" });
                 }
 
                 const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
-
-                const previewConfig = {
-                    embedMode: "FULL_WINDOW",
-                    showAnnotationTools: true,
-                    showDownloadPDF: true,
-                    showPrintPDF: true,
-                    enableAnnotationAPIs: true,
-                    showLeftHandPanel: true,
-                    showPageControls: true,
-                    showBookmarks: true
-                };
-
                 let finalUrl = absoluteUrl;
-                if (lowerUrl.includes('drive.google.com')) {
-                    if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                        const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                        finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
-                    }
+                if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                    finalUrl = `https://drive.google.com/uc?id=${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}&export=download`;
                 }
 
                 const adobeFilePromise = adobeDCView.previewFile({
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey || 'unique-id' }
-                }, previewConfig);
+                }, { embedMode: "FULL_WINDOW", showAnnotationTools: true, enableAnnotationAPIs: true });
 
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
                         try {
-                            const { data } = await supabaseClient
-                                .from('pdf_annotations')
-                                .select('annotation_data')
-                                .eq('group_id', groupId)
-                                .eq('file_key', fileKey)
-                                .single();
-
-                            if (data && data.annotation_data) {
-                                annotationManager.addAnnotations(data.annotation_data);
-                            }
-                        } catch (e) { console.log('No existing annotations found'); }
+                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
+                                .eq('group_id', groupId).eq('file_key', fileKey).single();
+                            if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
+                        } catch (e) { }
 
                         annotationManager.setConfig({ showAuthorName: true, authorName: userName });
-
                         annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
                             try {
-                                const { error } = await supabaseClient
-                                    .from('pdf_annotations')
-                                    .upsert({
-                                        group_id: groupId,
-                                        file_key: fileKey,
-                                        annotation_data: annotations,
-                                        user_name: userName,
-                                        updated_at: new Date()
-                                    }, { onConflict: 'group_id, file_key' });
-
-                                if (error) throw error;
+                                await supabaseClient.from('pdf_annotations').upsert({
+                                    group_id: groupId, file_key: fileKey, annotation_data: annotations,
+                                    user_name: userName, updated_at: new Date()
+                                }, { onConflict: 'group_id, file_key' });
                                 return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                            } catch (err) {
-                                console.error('Error saving annotations:', err);
-                                return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
-                            }
+                            } catch (err) { return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL }; }
                         }, { autoSaveFrequency: 2 });
                     });
                 }).catch(err => {
-                    console.error('Adobe Preview Error:', err);
-                    // Use standard fallback if Adobe fails
-                    adobeContainer.style.display = 'none';
-                    if (placeholder) {
-                        placeholder.style.display = 'flex';
-                        placeholder.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;"><p>Adobe was unable to preview this document.</p><p style="font-size: 11px; color: #64748b; margin-top: 5px;">Please use the "Open in New Tab" link below.</p></div>`;
-                    }
+                    delete adobeContainer.dataset.activeUrl;
+                    showCompatibilityMode('Adobe Preview Rejected');
                 });
-            } catch (e) { console.error('Init Error:', e); }
+            } catch (e) { showCompatibilityMode('Init Loop Failed'); }
         };
 
-        if (window.AdobeDC) {
-            initAdobe();
-        } else {
-            document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
-        }
+        if (window.AdobeDC) initAdobe();
+        else document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
 
-        toolbar.style.display = 'flex';
-        linkBtn.href = absoluteUrl;
+        if (toolbar) toolbar.style.display = 'flex';
+        if (linkBtn) linkBtn.href = absoluteUrl;
         return;
     }
 
-    // Fallback for non-PDF or if Adobe fails
-    let finalViewerUrl = absoluteUrl;
-    if (lowerUrl.includes('drive.google.com')) {
-        if (absoluteUrl.includes('/view')) finalViewerUrl = absoluteUrl.replace(/\/view.*/, '/preview');
-        else if (absoluteUrl.includes('/edit')) finalViewerUrl = absoluteUrl.replace(/\/edit.*/, '/preview');
-        else if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-            const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-            finalViewerUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-    } else if (lowerUrl.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx)(\?.*)?$/) || lowerUrl.includes('supabase.co/storage/v1/object/public')) {
-        finalViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
-    }
-
-    if (iframe) {
-        iframe.style.display = 'none';
-        placeholder.style.display = 'flex';
-        placeholder.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <div class="viewer-loader" style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
-                <p style="font-size: 1.1rem; font-weight: 500; color: #64748b;">Loading document preview...</p>
-                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">This may take a few seconds.</p>
-            </div>
-        `;
-
-        iframe.onload = () => {
-            iframe.style.display = 'block';
-            placeholder.style.display = 'none';
-        };
-
-        setTimeout(() => {
-            iframe.src = finalViewerUrl;
-            toolbar.style.display = 'flex';
-            linkBtn.href = absoluteUrl;
-        }, 100);
-    }
+    showCompatibilityMode('Non-PDF file detected');
 };
 
 window.filterTable = (program) => {

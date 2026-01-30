@@ -562,19 +562,12 @@ window.openFileViewer = async (url, fileKey) => {
     if (adobeContainer) adobeContainer.style.display = 'block';
     if (titleEl) titleEl.innerText = 'Reviewing Feedback: ' + fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
-    // Ensure absolute protocol
     let absoluteUrl = url.trim();
-    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) {
-        absoluteUrl = 'https://' + absoluteUrl;
-    }
+    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
 
     const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = (lowerUrl.includes('.pdf') ||
-        lowerUrl.includes('supabase.co/storage/v1/object/public') ||
-        lowerUrl.includes('drive.google.com')) &&
-        !lowerUrl.includes('docs.google.com/viewer');
+    const isPDF = (lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co') || lowerUrl.includes('drive.google.com')) && !lowerUrl.includes('docs.google.com/viewer');
 
-    // Prevent redundant reloads
     if (adobeContainer.dataset.activeUrl === absoluteUrl && adobeContainer.innerHTML !== '') {
         adobeContainer.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
@@ -582,83 +575,79 @@ window.openFileViewer = async (url, fileKey) => {
     }
     adobeContainer.dataset.activeUrl = absoluteUrl;
 
+    const showCompatibilityMode = () => {
+        adobeContainer.style.display = 'none';
+        if (placeholder) {
+            placeholder.style.display = 'flex';
+            placeholder.innerHTML = `
+                <div style="text-align: center; color: #64748b; padding: 20px;">
+                    <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; display: inline-block;"></div>
+                    <p style="font-weight: 600;">Opening Standard Preview...</p>
+                    <p style="font-size: 0.8rem; margin-top: 4px;">Direct annotation link restricted by Drive security.</p>
+                </div>
+            `;
+        }
+
+        let finalFallbackUrl = absoluteUrl;
+        if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+            finalFallbackUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
+        } else {
+            finalFallbackUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
+        }
+
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.src = finalFallbackUrl;
+        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
+
+        if (adobeContainer) {
+            adobeContainer.innerHTML = '';
+            adobeContainer.appendChild(iframe);
+            adobeContainer.style.display = 'block';
+        }
+    };
+
     if (isPDF) {
-        // Show Adobe Container immediately, hide placeholder 
-        // Adobe has its own better loading indicator
         adobeContainer.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
 
         const initAdobe = async () => {
-            if (!adobeDCView) {
-                adobeDCView = new AdobeDC.View({
-                    clientId: ADOBE_CLIENT_ID,
-                    divId: "adobe-dc-view"
-                });
-            }
-
-            let finalUrl = absoluteUrl;
-            if (lowerUrl.includes('drive.google.com')) {
-                if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+            try {
+                if (!adobeDCView) {
+                    adobeDCView = new AdobeDC.View({ clientId: ADOBE_CLIENT_ID, divId: "adobe-dc-view" });
                 }
-            }
 
-            const adobeFilePromise = adobeDCView.previewFile({
-                content: { location: { url: finalUrl } },
-                metaData: { fileName: fileKey + ".pdf", id: fileKey }
-            }, {
-                embedMode: "FULL_WINDOW",
-                showAnnotationTools: false, // Read-only for students
-                enableAnnotationAPIs: true,
-                showLeftHandPanel: true,
-                showPageControls: true,
-                showBookmarks: true
-            });
-
-            adobeFilePromise.then(adobeViewer => {
-                if (placeholder) placeholder.style.display = 'none';
-                adobeViewer.getAnnotationManager().then(async annotationManager => {
-                    // Fetch existing annotations from Supabase
-                    try {
-                        const { data } = await supabaseClient
-                            .from('pdf_annotations')
-                            .select('annotation_data')
-                            .eq('group_id', currentGroupId)
-                            .eq('file_key', fileKey)
-                            .single();
-
-                        if (data && data.annotation_data) {
-                            annotationManager.addAnnotations(data.annotation_data);
-                        }
-                    } catch (e) { console.log('No annotations found'); }
-                });
-            }).catch(err => {
-                console.error('Adobe student preview error:', err);
-                if (adobeContainer) adobeContainer.style.display = 'none';
-                if (placeholder) {
-                    placeholder.style.display = 'flex';
-                    placeholder.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;"><p>Failed to load PDF preview.</p></div>`;
+                let finalUrl = absoluteUrl;
+                if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                    finalUrl = `https://drive.google.com/uc?id=${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}&export=download`;
                 }
-            });
+
+                const adobeFilePromise = adobeDCView.previewFile({
+                    content: { location: { url: finalUrl } },
+                    metaData: { fileName: fileKey + ".pdf", id: fileKey }
+                }, { embedMode: "FULL_WINDOW", showAnnotationTools: false, enableAnnotationAPIs: true });
+
+                adobeFilePromise.then(adobeViewer => {
+                    if (placeholder) placeholder.style.display = 'none';
+                    adobeViewer.getAnnotationManager().then(async annotationManager => {
+                        try {
+                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
+                                .eq('group_id', currentGroupId).eq('file_key', fileKey).single();
+                            if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
+                        } catch (e) { }
+                    });
+                }).catch(err => {
+                    delete adobeContainer.dataset.activeUrl;
+                    showCompatibilityMode();
+                });
+            } catch (e) { showCompatibilityMode(); }
         };
 
-        if (window.AdobeDC) {
-            initAdobe();
-        } else {
-            document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
-        }
+        if (window.AdobeDC) initAdobe();
+        else document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
     } else {
-        // Fallback or non-PDF message
-        if (adobeContainer) {
-            adobeContainer.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #64748b; padding: 20px; text-align: center;">
-                    <span class="material-icons-round" style="font-size: 48px; margin-bottom: 10px;">info</span>
-                    <p>Annotation feedback is only available for PDF files.</p>
-                    <a href="${absoluteUrl}" target="_blank" style="color: var(--primary-color); font-weight: 600; margin-top: 10px; text-decoration: none;">Open Original File</a>
-                </div>
-            `;
-        }
-        if (placeholder) placeholder.style.display = 'none';
+        showCompatibilityMode();
     }
 };
