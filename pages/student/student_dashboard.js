@@ -637,165 +637,143 @@ window.saveSubmissions = async function (specificField) {
     }
 }
 
+let currentViewerFileKey = null;
 
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
-    const adobeContainer = document.getElementById('adobe-dc-view');
-    if (adobeContainer) {
-        adobeContainer.innerHTML = '';
-        delete adobeContainer.dataset.activeUrl;
-    }
-    adobeDCView = null;
+    const viewer = document.getElementById('fileViewer');
+    if (viewer) viewer.src = '';
+    currentViewerFileKey = null;
 };
 
+// --- SIDEBAR COMMENT SYSTEM (Student Side) ---
 window.openFileViewer = async (url, fileKey) => {
     if (!url) return;
+    currentViewerFileKey = fileKey;
 
     const modal = document.getElementById('fileModal');
     const placeholder = document.getElementById('viewerPlaceholder');
-    const adobeContainer = document.getElementById('adobe-dc-view');
     const titleEl = document.getElementById('modalFileTitle');
+    const iframe = document.getElementById('fileViewer');
 
     if (modal) modal.style.display = 'flex';
     if (placeholder) placeholder.style.display = 'flex';
-    if (adobeContainer) adobeContainer.style.display = 'block';
-    if (titleEl) titleEl.innerText = 'Reviewing Feedback: ' + fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    if (iframe) iframe.style.display = 'block';
+    if (titleEl) titleEl.innerText = 'Reviewing feedback: ' + fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
     let absoluteUrl = url.trim();
     if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
 
+    // Stable Viewer Logic
+    let finalViewerUrl = absoluteUrl;
     const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = (lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co') || lowerUrl.includes('drive.google.com')) && !lowerUrl.includes('docs.google.com/viewer');
+    if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+        finalViewerUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
+    } else if (lowerUrl.endsWith('.pdf') || lowerUrl.includes('supabase.co')) {
+        finalViewerUrl = absoluteUrl;
+    } else {
+        finalViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
+    }
 
-    if (adobeContainer.dataset.activeUrl === absoluteUrl && adobeContainer.innerHTML !== '') {
-        adobeContainer.style.display = 'block';
-        if (placeholder) placeholder.style.display = 'none';
+    if (iframe) {
+        iframe.src = finalViewerUrl;
+        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
+    }
+
+    // Load Sidebar Discussion
+    loadComments(currentGroupId, fileKey);
+};
+
+async function loadComments(groupId, fileKey) {
+    const list = document.getElementById('commentsList');
+    if (!list) return;
+
+    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;"><div class="viewer-loader" style="width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 1s linear infinite; display:inline-block;"></div></div>`;
+
+    try {
+        const { data: comments, error } = await supabaseClient
+            .from('file_comments')
+            .select('*')
+            .eq('group_id', groupId)
+            .eq('file_key', fileKey)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        renderComments(comments || []);
+    } catch (e) {
+        console.error('Comments Load Error:', e);
+        list.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px; font-size:0.8rem;">Error loading comments.</div>`;
+    }
+}
+
+function renderComments(comments) {
+    const list = document.getElementById('commentsList');
+    if (comments.length === 0) {
+        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;">
+            <span class="material-icons-round" style="font-size: 40px; opacity: 0.3;">forum</span>
+            <p style="font-size: 0.85rem; margin-top: 10px;">No feedback found yet.</p>
+        </div>`;
         return;
     }
-    adobeContainer.dataset.activeUrl = absoluteUrl;
 
-    const showCompatibilityMode = (reason) => {
-        adobeContainer.style.display = 'none';
-        if (placeholder) {
-            placeholder.style.display = 'flex';
-            placeholder.innerHTML = `
-                <div style="text-align: center; color: #64748b; padding: 20px;">
-                    <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; display: inline-block;"></div>
-                    <p style="font-weight: 600;">Opening Standard Preview...</p>
-                    <p style="font-size: 0.8rem; margin-top: 6px; max-width: 300px; color: #ef4444; font-weight: 700;">Error: ${reason || 'Direct annotation link restricted'}</p>
-                    <p style="font-size: 0.75rem; margin-top: 4px; color: #94a3b8;">Using secondary viewer.</p>
+    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+    const myName = user.group_name || user.name || 'Student';
+
+    list.innerHTML = comments.map(c => {
+        const isMe = c.user_name === myName;
+        const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        return `
+            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'};">
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: ${c.user_role === 'Panelist' ? 'var(--primary-color)' : '#64748b'};">${c.user_name}</span>
+                    <span style="font-size: 0.6rem; color: #94a3b8;">${time}</span>
                 </div>
-            `;
-        }
+                <div style="background: ${isMe ? 'var(--primary-color)' : 'white'}; 
+                            color: ${isMe ? 'white' : '#1e293b'}; 
+                            padding: 10px 14px; 
+                            border-radius: ${isMe ? '12px 12px 2px 12px' : '2px 12px 12px 12px'}; 
+                            font-size: 0.88rem; 
+                            line-height: 1.4; 
+                            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                            max-width: 90%;
+                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};">
+                    ${c.comment_text}
+                </div>
+            </div>
+        `;
+    }).join('');
 
-        let finalFallbackUrl = absoluteUrl;
-        if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-            finalFallbackUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
-        } else {
-            finalFallbackUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
-        }
+    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
+}
 
-        const iframe = document.createElement('iframe');
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
-        iframe.src = finalFallbackUrl;
-        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
+window.postComment = async () => {
+    const input = document.getElementById('commentInput');
+    const text = input.value.trim();
+    if (!text || !currentGroupId || !currentViewerFileKey) return;
 
-        if (adobeContainer) {
-            adobeContainer.innerHTML = '';
-            adobeContainer.appendChild(iframe);
-            adobeContainer.style.display = 'block';
+    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+    const userName = user.group_name || user.name || 'Student';
 
-            // Add Retry and Direct Link buttons
-            if (placeholder) {
-                placeholder.innerHTML += `
-                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                        <button onclick="delete document.getElementById('adobe-dc-view').dataset.activeUrl; window.openFileViewer('${url}', '${fileKey}')" style="background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                            <span class="material-icons-round" style="font-size: 16px;">refresh</span>
-                            Retry
-                        </button>
-                        <a href="${url}" target="_blank" style="background: var(--primary-color); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                            <span class="material-icons-round" style="font-size: 16px;">open_in_new</span>
-                            Open Original Link
-                        </a>
-                    </div>
-                `;
-            }
-        }
-    };
+    input.disabled = true;
 
-    if (isPDF) {
-        adobeContainer.innerHTML = '';
-        adobeContainer.style.display = 'block';
-        if (placeholder) placeholder.style.display = 'none';
+    try {
+        const { error } = await supabaseClient.from('file_comments').insert({
+            group_id: currentGroupId,
+            file_key: currentViewerFileKey,
+            user_name: userName,
+            user_role: 'Student',
+            comment_text: text
+        });
 
-        const initAdobe = async () => {
-            try {
-                adobeDCView = new AdobeDC.View({ clientId: ADOBE_CLIENT_ID, divId: "adobe-dc-view" });
-
-                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)?.[1] || absoluteUrl.match(/id=([^\&]+)/)?.[1];
-                const fileName = (fileKey || 'document').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf';
-
-                let finalUrl = absoluteUrl;
-                if (lowerUrl.includes('drive.google.com') && fileId) {
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=media&confirm=t`;
-                }
-
-                console.log('ADOBE LOADING (Student):', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
-
-                const loginUser = JSON.parse(localStorage.getItem('loginUser') || '{}');
-                const displayName = loginUser.group_name || loginUser.name || 'Student Group';
-
-                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
-                    return Promise.resolve({
-                        userProfile: {
-                            name: displayName,
-                            firstName: displayName.split(' ')[0],
-                            lastName: displayName.split(' ').slice(1).join(' ') || '',
-                            email: loginUser.email || ''
-                        }
-                    });
-                });
-
-                const adobeFilePromise = adobeDCView.previewFile({
-                    content: { location: { url: finalUrl } },
-                    metaData: { fileName: fileName, id: fileKey }
-                }, {
-                    embedMode: "FULL_WINDOW",
-                    showAnnotationTools: true,
-                    enableAnnotationAPIs: true,
-                    showLeftHandPanel: true,
-                    showPageControls: true,
-                    showBookmarks: true,
-                    defaultViewMode: "FIT_PAGE"
-                });
-
-                adobeFilePromise.then(adobeViewer => {
-                    if (placeholder) placeholder.style.display = 'none';
-                    adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        try {
-                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
-                                .eq('group_id', currentGroupId).eq('file_key', fileKey).single();
-                            if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
-                        } catch (e) { }
-                    });
-                }).catch(err => {
-                    console.error('CRITICAL ADOBE ERROR (Student):', err);
-                    let specificError = 'Check Console';
-                    if (err) {
-                        specificError = err.type || err.code || err.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 50));
-                    }
-                    delete adobeContainer.dataset.activeUrl;
-                    showCompatibilityMode(specificError);
-                });
-            } catch (e) { showCompatibilityMode('Init Failed: ' + e.message); }
-        };
-
-        if (window.AdobeDC) initAdobe();
-        else document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
-    } else {
-        showCompatibilityMode();
+        if (error) throw error;
+        input.value = '';
+        loadComments(currentGroupId, currentViewerFileKey);
+    } catch (e) {
+        alert('Could not send reply: ' + e.message);
+    } finally {
+        input.disabled = false;
+        input.focus();
     }
 };
 

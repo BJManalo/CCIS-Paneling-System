@@ -886,211 +886,151 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     document.getElementById('fileViewer').src = '';
-    const adobeContainer = document.getElementById('adobe-dc-view');
-    if (adobeContainer) {
-        adobeContainer.innerHTML = '';
-        adobeContainer.style.display = 'none';
-        delete adobeContainer.dataset.activeUrl;
-    }
-    adobeDCView = null;
+    const sidebar = document.getElementById('commentsSidebar');
+    if (sidebar) sidebar.style.display = 'none';
     currentViewerFileKey = null;
     currentViewerGroupId = null;
 };
 
+// --- SIDEBAR COMMENT SYSTEM (Option A) ---
 window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) return;
     currentViewerGroupId = groupId;
     currentViewerFileKey = fileKey;
 
-    let absoluteUrl = url.trim();
-    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
-
-    const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = (lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co') || lowerUrl.includes('drive.google.com')) && !lowerUrl.includes('docs.google.com/viewer');
-
     const iframe = document.getElementById('fileViewer');
-    const adobeContainer = document.getElementById('adobe-dc-view');
     const placeholder = document.getElementById('viewerPlaceholder');
     const toolbar = document.getElementById('viewerToolbar');
     const linkBtn = document.getElementById('externalLinkBtn');
+    const sidebar = document.getElementById('commentsSidebar');
+    const nameDisplay = document.getElementById('currentFileNameDisplay');
 
-    if (adobeContainer.dataset.activeUrl === absoluteUrl && adobeContainer.innerHTML !== '') {
-        adobeContainer.style.display = 'block';
-        if (placeholder) placeholder.style.display = 'none';
-        if (iframe) iframe.style.display = 'none';
-        if (toolbar) toolbar.style.display = 'flex';
-        return;
+    // UI Reset
+    if (placeholder) placeholder.style.display = 'none';
+    if (iframe) iframe.style.display = 'block';
+    if (toolbar) toolbar.style.display = 'flex';
+    if (sidebar) sidebar.style.display = 'flex';
+    if (nameDisplay) nameDisplay.innerText = (fileKey || 'File').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+
+    let absoluteUrl = url.trim();
+    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
+
+    // Standard Viewer Link Logic (Stable)
+    let finalViewerUrl = absoluteUrl;
+    const lowerUrl = absoluteUrl.toLowerCase();
+    if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+        finalViewerUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
+    } else if (lowerUrl.endsWith('.pdf') || lowerUrl.includes('supabase.co')) {
+        // Use browser's native PDF viewer for PDFs
+        finalViewerUrl = absoluteUrl;
+    } else {
+        // Fallback to Google Docs Viewer for other types
+        finalViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
     }
-    adobeContainer.dataset.activeUrl = absoluteUrl;
 
-    const showCompatibilityMode = (reason) => {
-        console.warn('Switching to compatibility mode:', reason);
-        adobeContainer.style.display = 'none';
-        if (iframe) iframe.style.display = 'none';
-        placeholder.style.display = 'flex';
-        placeholder.innerHTML = `
-            <div style="text-align: center; color: #64748b; padding: 20px;">
-                <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; display: inline-block;"></div>
-                <p style="font-weight: 600;">Loading Compatibility Preview...</p>
-                <p style="font-size: 0.8rem; margin-top: 6px; max-width: 300px; color: #ef4444; font-weight: 700;">Error: ${reason || 'Direct Link Restricted'}</p>
-                <p style="font-size: 0.75rem; margin-top: 4px; color: #94a3b8;">Switching to the document's original viewer...</p>
-            </div>
-        `;
+    iframe.src = finalViewerUrl;
+    if (linkBtn) linkBtn.href = absoluteUrl;
 
-        let finalFallbackUrl = absoluteUrl;
-        if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-            finalFallbackUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
-        } else {
-            finalFallbackUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
-        }
+    // Load Sidebar Comments
+    loadComments(groupId, fileKey);
+};
 
-        placeholder.innerHTML += `
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                <button onclick="window.loadViewer('${absoluteUrl}', '${groupId}', '${fileKey}')" style="background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                    <span class="material-icons-round" style="font-size: 16px;">refresh</span>
-                    Retry
-                </button>
-                <a href="${absoluteUrl}" target="_blank" style="background: var(--primary-color); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                    <span class="material-icons-round" style="font-size: 16px;">open_in_new</span>
-                    Open Original Link
-                </a>
-            </div>
-        `;
+async function loadComments(groupId, fileKey) {
+    const list = document.getElementById('commentsList');
+    if (!list) return;
 
-        setTimeout(() => {
-            if (iframe) {
-                iframe.src = finalFallbackUrl;
-                iframe.onload = () => {
-                    placeholder.style.display = 'none';
-                    iframe.style.display = 'block';
-                    if (toolbar) toolbar.style.display = 'flex';
-                };
-            }
-            if (linkBtn) linkBtn.href = absoluteUrl;
-        }, 500);
-    };
+    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;"><div class="viewer-loader" style="width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; margin-bottom:10px;"></div><br>Loading discussion...</div>`;
 
-    if (isPDF) {
-        const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-        const userName = user.name || user.full_name || 'Panelist';
+    try {
+        const { data: comments, error } = await supabaseClient
+            .from('file_comments')
+            .select('*')
+            .eq('group_id', groupId)
+            .eq('file_key', fileKey)
+            .order('created_at', { ascending: true });
 
-        adobeContainer.innerHTML = ''; // Start fresh
-        adobeContainer.style.display = 'block';
-        if (placeholder) placeholder.style.display = 'none';
-        if (iframe) iframe.style.display = 'none';
+        if (error) throw error;
+        renderComments(comments || []);
+    } catch (e) {
+        console.error('Comments Load Error:', e);
+        list.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px; font-size:0.8rem;">Error loading comments.</div>`;
+    }
+}
 
-        const initAdobe = async () => {
-            try {
-                // Always recreate view instance if container was cleared
-                adobeDCView = new AdobeDC.View({
-                    clientId: ADOBE_CLIENT_ID,
-                    divId: "adobe-dc-view"
-                });
-
-                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)?.[1] || absoluteUrl.match(/id=([^\&]+)/)?.[1];
-                const fileName = (fileKey || 'document').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf';
-
-                let finalUrl = absoluteUrl;
-                if (lowerUrl.includes('drive.google.com') && fileId) {
-                    // This is the most 'raw' link variant that often bypasses the browser's intermediate pages
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=media&confirm=t`;
-                }
-
-                console.log('ADOBE LOADING:', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID, userName });
-
-                // 1. REGISTER THE SAVE API (Corrected for JSON only)
-                const saveApiOptions = {
-                    autoSaveFrequency: 2,
-                    enableSaveShortcut: true,
-                    includePDFAnnotations: false // CRITICAL: This ensures we get JSON, not a binary PDF
-                };
-
-                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (metaData, content) => {
-                    try {
-                        console.log('🚀 PDF AUTO-SAVE TRIGGERED:', { groupId, fileKey });
-                        // 'content' is now an array of annotations because includePDFAnnotations is false
-                        const { error } = await supabaseClient.from('pdf_annotations').upsert({
-                            group_id: groupId,
-                            file_key: fileKey,
-                            annotation_data: content,
-                            user_name: userName,
-                            updated_at: new Date()
-                        }, { onConflict: 'group_id, file_key' });
-
-                        if (error) throw error;
-                        console.log('✅ PDF ANNOTATIONS STORED SUCCESSFULLY');
-                        return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                    } catch (err) {
-                        console.error('❌ PDF SAVE FAILED:', err);
-                        return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
-                    }
-                }, saveApiOptions);
-
-                const adobeFilePromise = adobeDCView.previewFile({
-                    content: { location: { url: finalUrl } },
-                    metaData: { fileName: fileName, id: fileKey || 'unique-id' }
-                }, {
-                    embedMode: "FULL_WINDOW",
-                    showAnnotationTools: true,
-                    enableAnnotationAPIs: true,
-                    showLeftHandPanel: true,
-                    showPageControls: true,
-                    showBookmarks: true,
-                    defaultViewMode: "FIT_PAGE"
-                });
-
-                adobeFilePromise.then(adobeViewer => {
-                    adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        // A. Load Existing
-                        try {
-                            const { data } = await supabaseClient.from('pdf_annotations')
-                                .select('annotation_data').eq('group_id', groupId)
-                                .eq('file_key', fileKey).maybeSingle();
-
-                            if (data?.annotation_data) {
-                                console.log('📥 LOADING PREVIOUS PANEL INPUTS...');
-                                annotationManager.addAnnotations(data.annotation_data);
-                            }
-                        } catch (e) { console.error('Error loading annotations:', e); }
-
-                        // B. Manual Sync Button for peace of mind
-                        window.syncPdfNow = async () => {
-                            const all = await annotationManager.getAnnotations();
-                            const { error } = await supabaseClient.from('pdf_annotations').upsert({
-                                group_id: groupId, file_key: fileKey, annotation_data: all,
-                                user_name: userName, updated_at: new Date()
-                            }, { onConflict: 'group_id, file_key' });
-                            if (!error) alert('Comments synced successfully!');
-                        };
-
-                        annotationManager.setConfig({ authorName: userName });
-                    });
-
-                    if (placeholder) placeholder.style.display = 'none';
-                }).catch(err => {
-                    console.error('CRITICAL ADOBE ERROR:', err);
-                    let specificError = 'Check Console';
-                    if (err) {
-                        specificError = err.type || err.code || err.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 50));
-                    }
-                    delete adobeContainer.dataset.activeUrl;
-                    showCompatibilityMode('Adobe SDK Error: ' + specificError);
-                });
-            } catch (e) {
-                console.error('Adobe init error:', e);
-                showCompatibilityMode('Init Failed: ' + e.message);
-            }
-        };
-
-        if (window.AdobeDC) initAdobe();
-        else document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
-
-        if (toolbar) toolbar.style.display = 'flex';
-        if (linkBtn) linkBtn.href = absoluteUrl;
+function renderComments(comments) {
+    const list = document.getElementById('commentsList');
+    if (comments.length === 0) {
+        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;">
+            <span class="material-icons-round" style="font-size: 40px; opacity: 0.3;">forum</span>
+            <p style="font-size: 0.85rem; margin-top: 10px;">No feedback yet.<br>Start the discussion below.</p>
+        </div>`;
         return;
     }
 
-    showCompatibilityMode('Non-PDF detected');
+    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+    const myName = user.name || user.full_name || 'Panelist';
+
+    list.innerHTML = comments.map(c => {
+        const isMe = c.user_name === myName;
+        const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const date = new Date(c.created_at).toLocaleDateString();
+        const roleBubble = c.user_role === 'Student' ? '#f0fdf4' : '#eff6ff';
+        const roleColor = c.user_role === 'Student' ? '#166534' : '#1e40af';
+
+        return `
+            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'};">
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: #64748b;">${c.user_name}</span>
+                    <span style="font-size: 0.65rem; color: #94a3b8;">${date} ${time}</span>
+                </div>
+                <div style="background: ${isMe ? 'var(--primary-color)' : 'white'}; 
+                            color: ${isMe ? 'white' : '#1e293b'}; 
+                            padding: 10px 14px; 
+                            border-radius: ${isMe ? '12px 12px 2px 12px' : '2px 12px 12px 12px'}; 
+                            font-size: 0.88rem; 
+                            line-height: 1.4; 
+                            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                            max-width: 90%;
+                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};">
+                    ${c.comment_text}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Scroll to bottom
+    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
+}
+
+window.postComment = async () => {
+    const input = document.getElementById('commentInput');
+    const text = input.value.trim();
+    if (!text || !currentViewerGroupId || !currentViewerFileKey) return;
+
+    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+    const userName = user.name || user.full_name || 'Panelist';
+
+    // Disable input while saving
+    input.disabled = true;
+
+    try {
+        const { error } = await supabaseClient.from('file_comments').insert({
+            group_id: currentViewerGroupId,
+            file_key: currentViewerFileKey,
+            user_name: userName,
+            user_role: 'Panelist', // This is the Panel page
+            comment_text: text
+        });
+
+        if (error) throw error;
+        input.value = '';
+        loadComments(currentViewerGroupId, currentViewerFileKey);
+    } catch (e) {
+        alert('Could not post comment: ' + e.message);
+    } finally {
+        input.disabled = false;
+        input.focus();
+    }
 };
 
 window.filterTable = (program) => {
