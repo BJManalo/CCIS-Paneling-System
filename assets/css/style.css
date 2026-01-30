@@ -1620,3 +1620,19 @@ button {
         opacity: 1;
     }
 }
+
+/* --- Adobe PDF Viewer Fixes --- */
+/* Ensures comment text and inputs are always visible (not white-on-white) */
+#adobe-dc-view textarea,
+#adobe-dc-view input,
+#adobe-dc-view [contenteditable="true"] {
+    color: #1f2937 !important; /* var(--text-main) */
+    background-color: #ffffff !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+/* Fix for Adobe's specific comment author name visibility if needed */
+.spectrum-Textfield-input {
+    color: #1f2937 !important;
+}
