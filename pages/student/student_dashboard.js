@@ -180,13 +180,11 @@ async function loadSubmissionData() {
                 el.value = linkMap[key] || '';
 
                 const rawStatus = statusMap[key] || 'Pending';
-                const rawRemarks = remarksMap[key] || {}; // Now expecting object or string
+                const rawRemarks = remarksMap[key] || {};
 
-                // --- Multi-Panel Logic ---
-                let feedbackData = []; // Array of { panel, status, remarks }
+                let feedbackData = [];
 
                 if (typeof rawStatus === 'object') {
-                    // Modern structure: { "Panel Name": "Approved" }
                     Object.keys(rawStatus).forEach(panel => {
                         feedbackData.push({
                             panel: panel,
@@ -195,7 +193,6 @@ async function loadSubmissionData() {
                         });
                     });
                 } else {
-                    // Compatibility with old single-string format
                     feedbackData.push({
                         panel: 'Panel',
                         status: rawStatus,
@@ -203,13 +200,11 @@ async function loadSubmissionData() {
                     });
                 }
 
-                // 1. Label & Badge Wrapper
                 const prevEl = el.previousElementSibling;
                 if (prevEl && (prevEl.classList.contains('status-badge-container') || prevEl.innerText === 'Link')) {
                     prevEl.remove();
                 }
 
-                // Prepare Badge HTML (can be multiple)
                 const badgesHtml = feedbackData.map(f => {
                     let color = '#64748b'; let icon = 'hourglass_empty'; let bg = '#f1f5f9'; let border = '#e2e8f0';
                     if (f.status.includes('Approved')) {
@@ -239,7 +234,6 @@ async function loadSubmissionData() {
                 `;
                 el.insertAdjacentHTML('beforebegin', headerHtml);
 
-                // 2. Remarks (Clean Design)
                 const nextEl = el.nextElementSibling;
                 if (nextEl && nextEl.classList.contains('remarks-container')) nextEl.remove();
 
@@ -273,6 +267,38 @@ async function loadSubmissionData() {
                     }).join('');
                     el.insertAdjacentHTML('afterend', remarksHtml);
                 }
+
+                // --- ACTION BUTTON INJECTION ---
+                if (!el.parentElement.classList.contains('input-with-action')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'input-with-action';
+                    wrapper.style.cssText = 'position: relative; display: flex; align-items: center; gap: 8px; width: 100%;';
+
+                    el.parentNode.insertBefore(wrapper, el);
+                    wrapper.appendChild(el);
+                    el.style.marginBottom = '0'; // Let the wrapper handle the margin
+
+                    const checkBtn = document.createElement('button');
+                    checkBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">spellcheck</span>';
+                    checkBtn.title = "Check if link is Public";
+                    checkBtn.style.cssText = `
+                        background: #f1f5f9;
+                        border: 1.5px solid #e2e8f0;
+                        border-radius: 8px;
+                        color: #64748b;
+                        padding: 10px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        transition: all 0.2s;
+                    `;
+                    checkBtn.onclick = (e) => {
+                        e.preventDefault();
+                        window.verifyDriveLink(elementId);
+                    };
+                    wrapper.appendChild(checkBtn);
+                }
             };
 
             // Render Titles
@@ -289,7 +315,7 @@ async function loadSubmissionData() {
             renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
             renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
 
-            // Store links in window.currentLinks - Handled globally now
+            // Store links in window.currentLinks
             window.currentLinks = {
                 titles: tLinks,
                 preoral: pLinks,
@@ -298,12 +324,11 @@ async function loadSubmissionData() {
 
             // Initialize Button State
             updateSaveButtonState('titles');
-
         }
     } catch (err) {
         console.error('Unexpected error:', err);
     }
-}
+};
 
 // Global Tab Switching Logic
 window.switchSubTab = (stageId, index, btn) => {
@@ -657,3 +682,59 @@ window.openFileViewer = async (url, fileKey) => {
         showCompatibilityMode();
     }
 };
+
+window.verifyDriveLink = async (inputId) => {
+    const input = document.getElementById(inputId);
+    const url = input.value.trim();
+    const btn = input.nextElementSibling;
+
+    if (!url) {
+        showToast('Enter a link first', 'info');
+        return;
+    }
+
+    if (!url.includes('drive.google.com')) {
+        showToast('Only for GDrive links', 'info');
+        return;
+    }
+
+    const fileIdMatch = url.match(/\/d\/([^\/]+)/) || url.match(/id=([^\&]+)/);
+    if (!fileIdMatch) {
+        showToast('Invalid Drive link', 'info');
+        return;
+    }
+
+    const fileId = fileIdMatch[1];
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round" style="font-size:18px; animation: spin 1s linear infinite;">sync</span>';
+
+    try {
+        const checkUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`;
+        const isPublic = await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+            img.src = checkUrl;
+        });
+
+        if (isPublic) {
+            showToast('Link is PUBLIC (Correct)', 'success');
+            btn.style.borderColor = '#10b981';
+            btn.style.color = '#10b981';
+            btn.style.background = '#f0fdf4';
+        } else {
+            showToast('RESTRICTED: Change to "Anyone with link"', 'info');
+            btn.style.borderColor = '#ef4444';
+            btn.style.color = '#ef4444';
+            btn.style.background = '#fef2f2';
+        }
+    } catch (e) {
+        showToast('Verification failed', 'info');
+    } finally {
+        btn.disabled = false;
+        setTimeout(() => {
+            btn.innerHTML = originalContent;
+        }, 2000);
+    }
+}
