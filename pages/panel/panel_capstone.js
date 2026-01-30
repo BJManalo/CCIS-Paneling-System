@@ -872,12 +872,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     const adobeContainer = document.getElementById('adobe-dc-view');
     const placeholder = document.getElementById('viewerPlaceholder');
     const toolbar = document.getElementById('viewerToolbar');
-    const linkBtn = document.getElementById('externalLinkBtn');
+    // Prevent redundant reloads
+    if (adobeContainer.dataset.activeUrl === absoluteUrl) {
+        console.log('File already loaded, skipping reload.');
+        return;
+    }
+    adobeContainer.dataset.activeUrl = absoluteUrl;
 
-    // Reset visibility
+    // Reset visibility logic (Improved to prevent flicker)
     if (iframe) iframe.style.display = 'none';
-    if (adobeContainer) adobeContainer.style.display = 'none';
-    placeholder.style.display = 'flex';
 
     // If it's a PDF, use Adobe
     if (isPDF) {
@@ -885,15 +888,10 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         const user = userJson ? JSON.parse(userJson) : { name: 'Guest' };
         const userName = user.name || user.full_name || 'Panelist';
 
+        // Show Adobe Container immediately, hide placeholder 
+        // Adobe has its own better loading indicator so we don't need a custom overlay
         adobeContainer.style.display = 'block';
-        placeholder.style.display = 'flex';
-        placeholder.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <div class="viewer-loader" style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
-                <p style="font-size: 1.1rem; font-weight: 500; color: #64748b;">Loading document with annotations...</p>
-                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">This may take a few seconds.</p>
-            </div>
-        `;
+        placeholder.style.display = 'none';
         if (iframe) iframe.style.display = 'none';
 
         const initAdobe = async () => {

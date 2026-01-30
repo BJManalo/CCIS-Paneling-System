@@ -571,7 +571,19 @@ window.openFileViewer = async (url, fileKey) => {
         lowerUrl.includes('drive.google.com') ||
         lowerUrl.includes('docs.google.com/viewer');
 
+    // Prevent redundant reloads
+    if (adobeContainer.dataset.activeUrl === absoluteUrl) {
+        console.log('File already loaded, skipping reload.');
+        return;
+    }
+    adobeContainer.dataset.activeUrl = absoluteUrl;
+
     if (isPDF) {
+        // Show Adobe Container immediately, hide placeholder 
+        // Adobe has its own better loading indicator
+        adobeContainer.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+
         const initAdobe = async () => {
             if (!adobeDCView) {
                 adobeDCView = new AdobeDC.View({
