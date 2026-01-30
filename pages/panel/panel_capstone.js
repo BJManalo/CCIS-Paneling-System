@@ -844,6 +844,7 @@ window.closeFileModal = () => {
     if (adobeContainer) {
         adobeContainer.innerHTML = '';
         adobeContainer.style.display = 'none';
+        delete adobeContainer.dataset.activeUrl;
     }
     adobeDCView = null;
     currentViewerFileKey = null;
@@ -873,8 +874,11 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     const placeholder = document.getElementById('viewerPlaceholder');
     const toolbar = document.getElementById('viewerToolbar');
     // Prevent redundant reloads
-    if (adobeContainer.dataset.activeUrl === absoluteUrl) {
-        console.log('File already loaded, skipping reload.');
+    if (adobeContainer.dataset.activeUrl === absoluteUrl && adobeContainer.innerHTML !== '') {
+        adobeContainer.style.display = 'block';
+        placeholder.style.display = 'none';
+        if (iframe) iframe.style.display = 'none';
+        toolbar.style.display = 'flex';
         return;
     }
     adobeContainer.dataset.activeUrl = absoluteUrl;

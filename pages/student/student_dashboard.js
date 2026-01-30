@@ -542,7 +542,10 @@ window.saveSubmissions = async function () {
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     const adobeContainer = document.getElementById('adobe-dc-view');
-    if (adobeContainer) adobeContainer.innerHTML = '';
+    if (adobeContainer) {
+        adobeContainer.innerHTML = '';
+        delete adobeContainer.dataset.activeUrl;
+    }
     adobeDCView = null;
 };
 
@@ -572,8 +575,9 @@ window.openFileViewer = async (url, fileKey) => {
         lowerUrl.includes('docs.google.com/viewer');
 
     // Prevent redundant reloads
-    if (adobeContainer.dataset.activeUrl === absoluteUrl) {
-        console.log('File already loaded, skipping reload.');
+    if (adobeContainer.dataset.activeUrl === absoluteUrl && adobeContainer.innerHTML !== '') {
+        adobeContainer.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
         return;
     }
     adobeContainer.dataset.activeUrl = absoluteUrl;
