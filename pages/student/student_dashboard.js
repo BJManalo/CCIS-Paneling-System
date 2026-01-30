@@ -568,50 +568,61 @@ window.openFileViewer = async (url, fileKey) => {
     const lowerUrl = absoluteUrl.toLowerCase();
     const isPDF = lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co/storage/v1/object/public');
 
-    if (isPDF && typeof AdobeDC !== 'undefined') {
-        if (!adobeDCView) {
-            adobeDCView = new AdobeDC.View({
-                clientId: ADOBE_CLIENT_ID,
-                divId: "adobe-dc-view"
-            });
-        }
-
-        let finalUrl = absoluteUrl;
-        if (lowerUrl.includes('drive.google.com')) {
-            if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+    if (isPDF) {
+        const initAdobe = async () => {
+            if (!adobeDCView) {
+                adobeDCView = new AdobeDC.View({
+                    clientId: ADOBE_CLIENT_ID,
+                    divId: "adobe-dc-view"
+                });
             }
-        }
 
-        const adobeFilePromise = adobeDCView.previewFile({
-            content: { location: { url: finalUrl } },
-            metaData: { fileName: fileKey + ".pdf", id: fileKey }
-        }, {
-            embedMode: "FULL_WINDOW",
-            showAnnotationTools: false, // Read-only for students
-            enableAnnotationAPIs: true,
-        });
+            let finalUrl = absoluteUrl;
+            if (lowerUrl.includes('drive.google.com')) {
+                if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+                }
+            }
 
-        adobeFilePromise.then(adobeViewer => {
-            adobeViewer.getAnnotationManager().then(async annotationManager => {
-                // Fetch existing annotations from Supabase
-                try {
-                    const { data } = await supabaseClient
-                        .from('pdf_annotations')
-                        .select('annotation_data')
-                        .eq('group_id', currentGroupId)
-                        .eq('file_key', fileKey)
-                        .single();
-
-                    if (data && data.annotation_data) {
-                        annotationManager.addAnnotations(data.annotation_data);
-                    }
-                } catch (e) { console.log('No annotations found'); }
-
-                if (placeholder) placeholder.style.display = 'none';
+            const adobeFilePromise = adobeDCView.previewFile({
+                content: { location: { url: finalUrl } },
+                metaData: { fileName: fileKey + ".pdf", id: fileKey }
+            }, {
+                embedMode: "FULL_WINDOW",
+                showAnnotationTools: false, // Read-only for students
+                enableAnnotationAPIs: true,
+                showLeftHandPanel: true,
+                showPageControls: true,
+                showBookmarks: true
             });
-        });
+
+            adobeFilePromise.then(adobeViewer => {
+                adobeViewer.getAnnotationManager().then(async annotationManager => {
+                    // Fetch existing annotations from Supabase
+                    try {
+                        const { data } = await supabaseClient
+                            .from('pdf_annotations')
+                            .select('annotation_data')
+                            .eq('group_id', currentGroupId)
+                            .eq('file_key', fileKey)
+                            .single();
+
+                        if (data && data.annotation_data) {
+                            annotationManager.addAnnotations(data.annotation_data);
+                        }
+                    } catch (e) { console.log('No annotations found'); }
+
+                    if (placeholder) placeholder.style.display = 'none';
+                });
+            });
+        };
+
+        if (window.AdobeDC) {
+            initAdobe();
+        } else {
+            document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
+        }
     } else {
         // Fallback or non-PDF message
         if (adobeContainer) {

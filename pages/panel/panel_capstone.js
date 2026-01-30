@@ -837,92 +837,98 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (adobeContainer) adobeContainer.style.display = 'none';
     placeholder.style.display = 'flex';
 
-    // If it's a PDF and we have the SDK, use Adobe
-    if (isPDF && typeof AdobeDC !== 'undefined') {
+    // If it's a PDF, use Adobe
+    if (isPDF) {
         const userJson = localStorage.getItem('loginUser');
         const user = userJson ? JSON.parse(userJson) : { name: 'Guest' };
         const userName = user.name || user.full_name || 'Panelist';
 
         adobeContainer.style.display = 'block';
         placeholder.style.display = 'none';
-        iframe.style.display = 'none';
+        if (iframe) iframe.style.display = 'none';
 
-        if (!adobeDCView) {
-            adobeDCView = new AdobeDC.View({
-                clientId: ADOBE_CLIENT_ID,
-                divId: "adobe-dc-view"
+        const initAdobe = async () => {
+            if (!adobeDCView) {
+                adobeDCView = new AdobeDC.View({
+                    clientId: ADOBE_CLIENT_ID,
+                    divId: "adobe-dc-view"
+                });
+            }
+
+            const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
+
+            const previewConfig = {
+                embedMode: "FULL_WINDOW",
+                showAnnotationTools: true,
+                showDownloadPDF: true,
+                showPrintPDF: true,
+                enableAnnotationAPIs: true,
+                showLeftHandPanel: true,
+                showPageControls: true,
+                showBookmarks: true
+            };
+
+            let finalUrl = absoluteUrl;
+            if (lowerUrl.includes('drive.google.com')) {
+                if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+                }
+            }
+
+            const adobeFilePromise = adobeDCView.previewFile({
+                content: { location: { url: finalUrl } },
+                metaData: { fileName: fileName, id: fileKey || 'unique-id' }
+            }, previewConfig);
+
+            adobeFilePromise.then(adobeViewer => {
+                adobeViewer.getAnnotationManager().then(async annotationManager => {
+                    try {
+                        const { data } = await supabaseClient
+                            .from('pdf_annotations')
+                            .select('annotation_data')
+                            .eq('group_id', groupId)
+                            .eq('file_key', fileKey)
+                            .single();
+
+                        if (data && data.annotation_data) {
+                            annotationManager.addAnnotations(data.annotation_data);
+                        }
+                    } catch (e) { console.log('No existing annotations found'); }
+
+                    annotationManager.setConfig({
+                        showAuthorName: true,
+                        authorName: userName
+                    });
+
+                    annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
+                        try {
+                            const { error } = await supabaseClient
+                                .from('pdf_annotations')
+                                .upsert({
+                                    group_id: groupId,
+                                    file_key: fileKey,
+                                    annotation_data: annotations,
+                                    user_name: userName,
+                                    updated_at: new Date()
+                                }, { onConflict: 'group_id, file_key' });
+
+                            if (error) throw error;
+                            return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                        } catch (err) {
+                            console.error('Error saving annotations:', err);
+                            return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
+                        }
+                    }, { autoSaveFrequency: 2 });
+                });
             });
-        }
-
-        const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
-
-        const previewConfig = {
-            embedMode: "FULL_WINDOW",
-            showAnnotationTools: true,
-            showDownloadPDF: true,
-            showPrintPDF: true,
-            enableAnnotationAPIs: true,
         };
 
-        // For Google Drive, get the direct stream URL
-        let finalUrl = absoluteUrl;
-        if (lowerUrl.includes('drive.google.com')) {
-            if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
-            }
+        if (window.AdobeDC) {
+            initAdobe();
+        } else {
+            document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
         }
-
-        const adobeFilePromise = adobeDCView.previewFile({
-            content: { location: { url: finalUrl } },
-            metaData: { fileName: fileName, id: fileKey || 'unique-id' }
-        }, previewConfig);
-
-        /* Handle Annotations */
-        adobeFilePromise.then(adobeViewer => {
-            adobeViewer.getAnnotationManager().then(async annotationManager => {
-                // 1. Fetch existing annotations from Supabase
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('pdf_annotations')
-                        .select('annotation_data')
-                        .eq('group_id', groupId)
-                        .eq('file_key', fileKey)
-                        .single();
-
-                    if (data && data.annotation_data) {
-                        annotationManager.addAnnotations(data.annotation_data);
-                    }
-                } catch (e) { console.log('No existing annotations found'); }
-
-                // 2. Set user profile
-                annotationManager.setConfig({
-                    showAuthorName: true,
-                    authorName: userName
-                });
-
-                // 3. Register Save event
-                annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
-                    try {
-                        const { error } = await supabaseClient
-                            .from('pdf_annotations')
-                            .upsert({
-                                group_id: groupId,
-                                file_key: fileKey,
-                                annotation_data: annotations,
-                                user_name: userName,
-                                updated_at: new Date()
-                            }, { onConflict: 'group_id, file_key' });
-
-                        if (error) throw error;
-                        return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                    } catch (err) {
-                        console.error('Error saving annotations:', err);
-                        return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
-                    }
-                }, { autoSaveFrequency: 2 });
-            });
-        });
 
         toolbar.style.display = 'flex';
         linkBtn.href = absoluteUrl;
