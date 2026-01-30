@@ -1000,122 +1000,157 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 });
 
                 adobeFilePromise.then(adobeViewer => {
-                    if (placeholder) placeholder.style.display = 'none';
-                    adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        // Restore existing annotations
-                        // CRITICAL: Order by updated_at to get the LATEST save, accommodating potential duplicate rows
-                        try {
-                            console.log(`FETCHING for Group: ${groupId}, File: ${fileKey}`);
-                            const { data, error } = await supabaseClient.from('pdf_annotations')
-                                .select('annotation_data')
-                                .eq('group_id', groupId)
-                                .eq('file_key', fileKey)
-                                .order('updated_at', { ascending: false })
-                                .limit(1)
-                                .maybeSingle();
-
-                            if (error) console.error('Error fetching annotations:', error);
-
-                            if (data?.annotation_data) {
-                                console.log('FOUND SAVED ANNOTATIONS:', data.annotation_data.length);
-                                const imported = await annotationManager.addAnnotations(data.annotation_data);
-                                console.log('Import result:', imported);
-                            } else {
-                                console.log('NO PREVIOUS ANNOTATIONS FOUND.');
-                            }
-                        } catch (e) {
-                            console.error('Exception restoring annotations:', e);
-                        }
-
-                        // Settings to ensure name is picked up
-                        annotationManager.setConfig({
-                            showAuthorName: true,
-                            authorName: userName
-                        });
-
-                        // Manual Save Logic
-                        const saveAnnotations = async (annotations) => {
-                            // Create a clean copy for the database with enforced identity
-                            // This ensures students see the correct name even if the Panel UI doesn't update immediately
-                            const dbAnnotations = annotations.map(annot => {
-                                const newAnnot = JSON.parse(JSON.stringify(annot));
-
-                                // 1. Enforce Title (Author Name)
-                                newAnnot.title = userName;
-
-                                // 2. Enforce Body Prefix
-                                // Ensure we don't double-prefix if it's already there
-                                if (newAnnot.bodyValue) {
-                                    const prefix = `[${userName}]:`;
-                                    if (!newAnnot.bodyValue.startsWith(`${prefix}`)) {
-                                        // Remove any old prefix if it exists to be safe, or just prepend
-                                        newAnnot.bodyValue = `${prefix} ${newAnnot.bodyValue.replace(/^\[.*?\]:\s*/, '')}`;
-                                    }
-                                }
-                                return newAnnot;
-                            });
-
-                            try {
-                                console.log('Attempting to save to Supabase...');
-                                const { error } = await supabaseClient.from('pdf_annotations').upsert({
-                                    group_id: groupId,
-                                    file_key: fileKey,
-                                    annotation_data: dbAnnotations,
-                                    user_name: userName,
-                                    updated_at: new Date().toISOString()
-                                }, { onConflict: ['group_id', 'file_key'] });
-
-                                if (error) {
-                                    console.error('SUPABASE ERROR:', error);
-                                    alert(`Failed to save comments: ${error.message} \n\nPlease run the SUPABASE_SETUP.sql script.`);
-                                    throw error;
-                                }
-                                console.log('SAVE SUCCESSful:', dbAnnotations.length);
-                            } catch (err) {
-                                console.error('SAVE FAILED (Exception):', err);
-                            }
+                    // Create Manual Save Button if not exists
+                    if (!document.getElementById('manual-save-btn')) {
+                        const saveBtn = document.createElement('button');
+                        saveBtn.id = 'manual-save-btn';
+                        saveBtn.innerHTML = `<span class="material-icons-round" style="font-size: 16px;">save</span> Save Comments`;
+                        saveBtn.style.cssText = `
+                            position: absolute;
+                            top: 10px;
+                            right: 200px; /* Positioned left of standard tools */
+                            z-index: 9999;
+                            background: var(--primary-color);
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            font-size: 14px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                            display: flex;
+                            align-items: center;
+                            gap: 5px;
+                        `;
+                        saveBtn.onclick = async () => {
+                            saveBtn.innerHTML = `<div class="viewer-loader" style="width: 14px; height: 14px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div> Saving...`;
+                            const notes = await annotationManager.getAnnotations();
+                            await saveAnnotations(notes);
+                            saveBtn.innerHTML = `<span class="material-icons-round" style="font-size: 16px;">save</span> Save Comments`;
                         };
+                        adobeContainer.appendChild(saveBtn);
+                    }
 
-                        // IMMEDIATE SAVE on any change
-                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
-                            console.log('ANNOTATION EVENT:', event.type);
-                            if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
-                                // Just get and save - do not try to update UI locally to avoid race conditions
-                                const annotations = await annotationManager.getAnnotations();
-                                saveAnnotations(annotations);
+                    // Restore existing annotations
+                    // CRITICAL: Order by updated_at to get the LATEST save, accommodating potential duplicate rows
+                    try {
+                        console.log(`FETCHING for Group: ${groupId}, File: ${fileKey}`);
+                        const { data, error } = await supabaseClient.from('pdf_annotations')
+                            .select('annotation_data')
+                            .eq('group_id', groupId)
+                            .eq('file_key', fileKey)
+                            .order('updated_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (error) console.error('Error fetching annotations:', error);
+
+                        if (data?.annotation_data) {
+                            console.log('FOUND SAVED ANNOTATIONS:', data.annotation_data.length);
+                            const imported = await annotationManager.addAnnotations(data.annotation_data);
+                            console.log('Import result:', imported);
+                        } else {
+                            console.log('NO PREVIOUS ANNOTATIONS FOUND.');
+                        }
+                    } catch (e) {
+                        console.error('Exception restoring annotations:', e);
+                    }
+
+                    // Settings to ensure name is picked up
+                    annotationManager.setConfig({
+                        showAuthorName: true,
+                        authorName: userName
+                    });
+
+                    // Manual Save Logic
+                    const saveAnnotations = async (annotations) => {
+                        // Debug: explicitly alert what we are trying to save
+                        console.log(`PREPARING SAVE: Group ${groupId} (${typeof groupId}), File ${fileKey}, Count ${annotations.length}`);
+
+                        const dbAnnotations = annotations.map(annot => {
+                            const newAnnot = JSON.parse(JSON.stringify(annot));
+                            newAnnot.title = userName; // Force name
+                            if (newAnnot.bodyValue) {
+                                const prefix = `[${userName}]:`;
+                                if (!newAnnot.bodyValue.startsWith(`${prefix}`)) {
+                                    newAnnot.bodyValue = `${prefix} ${newAnnot.bodyValue.replace(/^\[.*?\]:\s*/, '')}`;
+                                }
                             }
+                            return newAnnot;
                         });
 
-                        // Fallback periodic save
-                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
-                            await saveAnnotations(annotations);
-                            return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                        }, { autoSaveFrequency: 2 });
+                        try {
+                            const gId = parseInt(groupId, 10); // Ensure integer
+                            if (isNaN(gId)) {
+                                alert('Error: Invalid Group ID');
+                                return;
+                            }
+
+                            // alert(`Saving ${dbAnnotations.length} comment(s) for Group ${gId}...`); // VERBOSE DEBUG
+
+                            const { error } = await supabaseClient.from('pdf_annotations').upsert({
+                                group_id: gId,
+                                file_key: fileKey,
+                                annotation_data: dbAnnotations,
+                                user_name: userName,
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: ['group_id', 'file_key'] });
+
+                            if (error) {
+                                console.error('SUPABASE ERROR:', error);
+                                alert(`SAVE ERROR: ${error.message}\n\nDid you run the Setup Script?`);
+                                return;
+                            }
+
+                            console.log('SAVE SUCCESSful');
+                            alert('Comments Saved Successfully!'); // Explicit confirmation per user request
+                        } catch (err) {
+                            console.error('SAVE EXCEPTION:', err);
+                            alert(`System Error: ${err.message}`);
+                        }
+                    };
+
+                    // IMMEDIATE SAVE on any change
+                    annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
+                        console.log('ANNOTATION EVENT:', event.type);
+                        if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
+                            // Just get and save - do not try to update UI locally to avoid race conditions
+                            const annotations = await annotationManager.getAnnotations();
+                            saveAnnotations(annotations);
+                        }
                     });
-                }).catch(err => {
-                    console.error('CRITICAL ADOBE ERROR:', err);
-                    let specificError = 'Check Console';
-                    if (err) {
-                        specificError = err.type || err.code || err.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 50));
-                    }
-                    delete adobeContainer.dataset.activeUrl;
-                    showCompatibilityMode('Adobe SDK Error: ' + specificError);
+
+                    // Fallback periodic save
+                    annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
+                        await saveAnnotations(annotations);
+                        return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                    }, { autoSaveFrequency: 2 });
                 });
-            } catch (e) {
-                console.error('Adobe init error:', e);
-                showCompatibilityMode('Init Failed: ' + e.message);
+            }).catch (err => {
+            console.error('CRITICAL ADOBE ERROR:', err);
+            let specificError = 'Check Console';
+            if (err) {
+                specificError = err.type || err.code || err.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 50));
             }
-        };
+            delete adobeContainer.dataset.activeUrl;
+            showCompatibilityMode('Adobe SDK Error: ' + specificError);
+        });
+    } catch (e) {
+        console.error('Adobe init error:', e);
+        showCompatibilityMode('Init Failed: ' + e.message);
+    }
+};
 
-        if (window.AdobeDC) initAdobe();
-        else document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
+if (window.AdobeDC) initAdobe();
+else document.addEventListener("adobe_dc_view_sdk.ready", initAdobe);
 
-        if (toolbar) toolbar.style.display = 'flex';
-        if (linkBtn) linkBtn.href = absoluteUrl;
-        return;
+if (toolbar) toolbar.style.display = 'flex';
+if (linkBtn) linkBtn.href = absoluteUrl;
+return;
     }
 
-    showCompatibilityMode('Non-PDF detected');
+showCompatibilityMode('Non-PDF detected');
 };
 
 window.filterTable = (program) => {
