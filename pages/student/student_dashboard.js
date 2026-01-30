@@ -641,6 +641,16 @@ window.openFileViewer = async (url, fileKey) => {
             adobeContainer.innerHTML = '';
             adobeContainer.appendChild(iframe);
             adobeContainer.style.display = 'block';
+
+            // Add Retry button for Adobe
+            if (placeholder) {
+                placeholder.innerHTML += `
+                    <button onclick="delete document.getElementById('adobe-dc-view').dataset.activeUrl; window.openFileViewer('${url}', '${fileKey}')" style="margin-top: 15px; background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-left: auto; margin-right: auto; transition: all 0.2s;">
+                        <span class="material-icons-round" style="font-size: 16px;">refresh</span>
+                        Retry Annotation View
+                    </button>
+                `;
+            }
         }
     };
 
@@ -655,7 +665,8 @@ window.openFileViewer = async (url, fileKey) => {
 
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                    finalUrl = `https://drive.google.com/uc?id=${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}&export=download`;
+                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`;
                 }
 
                 const adobeFilePromise = adobeDCView.previewFile({
@@ -663,7 +674,7 @@ window.openFileViewer = async (url, fileKey) => {
                     metaData: { fileName: fileKey + ".pdf", id: fileKey }
                 }, {
                     embedMode: "SIZED_CONTAINER",
-                    showAnnotationTools: false,
+                    showAnnotationTools: true,
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
                     showPageControls: true,

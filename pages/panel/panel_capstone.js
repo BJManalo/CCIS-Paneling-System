@@ -902,6 +902,13 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             finalFallbackUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
         }
 
+        placeholder.innerHTML += `
+            <button onclick="window.loadViewer('${absoluteUrl}', '${groupId}', '${fileKey}')" style="margin-top: 15px; background: #fff; border: 1.5px solid #e2e8f0; color: #475569; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-left: auto; margin-right: auto; transition: all 0.2s;">
+                <span class="material-icons-round" style="font-size: 16px;">refresh</span>
+                Retry Annotation View
+            </button>
+        `;
+
         setTimeout(() => {
             if (iframe) {
                 iframe.src = finalFallbackUrl;
@@ -935,7 +942,9 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                    finalUrl = `https://drive.google.com/uc?id=${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}&export=download`;
+                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                    // Using a more reliable direct URL for Adobe SDK
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`;
                 }
 
                 const adobeFilePromise = adobeDCView.previewFile({
