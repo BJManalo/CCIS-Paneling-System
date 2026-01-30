@@ -723,22 +723,33 @@ function renderComments(comments) {
         const isMe = c.user_name === myName;
         const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+        // Highlight correction references (Matching Panelist UI)
+        let formattedText = c.comment_text;
+        if (formattedText.startsWith('RE Page')) {
+            const parts = formattedText.split('\n— ');
+            if (parts.length > 1) {
+                formattedText = `<div style="background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isMe ? '#fff' : 'var(--primary-color)'}; font-size: 0.8rem; margin-bottom: 8px; font-style: italic; opacity: 0.9;">${parts[0]}</div>` + parts.slice(1).join('\n— ');
+            }
+        }
+
         return `
-            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'};">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                    <span style="font-size: 0.7rem; font-weight: 700; color: ${c.user_role === 'Panelist' ? 'var(--primary-color)' : '#64748b'};">${c.user_name}</span>
-                    <span style="font-size: 0.6rem; color: #94a3b8;">${time}</span>
+            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'}; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: ${c.user_role === 'Panelist' ? 'var(--primary-color)' : '#475569'};">
+                        ${isMe ? 'You' : c.user_name}
+                    </span>
+                    <span style="font-size: 0.65rem; color: #94a3b8;">${time}</span>
                 </div>
-                <div style="background: ${isMe ? 'var(--primary-color)' : 'white'}; 
+                <div style="background: ${isMe ? 'var(--primary-color)' : '#f1f5f9'}; 
                             color: ${isMe ? 'white' : '#1e293b'}; 
-                            padding: 10px 14px; 
-                            border-radius: ${isMe ? '12px 12px 2px 12px' : '2px 12px 12px 12px'}; 
-                            font-size: 0.88rem; 
-                            line-height: 1.4; 
-                            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-                            max-width: 90%;
-                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};">
-                    ${c.comment_text}
+                            padding: 12px 16px; 
+                            border-radius: ${isMe ? '18px 18px 2px 18px' : '2px 18px 18px 18px'}; 
+                            font-size: 0.9rem; 
+                            line-height: 1.5; 
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                            max-width: 95%;
+                            border: ${isMe ? 'none' : '1px solid #eef2f6'};">
+                    ${formattedText}
                 </div>
             </div>
         `;

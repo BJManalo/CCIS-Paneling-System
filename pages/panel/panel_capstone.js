@@ -957,6 +957,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         currentPageNum = 1;
         renderPage(currentPageNum);
         loadComments(groupId, fileKey);
+
+        // --- ENFORCE HIGHLIGHT FIRST: Reset UI ---
+        const input = document.getElementById('commentInput');
+        const postBtn = input ? input.nextElementSibling : null;
+        if (input) {
+            input.disabled = true;
+            input.placeholder = "⚠️ Highlight text in the PDF first to comment...";
+            input.value = "";
+        }
     } catch (e) {
         console.error('PDF Load Error:', e);
         container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Failed to load PDF. It might be restricted or not a PDF file.</div>`;
@@ -1032,12 +1041,17 @@ document.addEventListener('mouseup', () => {
         currentHighlightedPage = currentPageNum;
 
         const input = document.getElementById('commentInput');
+        const postBtn = input ? input.nextElementSibling : null;
         if (input) {
-            // Only auto-populate if the input is empty or doesn't have a reference yet
+            // UNLOCK UI on highlight
+            input.disabled = false;
+            input.placeholder = "Type your feedback after the '—' symbol...";
+            if (postBtn) postBtn.disabled = false;
+
+            // Only auto-populate if the input doesn't have a valid reference yet
             const hasReference = input.value.includes('RE Page');
             if (!hasReference || input.value.trim() === '') {
                 input.value = `RE Page ${currentPageNum}: "${text}"\n— `;
-                // Focus and move cursor to end only after finalize
                 input.focus();
                 input.setSelectionRange(input.value.length, input.value.length);
             }
@@ -1121,9 +1135,9 @@ window.postComment = async () => {
     const input = document.getElementById('commentInput');
     const text = input.value.trim();
 
-    // FORCE HIGHLIGHT LOGIC: Check if text contains "RE:" reference
-    if (!text.includes('RE:') || !text.includes('Page')) {
-        alert('❌ FORCE REFERENCE: Please highlight text in the PDF first to auto-generate a correction reference.');
+    // FORCE HIGHLIGHT LOGIC: Strict validation
+    if (!text.includes('RE Page') || !text.includes('—')) {
+        alert('❌ FORCE REFERENCE: You must highlight text in the PDF first! Do not delete the auto-generated reference.');
         return;
     }
 
@@ -1145,13 +1159,17 @@ window.postComment = async () => {
 
         if (error) throw error;
         input.value = '';
-        currentHighlightedText = ""; // Clear for next use
+        input.disabled = true; // Re-lock until next highlight
+        input.placeholder = "⚠️ Highlight next section to comment...";
+        currentHighlightedText = "";
         loadComments(currentViewerGroupId, currentViewerFileKey);
     } catch (e) {
         alert('Could not post comment: ' + e.message);
     } finally {
-        input.disabled = false;
-        input.focus();
+        if (!input.value) {
+            // Success case handled above, but if error we might want to keep it enabled?
+            // Actually, let's just use the logic in 'try'
+        }
     }
 };
 
