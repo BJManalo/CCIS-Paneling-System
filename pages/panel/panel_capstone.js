@@ -959,7 +959,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             name: userName,
                             firstName: userName.split(' ')[0],
                             lastName: userName.split(' ').slice(1).join(' ') || '',
-                            email: user.email || ''
+                            email: user.email || 'user@example.com'
                         }
                     });
                 });
@@ -986,7 +986,11 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
                         } catch (e) { }
 
-                        annotationManager.setConfig({ showAuthorName: true, authorName: userName });
+                        // Force settings to ensure name is picked up correctly
+                        annotationManager.setConfig({
+                            showAuthorName: true,
+                            authorName: userName
+                        });
                         annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
                             try {
                                 await supabaseClient.from('pdf_annotations').upsert({

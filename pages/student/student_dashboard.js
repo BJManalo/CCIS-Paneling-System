@@ -733,7 +733,7 @@ window.openFileViewer = async (url, fileKey) => {
                             name: displayName,
                             firstName: displayName.split(' ')[0],
                             lastName: displayName.split(' ').slice(1).join(' ') || '',
-                            email: loginUser.email || ''
+                            email: loginUser.email || 'student@example.com'
                         }
                     });
                 });
@@ -759,6 +759,12 @@ window.openFileViewer = async (url, fileKey) => {
                                 .eq('group_id', currentGroupId).eq('file_key', fileKey).single();
                             if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
                         } catch (e) { }
+
+                        // Force settings to ensure name is picked up correctly
+                        annotationManager.setConfig({
+                            showAuthorName: true,
+                            authorName: displayName
+                        });
                     });
                 }).catch(err => {
                     console.error('CRITICAL ADOBE ERROR (Student):', err);

@@ -1625,14 +1625,22 @@ button {
 /* Ensures comment text and inputs are always visible (not white-on-white) */
 #adobe-dc-view textarea,
 #adobe-dc-view input,
-#adobe-dc-view [contenteditable="true"] {
-    color: #1f2937 !important; /* var(--text-main) */
-    background-color: #ffffff !important;
-    font-size: 14px !important;
-    line-height: 1.5 !important;
+#adobe-dc-view [contenteditable="true"],
+#adobe-dc-view span,
+#adobe-dc-view div,
+#adobe-dc-view .spectrum-Body,
+#adobe-dc-view .spectrum-Heading,
+#adobe-dc-view [class*="author-name"],
+#adobe-dc-view [class*="comment-text"],
+#adobe-dc-view [class*="label"],
+#adobe-dc-view .spectrum-Textfield-input {
+    color: #1f2937 !important;
+    /* Force dark gray text */
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
-/* Fix for Adobe's specific comment author name visibility if needed */
-.spectrum-Textfield-input {
-    color: #1f2937 !important;
+#adobe-dc-view [contenteditable="true"] {
+    background-color: #ffffff !important;
+    min-height: 20px;
 }
