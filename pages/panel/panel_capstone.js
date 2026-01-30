@@ -979,10 +979,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         placeholder.innerHTML = `<p style="color:#ef4444;">Error loading PDF. Please use "Open Original".</p>`;
     }
 
-    if (document.getElementById('externalLinkBtn')) {
-        const groupName = document.getElementById('modalGroupName').innerText;
-        document.getElementById('externalLinkBtn').href = `viewer.html?url=${encodeURIComponent(absoluteUrl)}&groupId=${groupId}&fileKey=${fileKey}&groupName=${encodeURIComponent(groupName)}`;
-    }
+    if (document.getElementById('externalLinkBtn')) document.getElementById('externalLinkBtn').href = absoluteUrl;
 };
 
 async function renderPage(num) {
