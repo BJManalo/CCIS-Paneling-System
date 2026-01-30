@@ -145,35 +145,55 @@ async function loadSubmissionData() {
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
 
-            // Fetch Defense Statuses from the new table
-            const { data: defStatuses, error: dsError } = await supabaseClient
-                .from('defense_statuses')
-                .select('*')
-                .eq('group_id', groupId);
+            // Fetch Defense Statuses and Feedback from both new and legacy tables
+            const [dsRes, cfRes] = await Promise.all([
+                supabaseClient.from('defense_statuses').select('*').eq('group_id', groupId),
+                supabaseClient.from('capstone_feedback').select('*').eq('group_id', groupId)
+            ]);
 
-            if (dsError) {
-                console.error('Error fetching defense statuses:', dsError);
-            }
+            const defStatuses = dsRes.data || [];
+            const capstoneFeedback = cfRes.data || [];
 
-            // Helper to get status/remarks for a specific type
-            const getDS = (type) => {
+            // Map Statuses and Remarks
+            // Priority 1: New capstone_feedback table (Normalized)
+            // Priority 2: Legacy defense_statuses (for older data)
+
+            const getFeedbackMaps = (type) => {
                 const norm = type.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return defStatuses ? defStatuses.find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm) : null;
+                const statuses = {};
+                const remarks = {};
+
+                // Load from legacy first
+                const legacy = defStatuses.find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
+                if (legacy) {
+                    Object.entries(legacy.statuses || {}).forEach(([fKey, fVal]) => { statuses[fKey] = fVal; });
+                    Object.entries(legacy.remarks || {}).forEach(([fKey, fVal]) => { remarks[fKey] = fVal; });
+                }
+
+                // Override/Collect from new table
+                capstoneFeedback.filter(cf => cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
+                    if (!statuses[cf.file_key] || typeof statuses[cf.file_key] !== 'object') statuses[cf.file_key] = {};
+                    if (!remarks[cf.file_key] || typeof remarks[cf.file_key] !== 'object') remarks[cf.file_key] = {};
+
+                    if (cf.status) statuses[cf.file_key][cf.user_name] = cf.status;
+                    if (cf.remarks) remarks[cf.file_key][cf.user_name] = cf.remarks;
+                });
+
+                return { statuses, remarks };
             };
 
-            const titleDS = getDS('Title Defense');
-            const preOralDS = getDS('Pre-Oral Defense');
-            const finalDS = getDS('Final Defense');
+            const titleData = getFeedbackMaps('Title Defense');
+            const preOralData = getFeedbackMaps('Pre-Oral Defense');
+            const finalData = getFeedbackMaps('Final Defense');
 
-            // Map Statuses
-            let tStatus = titleDS ? (titleDS.statuses || {}) : {};
-            let pStatus = preOralDS ? (preOralDS.statuses || {}) : {};
-            let fStatus = finalDS ? (finalDS.statuses || {}) : {};
+            // Map variables for rendering
+            let tStatus = titleData.statuses;
+            let pStatus = preOralData.statuses;
+            let fStatus = finalData.statuses;
 
-            // Map Remarks
-            let tRemarks = titleDS ? (titleDS.remarks || {}) : {};
-            let pRemarks = preOralDS ? (preOralDS.remarks || {}) : {};
-            let fRemarks = finalDS ? (finalDS.remarks || {}) : {};
+            let tRemarks = titleData.remarks;
+            let pRemarks = preOralData.remarks;
+            let fRemarks = finalData.remarks;
 
             // Helper to render status badge and remarks
             const renderField = (linkMap, statusMap, remarksMap, key, elementId) => {

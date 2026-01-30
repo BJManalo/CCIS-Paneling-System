@@ -103,12 +103,39 @@ async function loadCapstoneData() {
             }
         });
 
-        // 4. Fetch Defense Statuses
-        const { data: defStatuses, error: dsError } = await supabaseClient
-            .from('defense_statuses')
-            .select('*');
+        // 4. Fetch Defense Statuses and Detailed Feedback
+        const [dsRes, cfRes] = await Promise.all([
+            supabaseClient.from('defense_statuses').select('*'),
+            supabaseClient.from('capstone_feedback').select('*')
+        ]);
 
-        if (dsError) throw dsError;
+        const defStatuses = dsRes.data || [];
+        const capstoneFeedback = cfRes.data || [];
+
+        // Helper to get merged status/remarks for a specific group/type
+        const getMergedFeedback = (groupId, type) => {
+            const norm = type.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const statuses = {};
+            const remarks = {};
+
+            // 1. From Legacy
+            const legacy = defStatuses.find(ds => ds.group_id === groupId && ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
+            if (legacy) {
+                Object.entries(legacy.statuses || {}).forEach(([fKey, val]) => { statuses[fKey] = val; });
+                Object.entries(legacy.remarks || {}).forEach(([fKey, val]) => { remarks[fKey] = val; });
+            }
+
+            // 2. Override/Merge from New Table
+            capstoneFeedback.filter(cf => cf.group_id === groupId && cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
+                if (!statuses[cf.file_key] || typeof statuses[cf.file_key] !== 'object') statuses[cf.file_key] = {};
+                if (!remarks[cf.file_key] || typeof remarks[cf.file_key] !== 'object') remarks[cf.file_key] = {};
+
+                if (cf.status) statuses[cf.file_key][cf.user_name] = cf.status;
+                if (cf.remarks) remarks[cf.file_key][cf.user_name] = cf.remarks;
+            });
+
+            return { statuses, remarks, id: legacy ? legacy.id : null };
+        };
 
         // 5. Process Data
         allData = [];
@@ -167,10 +194,10 @@ async function loadCapstoneData() {
 
                 const isPanelist = panelList.includes(user.name);
 
-                // Find matching defense status row
-                const statusRow = defStatuses.find(ds => ds.group_id === group.id && normalizeType(ds.defense_type) === normType);
-                const currentStatuses = statusRow ? (statusRow.statuses || {}) : {};
-                const currentRemarks = statusRow ? (statusRow.remarks || {}) : {};
+                // Get Merged Feedback (Legacy + New Table)
+                const feedbackRes = getMergedFeedback(group.id, normType);
+                const currentStatuses = feedbackRes.statuses;
+                const currentRemarks = feedbackRes.remarks;
 
                 let titleStatus = {}, preOralStatus = {}, finalStatus = {};
                 if (normType.includes('title')) titleStatus = currentStatuses;
@@ -184,13 +211,13 @@ async function loadCapstoneData() {
 
                 allData.push({
                     id: group.id,
-                    type: sched ? sched.schedule_type : defType, // Use specific type string from loop if no schedule
+                    type: sched ? sched.schedule_type : defType,
                     normalizedType: normType,
                     groupName: group.group_name,
                     program: (group.program || '').toUpperCase(),
                     date: sched ? sched.schedule_date : null,
                     time: sched ? sched.schedule_time : null,
-                    venue: sched ? sched.schedule_venue : 'Online / TBA', // Default if no schedule
+                    venue: sched ? sched.schedule_venue : 'Online / TBA',
                     panels: panelList,
                     files: filesObj,
 
@@ -199,7 +226,7 @@ async function loadCapstoneData() {
                     titleRemarks, preOralRemarks, finalRemarks,
 
                     // Store raw status info for updates
-                    defenseStatusId: statusRow ? statusRow.id : null,
+                    defenseStatusId: feedbackRes.id,
                     currentStatusJson: currentStatuses,
                     currentRemarksJson: currentRemarks,
 
@@ -681,6 +708,10 @@ window.openFileModal = (groupId) => {
 window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
     if (newStatus === 'Pending') return;
 
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+
     // UI Loading state
     const select = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
     if (select) {
@@ -691,71 +722,49 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
     try {
         const normTab = normalizeType(currentTab);
         const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
-        if (!group) {
-            console.error('Group not found for status update in this tab context.');
-            return;
-        }
+        if (!group) throw new Error('Group context not found');
 
-        const userJson = localStorage.getItem('loginUser');
-        const user = userJson ? JSON.parse(userJson) : null;
-        const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+        // 1. Save to the new capstone_feedback table for individual tracking
+        const { error: fError } = await supabaseClient
+            .from('capstone_feedback')
+            .upsert({
+                group_id: groupId,
+                defense_type: group.type,
+                file_key: fileKey,
+                user_name: userName,
+                status: newStatus
+            }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
-        let defenseType = group.type;
+        if (fError) throw fError;
 
+        // 2. Backward compatibility: Update the legacy defense_statuses table
+        // This is still useful for the table view badges
         let localMap = group.currentStatusJson || {};
-
-        // Multi-panel structure: { "title1": { "Panel A": "Approved" } }
-        if (typeof localMap[fileKey] !== 'object') {
-            localMap[fileKey] = {}; // Transition to new structure
-        }
+        if (typeof localMap[fileKey] !== 'object') localMap[fileKey] = {};
         localMap[fileKey][userName] = newStatus;
 
-        const payload = {
-            group_id: groupId,
-            defense_type: defenseType,
-            statuses: localMap,
-            remarks: group.currentRemarksJson || {}
-        };
+        await supabaseClient.from('defense_statuses')
+            .upsert({
+                group_id: groupId,
+                defense_type: group.type,
+                statuses: localMap,
+                updated_at: new Date()
+            }, { onConflict: 'group_id, defense_type' });
 
-        let error;
-        if (group.defenseStatusId) {
-            const result = await supabaseClient.from('defense_statuses')
-                .update({ statuses: localMap, updated_at: new Date() })
-                .eq('id', group.defenseStatusId);
-            error = result.error;
-        } else {
-            const result = await supabaseClient.from('defense_statuses')
-                .insert([payload])
-                .select();
-            error = result.error;
-            if (result.data) group.defenseStatusId = result.data[0].id;
-        }
-
-        if (error) throw error;
-
+        // Update local state
         group.currentStatusJson = localMap;
-        if (categoryKey === 'titles') group.titleStatus = localMap;
-        else if (categoryKey === 'pre_oral') group.preOralStatus = localMap;
-        else if (categoryKey === 'final') group.finalStatus = localMap;
 
-        // Fast UI Update
-        const select = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
         if (select) {
             select.disabled = false;
             select.style.opacity = '1';
-            select.style.borderColor = '#22c55e'; // Green success border
+            select.style.borderColor = '#22c55e';
         }
 
-        // Refresh the main table background data
         renderTable();
     } catch (err) {
-        console.error(err);
-        alert('Failed to update status: ' + (err.message || err));
-        const select = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
-        if (select) {
-            select.disabled = false;
-            select.style.opacity = '1';
-        }
+        console.error('Update Status Error:', err);
+        alert('Failed to update status: ' + err.message);
+        if (select) select.disabled = false;
     }
 };
 
@@ -763,73 +772,70 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     const userJson = localStorage.getItem('loginUser');
     if (!userJson) return;
     const user = JSON.parse(userJson);
-    const userName = user.name || 'Panel';
+    const userName = user.name || user.full_name || 'Panel';
+
     const textarea = document.getElementById(`remarks-${categoryKey}-${fileKey}`);
     const btn = textarea ? textarea.nextElementSibling : null;
     const newText = textarea ? textarea.value.trim() : '';
-    if (!newText) return;
+
+    if (!newText) {
+        alert('Please enter remarks before saving.');
+        return;
+    }
 
     if (btn) {
         btn.disabled = true;
         btn.innerText = 'Saving...';
     }
 
-    let formattedText = newText;
-    const prefix = `${userName}:`;
-    if (!formattedText.startsWith(prefix)) { formattedText = `${prefix} ${newText}`; }
-
-    // FIX: Look up using currentTab context same as other functions
-    const normTab = normalizeType(currentTab);
-    const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
-
-    let localMap = group.currentRemarksJson || {};
-    if (typeof localMap[fileKey] !== 'object') {
-        localMap[fileKey] = {};
-    }
-    localMap[fileKey][userName] = formattedText;
-
-    let defenseType = group.type;
-
     try {
-        let error;
-        if (group.defenseStatusId) {
-            const result = await supabaseClient.from('defense_statuses')
-                .update({ remarks: localMap, updated_at: new Date() })
-                .eq('id', group.defenseStatusId);
-            error = result.error;
-        } else {
-            const payload = {
+        const normTab = normalizeType(currentTab);
+        const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+        if (!group) throw new Error('Group context not found');
+
+        // 1. Save to the new capstone_feedback table (Primary Storage)
+        const { error: fError } = await supabaseClient
+            .from('capstone_feedback')
+            .upsert({
                 group_id: groupId,
-                defense_type: defenseType,
-                statuses: group.currentStatusJson || {},
-                remarks: localMap
-            };
-            const result = await supabaseClient.from('defense_statuses')
-                .insert([payload])
-                .select();
-            error = result.error;
-            if (result.data) group.defenseStatusId = result.data[0].id;
-        }
+                defense_type: group.type,
+                file_key: fileKey,
+                user_name: userName,
+                remarks: newText,
+                updated_at: new Date()
+            }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
-        if (error) throw error;
+        if (fError) throw fError;
 
-        // Update local data
+        // 2. Update Legacy JSON (for quick rendering in table)
+        let localMap = group.currentRemarksJson || {};
+        if (typeof localMap[fileKey] !== 'object') localMap[fileKey] = {};
+        localMap[fileKey][userName] = `${userName}: ${newText}`;
+
+        await supabaseClient.from('defense_statuses')
+            .upsert({
+                group_id: groupId,
+                defense_type: group.type,
+                remarks: localMap,
+                updated_at: new Date()
+            }, { onConflict: 'group_id, defense_type' });
+
         group.currentRemarksJson = localMap;
-        if (categoryKey === 'titles') group.titleRemarks = localMap;
-        else if (categoryKey === 'pre_oral') group.preOralRemarks = localMap;
-        else if (categoryKey === 'final') group.finalRemarks = localMap;
 
-        // Persistent visual feedback
-        if (textarea && btn) {
+        if (btn) {
             btn.innerText = 'Saved';
             btn.style.background = '#dcfce7';
             btn.style.color = '#166534';
-            btn.disabled = false;
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = 'Update Remarks';
+                btn.style.background = 'var(--primary-light)';
+                btn.style.color = 'var(--primary-color)';
+            }, 2000);
         }
     } catch (e) {
-        console.error(e);
-        alert('Error saving remarks: ' + (e.message || e));
-        const btn = document.querySelector(`button[onclick*="'${categoryKey}'"][onclick*="'${fileKey}'"]`);
+        console.error('Save Remarks Error:', e);
+        alert('Error saving remarks: ' + e.message);
         if (btn) {
             btn.disabled = false;
             btn.innerText = 'Save Remarks';
