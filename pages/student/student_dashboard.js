@@ -862,9 +862,24 @@ let revisionAutoSaveTimer = null;
 let isSavingRevision = false;
 
 window.startRevisionMode = () => {
+    const selector = document.getElementById('feedbackSelector');
     const btn = document.getElementById('startRevisionBtn');
     const status = document.getElementById('saveStatus');
     const statusText = document.getElementById('saveStatusText');
+
+    // CRITICAL: Ensure we are editing the DRAFT, not someone's comments
+    if (selector && selector.value !== 'draft') {
+        const confirmSwitch = confirm("To begin revisions, we need to switch you to your 'Original Draft'. You can use the panelist's comments as a reference, but your edits must be applied to your own document. Switch now?");
+
+        if (confirmSwitch) {
+            selector.value = 'draft';
+            window.handlePanelSwitch('draft');
+            showToast("Switched to Draft. Click 'Start Revision' again to begin editing.", "info");
+            return;
+        } else {
+            return;
+        }
+    }
 
     if (revisionAutoSaveTimer) return;
 
@@ -877,7 +892,7 @@ window.startRevisionMode = () => {
     statusText.innerText = "Viewer Syncing...";
 
     revisionAutoSaveTimer = setInterval(saveStudentRevision, 2000);
-    showToast("Revision Mode Active! Your markings will auto-save to your submission.", "success");
+    showToast("Revision Mode Active! Use the drawing tools to mark your fixes.", "success");
 };
 
 async function saveStudentRevision() {
