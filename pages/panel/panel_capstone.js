@@ -1027,46 +1027,84 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             console.error('Exception restoring annotations:', e);
                         }
 
-                        // Settings to ensure name is picked up
-                        annotationManager.setConfig({
-                            showAuthorName: true,
-                            authorName: userName
-                        });
+                        // Visual Toast Helper
+                        const showToast = (message, isError = false) => {
+                            const toast = document.createElement('div');
+                            toast.innerText = message;
+                            toast.style.position = 'fixed';
+                            toast.style.bottom = '20px';
+                            toast.style.right = '20px';
+                            toast.style.padding = '12px 24px';
+                            toast.style.background = isError ? '#ef4444' : '#10b981';
+                            toast.style.color = 'white';
+                            toast.style.borderRadius = '8px';
+                            toast.style.zIndex = '9999';
+                            toast.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                            toast.style.fontWeight = '600';
+                            toast.style.opacity = '0';
+                            toast.style.transition = 'opacity 0.3s ease';
+                            document.body.appendChild(toast);
+                            requestAnimationFrame(() => toast.style.opacity = '1');
+                            setTimeout(() => {
+                                toast.style.opacity = '0';
+                                setTimeout(() => toast.remove(), 300);
+                            }, 3000);
+                        };
 
-                        // Manual Save Logic
+                        // Manual Save Logic (Robust Check -> Update/Insert)
                         const saveAnnotations = async (annotations) => {
-                            // Create a clean copy for the database with enforced identity
-                            // This ensures students see the correct name even if the Panel UI doesn't update immediately
+                            // Create a clean copy for the database
                             const dbAnnotations = annotations.map(annot => {
                                 const newAnnot = JSON.parse(JSON.stringify(annot));
-
-                                // 1. Enforce Title (Author Name)
                                 newAnnot.title = userName;
-
-                                // 2. Enforce Body Prefix
-                                // Ensure we don't double-prefix if it's already there
-                                if (newAnnot.bodyValue) {
-                                    const prefix = `[${userName}]:`;
-                                    if (!newAnnot.bodyValue.startsWith(`${prefix}`)) {
-                                        // Remove any old prefix if it exists to be safe, or just prepend
-                                        newAnnot.bodyValue = `${prefix} ${newAnnot.bodyValue.replace(/^\[.*?\]:\s*/, '')}`;
-                                    }
+                                const prefix = `[${userName}]:`;
+                                if (newAnnot.bodyValue && !newAnnot.bodyValue.startsWith(prefix)) {
+                                    newAnnot.bodyValue = `${prefix} ${newAnnot.bodyValue.replace(/^\[.*?\]:\s*/, '')}`;
                                 }
                                 return newAnnot;
                             });
 
                             try {
-                                const { error } = await supabaseClient.from('pdf_annotations').upsert({
-                                    group_id: groupId,
-                                    file_key: fileKey,
-                                    annotation_data: dbAnnotations,
-                                    user_name: userName,
-                                    updated_at: new Date().toISOString()
-                                }, { onConflict: ['group_id', 'file_key'] });
+                                showToast('Saving comments...');
+                                const { data: existing, error: fetchError } = await supabaseClient
+                                    .from('pdf_annotations')
+                                    .select('id')
+                                    .eq('group_id', groupId)
+                                    .eq('file_key', fileKey)
+                                    .maybeSingle();
+
+                                if (fetchError) throw fetchError;
+
+                                let error = null;
+
+                                if (existing) {
+                                    const { error: updateError } = await supabaseClient
+                                        .from('pdf_annotations')
+                                        .update({
+                                            annotation_data: dbAnnotations,
+                                            user_name: userName,
+                                            updated_at: new Date().toISOString()
+                                        })
+                                        .eq('id', existing.id);
+                                    error = updateError;
+                                } else {
+                                    const { error: insertError } = await supabaseClient
+                                        .from('pdf_annotations')
+                                        .insert({
+                                            group_id: groupId,
+                                            file_key: fileKey,
+                                            annotation_data: dbAnnotations,
+                                            user_name: userName
+                                        });
+                                    error = insertError;
+                                }
+
                                 if (error) throw error;
+                                showToast('Comments Saved!');
                                 console.log('SAVE SUCCESSful:', dbAnnotations.length);
                             } catch (err) {
                                 console.error('SAVE FAILED:', err);
+                                showToast(`Save Failed: ${err.message}`, true);
                             }
                         };
 
@@ -1074,7 +1112,6 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                         annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
                             console.log('ANNOTATION EVENT:', event.type);
                             if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
-                                // Just get and save - do not try to update UI locally to avoid race conditions
                                 const annotations = await annotationManager.getAnnotations();
                                 saveAnnotations(annotations);
                             }
