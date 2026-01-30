@@ -726,17 +726,15 @@ window.openFileViewer = async (url, fileKey) => {
 
                 const loginUser = JSON.parse(localStorage.getItem('loginUser') || '{}');
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
-                    const profile = {
-                        id: loginUser.id || loginUser.email || 'student-id',
-                        name: displayName,
-                        displayName: displayName,
-                        firstName: displayName.split(' ')[0],
-                        lastName: displayName.split(' ').slice(1).join(' ') || '.',
-                        email: loginUser.email || ''
-                    };
                     return Promise.resolve({
-                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
-                        data: { userProfile: profile }
+                        userProfile: {
+                            id: loginUser.id || loginUser.email || 'student-id',
+                            name: displayName,
+                            displayName: displayName,
+                            firstName: displayName.split(' ')[0],
+                            lastName: displayName.split(' ').slice(1).join(' ') || '.',
+                            email: loginUser.email || ''
+                        }
                     });
                 });
 

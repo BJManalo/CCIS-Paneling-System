@@ -974,19 +974,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
                 // Identify the user to Adobe so comments don't show as 'Guest'
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
-                    const profile = {
-                        id: user.id || user.email || 'panelist-id', // Unique ID is often required for names to show
-                        name: userName,
-                        displayName: userName,
-                        firstName: userName.split(' ')[0],
-                        lastName: userName.split(' ').slice(1).join(' ') || '.',
-                        email: user.email || ''
-                    };
-                    console.log('ADOBE PROFILE:', profile);
-                    // Wrapped in 'data' object is sometimes required depending on SDK version
                     return Promise.resolve({
-                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
-                        data: { userProfile: profile }
+                        userProfile: {
+                            id: user.id || user.email || 'panelist-id',
+                            name: userName,
+                            displayName: userName,
+                            firstName: userName.split(' ')[0],
+                            lastName: userName.split(' ').slice(1).join(' ') || '.',
+                            email: user.email || ''
+                        }
                     });
                 });
 
