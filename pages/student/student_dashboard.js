@@ -559,10 +559,11 @@ function updateSaveButtonState(tabId) {
         if (isSubmitted) {
             // CHECK IF PANELS HAVE REPLIED (Allow Revision)
             let hasFeedback = false;
+            // Requirement: Enable only if there are at least 2 status/comments
             if (window.feedbackStatus && window.feedbackStatus[tabId] && window.feedbackStatus[tabId][fieldKey]) {
                 const fStat = window.feedbackStatus[tabId][fieldKey];
-                // Check if any panel has a status key (meaning they took action)
-                if (fStat && Object.keys(fStat).length > 0) {
+                // Check if AT LEAST 2 panels have set a status
+                if (fStat && Object.keys(fStat).length >= 2) {
                     hasFeedback = true;
                 }
             }
@@ -609,7 +610,17 @@ function updateSaveButtonState(tabId) {
                 inputs.forEach(input => {
                     input.readOnly = true;
                     input.style.backgroundColor = '#f1f5f9';
-                    input.title = "Submitted (Waiting for Panel Feedback)";
+                    input.title = "Submitted (Waiting for at least 2 Panels)";
+
+                    // Also disable sibling buttons visually if possible, or just rely on readOnly
+                    const wrapper = input.closest('.input-with-action');
+                    if (wrapper) {
+                        wrapper.querySelectorAll('button').forEach(b => {
+                            b.disabled = true;
+                            b.style.cursor = 'not-allowed';
+                            b.style.opacity = '0.6';
+                        });
+                    }
                 });
             }
         } else {
