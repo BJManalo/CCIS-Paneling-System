@@ -993,7 +993,6 @@ async function renderPage(num) {
     wrapper.dataset.pageNumber = num;
     wrapper.style.width = viewport.width + 'px';
     wrapper.style.height = viewport.height + 'px';
-    wrapper.style.transition = 'transform 0.3s ease'; // Smooth scroll feel
 
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
