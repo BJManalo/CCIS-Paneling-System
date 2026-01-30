@@ -1027,7 +1027,7 @@ window.changePage = (offset) => {
     }
 };
 
-// --- HIGHLIGHT DETECTION (Smooth Version) ---
+// --- HIGHLIGHT DETECTION (Real-time Sync Version) ---
 document.addEventListener('mouseup', () => {
     // Small timeout to ensure selection is finalized
     setTimeout(() => {
@@ -1041,20 +1041,31 @@ document.addEventListener('mouseup', () => {
         currentHighlightedPage = currentPageNum;
 
         const input = document.getElementById('commentInput');
-        const postBtn = input ? input.nextElementSibling : null;
+        const postBtn = input ? input.parentElement.querySelector('button') : null;
+
         if (input) {
-            // UNLOCK UI on highlight
+            // UNLOCK UI
             input.disabled = false;
             input.placeholder = "Type your feedback after the '—' symbol...";
             if (postBtn) postBtn.disabled = false;
 
-            // Only auto-populate if the input doesn't have a valid reference yet
-            const hasReference = input.value.includes('RE Page');
-            if (!hasReference || input.value.trim() === '') {
-                input.value = `RE Page ${currentPageNum}: "${text}"\n— `;
-                input.focus();
-                input.setSelectionRange(input.value.length, input.value.length);
+            const newReference = `RE Page ${currentPageNum}: "${text}"`;
+            const currentVal = input.value;
+
+            // REAL-TIME UPDATE LOGIC:
+            // If the user already typed something, we want to replace the reference part but keep their typed feedback.
+            if (currentVal.includes('—')) {
+                const parts = currentVal.split('—');
+                const existingFeedback = parts.length > 1 ? parts.slice(1).join('—') : "";
+                input.value = `${newReference}\n— ${existingFeedback.trim()}`;
+            } else {
+                // Fresh start or format lost
+                input.value = `${newReference}\n— `;
             }
+
+            // Move cursor to the very end so they can continue typing feedback
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
         }
     }, 50);
 });
