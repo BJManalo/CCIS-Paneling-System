@@ -381,6 +381,20 @@
                             <!-- Options populated via JS -->
                         </select>
                     </div>
+                    <!-- Revision Controls -->
+                    <div id="revisionContainer"
+                        style="display: none; align-items: center; gap: 12px; margin-left: 10px; padding-left: 15px; border-left: 2px solid #e2e8f0;">
+                        <button id="startRevisionBtn" onclick="window.startRevisionMode()"
+                            style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                            <span class="material-icons-round" style="font-size: 18px;">edit_note</span>
+                            Start Revision
+                        </button>
+                        <div id="saveStatus"
+                            style="display: none; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: #64748b;">
+                            <span class="material-icons-round" style="font-size: 16px;">sync</span>
+                            <span id="saveStatusText">Syncing...</span>
+                        </div>
+                    </div>
                 </div>
                 <button onclick="closeFileModal()"
                     style="background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;">
