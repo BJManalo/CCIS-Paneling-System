@@ -1,6 +1,8 @@
 // Initialize Supabase client
 // Note: PROJECT_URL, PUBLIC_KEY, and supabaseClient are already defined in ../../assets/js/shared.js
-// We use the existing client to avoid "Identifier already declared" errors.
+const ADOBE_CLIENT_ID = '5edc19dfde9349e3acb7ecc73bfa4848';
+let currentGroupId = null;
+let adobeDCView = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadSubmissionData();
@@ -15,6 +17,7 @@ async function loadSubmissionData() {
     }
 
     let groupId = loginUser.id;
+    currentGroupId = groupId;
 
     // Global variable linking
     if (!window.currentLinks) window.currentLinks = {};
@@ -228,8 +231,9 @@ async function loadSubmissionData() {
                 const headerHtml = `
                     <div class="status-badge-container" style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px;">
                         <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Submission Link</span>
-                        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                             ${badgesHtml}
+                            ${linkMap[key] ? `<button onclick="openFileViewer('${linkMap[key]}', '${key}')" style="background: var(--primary-light); color: var(--primary-color); border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;"><span class="material-icons-round" style="font-size: 14px;">visibility</span> View Feedback</button>` : ''}
                         </div>
                     </div>
                 `;
@@ -534,3 +538,91 @@ window.saveSubmissions = async function () {
     }
 }
 
+
+window.closeFileModal = () => {
+    document.getElementById('fileModal').style.display = 'none';
+    const adobeContainer = document.getElementById('adobe-dc-view');
+    if (adobeContainer) adobeContainer.innerHTML = '';
+    adobeDCView = null;
+};
+
+window.openFileViewer = async (url, fileKey) => {
+    if (!url) return;
+
+    const modal = document.getElementById('fileModal');
+    const placeholder = document.getElementById('viewerPlaceholder');
+    const adobeContainer = document.getElementById('adobe-dc-view');
+    const titleEl = document.getElementById('modalFileTitle');
+
+    if (modal) modal.style.display = 'flex';
+    if (placeholder) placeholder.style.display = 'flex';
+    if (adobeContainer) adobeContainer.style.display = 'block';
+    if (titleEl) titleEl.innerText = 'Reviewing Feedback: ' + fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+
+    // Ensure absolute protocol
+    let absoluteUrl = url.trim();
+    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) {
+        absoluteUrl = 'https://' + absoluteUrl;
+    }
+
+    const lowerUrl = absoluteUrl.toLowerCase();
+    const isPDF = lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co/storage/v1/object/public');
+
+    if (isPDF && typeof AdobeDC !== 'undefined') {
+        if (!adobeDCView) {
+            adobeDCView = new AdobeDC.View({
+                clientId: ADOBE_CLIENT_ID,
+                divId: "adobe-dc-view"
+            });
+        }
+
+        let finalUrl = absoluteUrl;
+        if (lowerUrl.includes('drive.google.com')) {
+            if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+            }
+        }
+
+        const adobeFilePromise = adobeDCView.previewFile({
+            content: { location: { url: finalUrl } },
+            metaData: { fileName: fileKey + ".pdf", id: fileKey }
+        }, {
+            embedMode: "FULL_WINDOW",
+            showAnnotationTools: false, // Read-only for students
+            enableAnnotationAPIs: true,
+        });
+
+        adobeFilePromise.then(adobeViewer => {
+            adobeViewer.getAnnotationManager().then(async annotationManager => {
+                // Fetch existing annotations from Supabase
+                try {
+                    const { data } = await supabaseClient
+                        .from('pdf_annotations')
+                        .select('annotation_data')
+                        .eq('group_id', currentGroupId)
+                        .eq('file_key', fileKey)
+                        .single();
+
+                    if (data && data.annotation_data) {
+                        annotationManager.addAnnotations(data.annotation_data);
+                    }
+                } catch (e) { console.log('No annotations found'); }
+
+                if (placeholder) placeholder.style.display = 'none';
+            });
+        });
+    } else {
+        // Fallback or non-PDF message
+        if (adobeContainer) {
+            adobeContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #64748b; padding: 20px; text-align: center;">
+                    <span class="material-icons-round" style="font-size: 48px; margin-bottom: 10px;">info</span>
+                    <p>Annotation feedback is only available for PDF files.</p>
+                    <a href="${absoluteUrl}" target="_blank" style="color: var(--primary-color); font-weight: 600; margin-top: 10px; text-decoration: none;">Open Original File</a>
+                </div>
+            `;
+        }
+        if (placeholder) placeholder.style.display = 'none';
+    }
+};

@@ -11,6 +11,10 @@ let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
 let currentStatusFilter = 'ALL';
 
 let currentRole = 'Panel'; // Default
+let adobeDCView = null;
+let currentViewerFileKey = null;
+let currentViewerGroupId = null;
+const ADOBE_CLIENT_ID = '5edc19dfde9349e3acb7ecc73bfa4848';
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCapstoneData();
@@ -501,7 +505,7 @@ window.openFileModal = (groupId) => {
                 });
                 item.style.background = '#f0f9ff';
                 itemContainer.style.borderColor = 'var(--primary-color)';
-                loadViewer(url);
+                loadViewer(url, groupId, label);
             };
 
             itemContainer.appendChild(item);
@@ -797,10 +801,21 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     document.getElementById('fileViewer').src = '';
+    const adobeContainer = document.getElementById('adobe-dc-view');
+    if (adobeContainer) {
+        adobeContainer.innerHTML = '';
+        adobeContainer.style.display = 'none';
+    }
+    adobeDCView = null;
+    currentViewerFileKey = null;
+    currentViewerGroupId = null;
 };
 
-window.loadViewer = (url) => {
+window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) return;
+
+    currentViewerGroupId = groupId;
+    currentViewerFileKey = fileKey;
 
     // Ensure absolute protocol to prevent relative URL 404s
     let absoluteUrl = url.trim();
@@ -808,54 +823,147 @@ window.loadViewer = (url) => {
         absoluteUrl = 'https://' + absoluteUrl;
     }
 
-    let viewerUrl = absoluteUrl;
     const lowerUrl = absoluteUrl.toLowerCase();
-
-    // 1. Google Drive handling
-    if (lowerUrl.includes('drive.google.com')) {
-        // Handle various Drive link formats and convert to preview
-        if (lowerUrl.includes('/view') || lowerUrl.includes('/edit') || lowerUrl.includes('/open') || lowerUrl.includes('/d/')) {
-            // Extract file ID if possible or just replace the end
-            if (absoluteUrl.includes('/view')) viewerUrl = absoluteUrl.replace(/\/view.*/, '/preview');
-            else if (absoluteUrl.includes('/edit')) viewerUrl = absoluteUrl.replace(/\/edit.*/, '/preview');
-            else if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                viewerUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-            }
-        }
-    }
-    // 2. Direct PDF / Office Docs via Google Viewer (more reliable for these types)
-    else if (lowerUrl.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx)(\?.*)?$/) || lowerUrl.includes('supabase.co/storage/v1/object/public')) {
-        viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
-    }
+    const isPDF = lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co/storage/v1/object/public');
 
     const iframe = document.getElementById('fileViewer');
+    const adobeContainer = document.getElementById('adobe-dc-view');
     const placeholder = document.getElementById('viewerPlaceholder');
     const toolbar = document.getElementById('viewerToolbar');
     const linkBtn = document.getElementById('externalLinkBtn');
 
-    // Show loading state
-    iframe.style.display = 'none';
+    // Reset visibility
+    if (iframe) iframe.style.display = 'none';
+    if (adobeContainer) adobeContainer.style.display = 'none';
     placeholder.style.display = 'flex';
-    placeholder.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center;">
-            <div class="viewer-loader" style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
-            <p style="font-size: 1.1rem; font-weight: 500; color: #64748b;">Loading document preview...</p>
-            <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">This may take a few seconds.</p>
-        </div>
-    `;
 
-    iframe.onload = () => {
-        iframe.style.display = 'block';
+    // If it's a PDF and we have the SDK, use Adobe
+    if (isPDF && typeof AdobeDC !== 'undefined') {
+        const userJson = localStorage.getItem('loginUser');
+        const user = userJson ? JSON.parse(userJson) : { name: 'Guest' };
+        const userName = user.name || user.full_name || 'Panelist';
+
+        adobeContainer.style.display = 'block';
         placeholder.style.display = 'none';
-    };
+        iframe.style.display = 'none';
 
-    // Use a small timeout to ensure UI updates before src change (which can be heavy)
-    setTimeout(() => {
-        iframe.src = viewerUrl;
+        if (!adobeDCView) {
+            adobeDCView = new AdobeDC.View({
+                clientId: ADOBE_CLIENT_ID,
+                divId: "adobe-dc-view"
+            });
+        }
+
+        const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
+
+        const previewConfig = {
+            embedMode: "FULL_WINDOW",
+            showAnnotationTools: true,
+            showDownloadPDF: true,
+            showPrintPDF: true,
+            enableAnnotationAPIs: true,
+        };
+
+        // For Google Drive, get the direct stream URL
+        let finalUrl = absoluteUrl;
+        if (lowerUrl.includes('drive.google.com')) {
+            if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+            }
+        }
+
+        const adobeFilePromise = adobeDCView.previewFile({
+            content: { location: { url: finalUrl } },
+            metaData: { fileName: fileName, id: fileKey || 'unique-id' }
+        }, previewConfig);
+
+        /* Handle Annotations */
+        adobeFilePromise.then(adobeViewer => {
+            adobeViewer.getAnnotationManager().then(async annotationManager => {
+                // 1. Fetch existing annotations from Supabase
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('pdf_annotations')
+                        .select('annotation_data')
+                        .eq('group_id', groupId)
+                        .eq('file_key', fileKey)
+                        .single();
+
+                    if (data && data.annotation_data) {
+                        annotationManager.addAnnotations(data.annotation_data);
+                    }
+                } catch (e) { console.log('No existing annotations found'); }
+
+                // 2. Set user profile
+                annotationManager.setConfig({
+                    showAuthorName: true,
+                    authorName: userName
+                });
+
+                // 3. Register Save event
+                annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
+                    try {
+                        const { error } = await supabaseClient
+                            .from('pdf_annotations')
+                            .upsert({
+                                group_id: groupId,
+                                file_key: fileKey,
+                                annotation_data: annotations,
+                                user_name: userName,
+                                updated_at: new Date()
+                            }, { onConflict: 'group_id, file_key' });
+
+                        if (error) throw error;
+                        return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                    } catch (err) {
+                        console.error('Error saving annotations:', err);
+                        return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
+                    }
+                }, { autoSaveFrequency: 2 });
+            });
+        });
+
         toolbar.style.display = 'flex';
         linkBtn.href = absoluteUrl;
-    }, 100);
+        return;
+    }
+
+    // Fallback for non-PDF or if Adobe fails
+    let finalViewerUrl = absoluteUrl;
+    if (lowerUrl.includes('drive.google.com')) {
+        if (absoluteUrl.includes('/view')) finalViewerUrl = absoluteUrl.replace(/\/view.*/, '/preview');
+        else if (absoluteUrl.includes('/edit')) finalViewerUrl = absoluteUrl.replace(/\/edit.*/, '/preview');
+        else if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+            const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+            finalViewerUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+    } else if (lowerUrl.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx)(\?.*)?$/) || lowerUrl.includes('supabase.co/storage/v1/object/public')) {
+        finalViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
+    }
+
+    if (iframe) {
+        iframe.style.display = 'none';
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div class="viewer-loader" style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+                <p style="font-size: 1.1rem; font-weight: 500; color: #64748b;">Loading document preview...</p>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">This may take a few seconds.</p>
+            </div>
+        `;
+
+        iframe.onload = () => {
+            iframe.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+
+        setTimeout(() => {
+            iframe.src = finalViewerUrl;
+            toolbar.style.display = 'flex';
+            linkBtn.href = absoluteUrl;
+        }, 100);
+    }
 };
 
 window.filterTable = (program) => {

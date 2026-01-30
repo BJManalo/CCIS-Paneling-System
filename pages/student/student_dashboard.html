@@ -14,6 +14,7 @@
     <!-- Styles -->
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="icon" type="image/png" href="../../assets/images/favicon.png">
+    <script src="https://documentservices.adobe.com/view-sdk/v3/index.js"></script>
     <style>
         .submission-card {
             background: white;
@@ -86,6 +87,16 @@
         .save-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 15px rgba(26, 86, 219, 0.3);
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -303,6 +314,41 @@
             <span class="nav-label">Account</span>
         </a>
     </nav>
+
+    <!-- File Viewer Modal -->
+    <div id="fileModal" class="modal-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div class="modal-content"
+            style="background: white; width: 90vw; max-width: 1200px; height: 85vh; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+
+            <!-- Modal Header -->
+            <div class="modal-header"
+                style="padding: 15px 25px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 12px 12px 0 0;">
+                <div>
+                    <h3 id="modalFileTitle" style="margin: 0; color: var(--primary-dark); font-size: 1.1rem;">Document
+                        Preview</h3>
+                </div>
+                <button onclick="closeFileModal()"
+                    style="background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body"
+                style="background: #f1f5f9; flex: 1; position: relative; overflow: hidden; border-radius: 0 0 12px 12px;">
+                <div id="adobe-dc-view" style="width: 100%; height: 100%;"></div>
+
+                <div id="viewerPlaceholder"
+                    style="position: absolute; top:0; left:0; width:100%; height:100%; display:none; flex-direction:column; justify-content:center; align-items:center; color:#64748b; background: white;">
+                    <div class="viewer-loader"
+                        style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;">
+                    </div>
+                    <p>Loading preview...</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Toast Notification -->
     <div id="toast"
