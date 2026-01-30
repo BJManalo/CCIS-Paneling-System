@@ -1003,14 +1003,29 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
                         // Restore existing annotations
+                        // CRITICAL: Order by updated_at to get the LATEST save, accommodating potential duplicate rows
                         try {
-                            const { data } = await supabaseClient.from('pdf_annotations')
+                            console.log(`FETCHING for Group: ${groupId}, File: ${fileKey}`);
+                            const { data, error } = await supabaseClient.from('pdf_annotations')
                                 .select('annotation_data')
                                 .eq('group_id', groupId)
                                 .eq('file_key', fileKey)
+                                .order('updated_at', { ascending: false })
+                                .limit(1)
                                 .maybeSingle();
-                            if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
-                        } catch (e) { }
+
+                            if (error) console.error('Error fetching annotations:', error);
+
+                            if (data?.annotation_data) {
+                                console.log('FOUND SAVED ANNOTATIONS:', data.annotation_data.length);
+                                const imported = await annotationManager.addAnnotations(data.annotation_data);
+                                console.log('Import result:', imported);
+                            } else {
+                                console.log('NO PREVIOUS ANNOTATIONS FOUND.');
+                            }
+                        } catch (e) {
+                            console.error('Exception restoring annotations:', e);
+                        }
 
                         // Settings to ensure name is picked up
                         annotationManager.setConfig({
