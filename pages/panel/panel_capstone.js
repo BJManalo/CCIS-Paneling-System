@@ -1028,8 +1028,10 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             else if (normTab.includes('final')) annotationsMap = group.finalAnnotations || {};
 
             if (annotationsMap[fileKey] && annotationsMap[fileKey][userName]) {
-                console.log("Loading existing annotation version");
-                finalUrl = annotationsMap[fileKey][userName];
+                const urlWithBuster = new URL(annotationsMap[fileKey][userName]);
+                urlWithBuster.searchParams.set('t', Date.now()); // Force fresh download
+                console.log("Loading existing annotation version with cache buster");
+                finalUrl = urlWithBuster.toString();
             }
         }
     }
@@ -1136,24 +1138,27 @@ async function saveAnnotatedPDF(isAuto = false) {
                 updated_at: new Date().toISOString()
             }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
-        if (dbError) throw dbError;
+        if (dbError) {
+            console.error("Database upsert failed:", dbError);
+            throw dbError;
+        }
 
-        // --- CRITICAL: Sync with local allData so it doesn't "vanish" when switching files ---
+        // --- Local Sync: Ensure the current session knows about the save ---
         if (allData && currentViewerGroupId) {
             const normTab = normalizeType(currentTab);
-            const group = allData.find(g => String(g.id) === String(currentViewerGroupId) && g.normalizedType === normTab);
+            const groupEntry = allData.find(g => String(g.id) === String(currentViewerGroupId) && g.normalizedType === normTab);
 
-            if (group) {
-                let fieldKey = "";
-                if (normTab.includes('title')) fieldKey = "titleAnnotations";
-                else if (normTab.includes('preoral')) fieldKey = "preOralAnnotations";
-                else if (normTab.includes('final')) fieldKey = "finalAnnotations";
+            if (groupEntry) {
+                let annotKey = "";
+                if (normTab.includes('title')) annotKey = "titleAnnotations";
+                else if (normTab.includes('preoral')) annotKey = "preOralAnnotations";
+                else if (normTab.includes('final')) annotKey = "finalAnnotations";
 
-                if (fieldKey) {
-                    if (!group[fieldKey]) group[fieldKey] = {};
-                    if (!group[fieldKey][currentViewerFileKey]) group[fieldKey][currentViewerFileKey] = {};
-                    group[fieldKey][currentViewerFileKey][userName] = publicUrl;
-                    console.log(`Local sync: Updated ${fieldKey} for ${currentViewerFileKey}`);
+                if (annotKey) {
+                    if (!groupEntry[annotKey]) groupEntry[annotKey] = {};
+                    if (!groupEntry[annotKey][currentViewerFileKey]) groupEntry[annotKey][currentViewerFileKey] = {};
+                    groupEntry[annotKey][currentViewerFileKey][userName] = publicUrl;
+                    console.log(`Synced ${annotKey} locally:`, publicUrl);
                 }
             }
         }
