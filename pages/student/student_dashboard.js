@@ -116,6 +116,9 @@ async function loadSubmissionData() {
                 finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
             }
 
+            // Store data for merging later
+            localStorage.setItem('lastGroupData', JSON.stringify(group));
+
             // Function to safely parse JSON
             const safeParse = (str) => {
                 try { return JSON.parse(str || '{}'); } catch (e) { return {}; }
@@ -409,33 +412,16 @@ function updateSaveButtonState(tabId) {
         return;
     }
 
-    const hasAnyData = (obj) => Object.values(obj || {}).some(val => val && val.trim() !== '');
+    const stageLinks = window.currentLinks[tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final'] || {};
 
-    // Ensure globally stored links are available
-    if (!window.currentLinks) window.currentLinks = {};
-
-    const stageLinks = window.currentLinks[tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final'];
-    const isSubmitted = hasAnyData(stageLinks);
-
-    if (isSubmitted) {
-        saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
-        saveBtn.disabled = true;
-        saveBtn.style.opacity = '0.7';
-        saveBtn.style.cursor = 'default';
-        saveBtn.title = "";
-
-        // Lock inputs
-        lockInputs(true, "Submitted (View Only)");
-    } else {
-        saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
-        saveBtn.disabled = false;
-        saveBtn.style.opacity = '1';
-        saveBtn.style.cursor = 'pointer';
-        saveBtn.title = "";
-
-        // Unlock inputs
-        lockInputs(false, "");
-    }
+    // Check if ALL fields in this stage are already approved (optional logic)
+    // For now, let's just keep the Save button active so they can update/add titles.
+    saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = '1';
+    saveBtn.style.cursor = 'pointer';
+    saveBtn.title = "";
+    lockInputs(false, "");
 }
 
 const showToast = (message, type = 'info') => {
@@ -492,37 +478,52 @@ window.saveSubmissions = async function () {
     const tabId = activeTab.innerText.toLowerCase().includes('title') ? 'titles' :
         activeTab.innerText.toLowerCase().includes('pre') ? 'preoral' : 'final';
 
-    // Collect data ONLY for the active tab
+    // Collect data - MERGE with existing links to prevent overwriting
+    const existingLinks = window.currentLinks[tabId] || {};
     let updates = {};
-    let activeLinks = {};
+    let activeLinks = { ...existingLinks };
 
     if (tabId === 'titles') {
-        activeLinks = {
-            title1: document.getElementById('titleLink1').value.trim(),
-            title2: document.getElementById('titleLink2').value.trim(),
-            title3: document.getElementById('titleLink3').value.trim()
-        };
+        const t1 = document.getElementById('titleLink1').value.trim();
+        const t2 = document.getElementById('titleLink2').value.trim();
+        const t3 = document.getElementById('titleLink3').value.trim();
+        if (t1) activeLinks.title1 = t1;
+        if (t2) activeLinks.title2 = t2;
+        if (t3) activeLinks.title3 = t3;
+
         updates.title_link = JSON.stringify(activeLinks);
 
-        // Save Project Titles (All 3)
+        // Merge Project Titles
+        let existingTitles = {};
+        try {
+            const group = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
+            existingTitles = JSON.parse(group.project_title || '{}');
+        } catch (e) { }
+
+        const pt1 = document.getElementById('projectTitle1')?.value.trim();
+        const pt2 = document.getElementById('projectTitle2')?.value.trim();
+        const pt3 = document.getElementById('projectTitle3')?.value.trim();
+
         const pTitles = {
-            title1: document.getElementById('projectTitle1') ? document.getElementById('projectTitle1').value.trim() : '',
-            title2: document.getElementById('projectTitle2') ? document.getElementById('projectTitle2').value.trim() : '',
-            title3: document.getElementById('projectTitle3') ? document.getElementById('projectTitle3').value.trim() : ''
+            ...existingTitles,
+            ...(pt1 && { title1: pt1 }),
+            ...(pt2 && { title2: pt2 }),
+            ...(pt3 && { title3: pt3 })
         };
         updates.project_title = JSON.stringify(pTitles);
     } else if (tabId === 'preoral') {
-        activeLinks = {
-            ch1: document.getElementById('preOralCh1').value.trim(),
-            ch2: document.getElementById('preOralCh2').value.trim(),
-            ch3: document.getElementById('preOralCh3').value.trim()
-        };
+        const ch1 = document.getElementById('preOralCh1').value.trim();
+        const ch2 = document.getElementById('preOralCh2').value.trim();
+        const ch3 = document.getElementById('preOralCh3').value.trim();
+        if (ch1) activeLinks.ch1 = ch1;
+        if (ch2) activeLinks.ch2 = ch2;
+        if (ch3) activeLinks.ch3 = ch3;
         updates.pre_oral_link = JSON.stringify(activeLinks);
     } else if (tabId === 'final') {
-        activeLinks = {
-            ch4: document.getElementById('finalCh4').value.trim(),
-            ch5: document.getElementById('finalCh5').value.trim()
-        };
+        const ch4 = document.getElementById('finalCh4').value.trim();
+        const ch5 = document.getElementById('finalCh5').value.trim();
+        if (ch4) activeLinks.ch4 = ch4;
+        if (ch5) activeLinks.ch5 = ch5;
         updates.final_link = JSON.stringify(activeLinks);
     }
 
