@@ -1160,25 +1160,105 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     showCompatibilityMode('Non-PDF detected');
 };
 
-window.filterTable = (program) => {
-    const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
-    if (currentProgram === program) {
-        currentProgram = 'ALL';
-        btns.forEach(btn => btn.classList.remove('active'));
-    } else {
-        currentProgram = program;
-        btns.forEach(btn => btn.classList.toggle('active', btn.innerText === program));
+// --- RESTORED GLOBAL FUNCTIONS ---
+
+window.updateStatus = async (groupId, category, label, newStatus) => {
+    if (newStatus === 'Pending') return;
+
+    try {
+        const { data: group, error: fetchError } = await supabaseClient
+            .from('student_groups')
+            .select('*')
+            .eq('id', groupId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+        const userName = user.name || user.full_name || 'Panel';
+
+        // Update Map Logic
+        let statusMap = {};
+        if (category === 'titles') statusMap = group.titleStatus || {};
+        else if (category === 'pre_oral') statusMap = group.preOralStatus || {};
+        else if (category === 'final') statusMap = group.finalStatus || {};
+
+        if (typeof statusMap[label] !== 'object') statusMap[label] = { [userName]: newStatus };
+        else statusMap[label][userName] = newStatus;
+
+        // DB Update
+        let updatePayload = {};
+        if (category === 'titles') updatePayload.titleStatus = statusMap;
+        else if (category === 'pre_oral') updatePayload.preOralStatus = statusMap;
+        else if (category === 'final') updatePayload.finalStatus = statusMap;
+
+        const { error: updateError } = await supabaseClient
+            .from('student_groups')
+            .update(updatePayload)
+            .eq('id', groupId);
+
+        if (updateError) throw updateError;
+
+        // alert('Status Updated!'); // Silent update is better for UI
+        // Refresh local data to reflect change
+        // We could call renderTable() but it might reset view. 
+        // Best to just let user see it changed locally in dropdown.
+        console.log('Status updated to', newStatus);
+
+    } catch (err) {
+        console.error('Update Status Error:', err);
+        alert('Failed to update status: ' + err.message);
     }
-    renderTable();
 };
 
-document.getElementById('searchInput')?.addEventListener('input', (e) => {
-    searchTerm = e.target.value;
-    renderTable();
-});
+window.saveRemarks = async (groupId, category, label) => {
+    const remarkInput = document.getElementById(`remarks-${category}-${label}`);
+    const remarkText = remarkInput ? remarkInput.value : '';
 
-function logout() {
+    try {
+        const { data: group, error: fetchError } = await supabaseClient
+            .from('student_groups')
+            .select('*')
+            .eq('id', groupId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+        const userName = user.name || user.full_name || 'Panel';
+
+        // Update Map Logic
+        let remarksMap = {};
+        if (category === 'titles') remarksMap = group.titleRemarks || {};
+        else if (category === 'pre_oral') remarksMap = group.preOralRemarks || {};
+        else if (category === 'final') remarksMap = group.finalRemarks || {};
+
+        if (typeof remarksMap[label] !== 'object') remarksMap[label] = { [userName]: remarkText };
+        else remarksMap[label][userName] = remarkText;
+
+        // DB Update
+        let updatePayload = {};
+        if (category === 'titles') updatePayload.titleRemarks = remarksMap;
+        else if (category === 'pre_oral') updatePayload.preOralRemarks = remarksMap;
+        else if (category === 'final') updatePayload.finalRemarks = remarksMap;
+
+        const { error: updateError } = await supabaseClient
+            .from('student_groups')
+            .update(updatePayload)
+            .eq('id', groupId);
+
+        if (updateError) throw updateError;
+
+        alert('Remarks Saved!');
+
+    } catch (err) {
+        console.error('Save Remarks Error:', err);
+        alert('Failed to save remarks: ' + err.message);
+    }
+};
+
+window.logout = function () { // Ensure logout is still here
     localStorage.removeItem('loginUser');
     window.location.href = '../../';
-}
+};
 
