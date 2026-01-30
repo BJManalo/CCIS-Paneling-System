@@ -104,13 +104,23 @@ async function loadCapstoneData() {
         });
 
         // 4. Fetch Defense Statuses and Detailed Feedback
-        const [dsRes, cfRes] = await Promise.all([
-            supabaseClient.from('defense_statuses').select('*'),
-            supabaseClient.from('capstone_feedback').select('*')
-        ]);
+        let defStatuses = [];
+        let capstoneFeedback = [];
 
-        const defStatuses = dsRes.data || [];
-        const capstoneFeedback = cfRes.data || [];
+        try {
+            const [dsRes, cfRes] = await Promise.all([
+                supabaseClient.from('defense_statuses').select('*'),
+                supabaseClient.from('capstone_feedback').select('*')
+            ]);
+
+            if (dsRes.error) console.error('Error fetching defense_statuses:', dsRes.error);
+            if (cfRes.error) console.warn('Note: capstone_feedback table might be missing or restricted:', cfRes.error);
+
+            defStatuses = dsRes.data || [];
+            capstoneFeedback = cfRes.data || [];
+        } catch (e) {
+            console.error('Promise.all error in loadCapstoneData:', e);
+        }
 
         // Helper to get merged status/remarks for a specific group/type
         const getMergedFeedback = (groupId, type) => {
@@ -712,58 +722,60 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
     const user = userJson ? JSON.parse(userJson) : null;
     const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
-    // UI Loading state
     const select = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
-    if (select) {
-        select.disabled = true;
-        select.style.opacity = '0.5';
-    }
+    if (select) { select.disabled = true; select.style.opacity = '0.5'; }
 
     try {
         const normTab = normalizeType(currentTab);
         const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
         if (!group) throw new Error('Group context not found');
 
-        // 1. Save to the new capstone_feedback table for individual tracking
-        const { error: fError } = await supabaseClient
+        // 1. Save to individual feedback table (robust against missing constraints)
+        const { data: existingFB, error: existingFBError } = await supabaseClient
             .from('capstone_feedback')
-            .upsert({
-                group_id: groupId,
-                defense_type: group.type,
-                file_key: fileKey,
-                user_name: userName,
-                status: newStatus
-            }, { onConflict: 'group_id, defense_type, file_key, user_name' });
+            .select('id')
+            .eq('group_id', groupId)
+            .eq('defense_type', group.type)
+            .eq('file_key', fileKey)
+            .eq('user_name', userName)
+            .maybeSingle();
 
-        if (fError) throw fError;
+        if (existingFBError) console.error('Error checking existing capstone_feedback:', existingFBError);
 
-        // 2. Backward compatibility: Update the legacy defense_statuses table
-        // This is still useful for the table view badges
+        if (existingFB) {
+            const { error: updateError } = await supabaseClient.from('capstone_feedback').update({ status: newStatus, updated_at: new Date() }).eq('id', existingFB.id);
+            if (updateError) throw updateError;
+            console.log('Updated capstone_feedback record:', existingFB.id);
+        } else {
+            const { error: insertError } = await supabaseClient.from('capstone_feedback').insert({ group_id: groupId, defense_type: group.type, file_key: fileKey, user_name: userName, status: newStatus });
+            if (insertError) throw insertError;
+            console.log('Inserted new capstone_feedback record.');
+        }
+
+        // 2. Update Legacy/Group Status mapping
         let localMap = group.currentStatusJson || {};
         if (typeof localMap[fileKey] !== 'object') localMap[fileKey] = {};
         localMap[fileKey][userName] = newStatus;
 
-        await supabaseClient.from('defense_statuses')
-            .upsert({
-                group_id: groupId,
-                defense_type: group.type,
-                statuses: localMap,
-                updated_at: new Date()
-            }, { onConflict: 'group_id, defense_type' });
-
-        // Update local state
-        group.currentStatusJson = localMap;
-
-        if (select) {
-            select.disabled = false;
-            select.style.opacity = '1';
-            select.style.borderColor = '#22c55e';
+        if (group.defenseStatusId) {
+            const { error: updateDSerror } = await supabaseClient.from('defense_statuses').update({ statuses: localMap, updated_at: new Date() }).eq('id', group.defenseStatusId);
+            if (updateDSerror) console.error('Error updating defense_statuses (legacy):', updateDSerror);
+            console.log('Updated defense_statuses (legacy) record:', group.defenseStatusId);
+        } else {
+            const { data: newDS, error: insertDSerror } = await supabaseClient.from('defense_statuses').insert({ group_id: groupId, defense_type: group.type, statuses: localMap }).select().single();
+            if (insertDSerror) console.error('Error inserting defense_statuses (legacy):', insertDSerror);
+            if (newDS) {
+                group.defenseStatusId = newDS.id;
+                console.log('Inserted new defense_statuses (legacy) record:', newDS.id);
+            }
         }
 
+        group.currentStatusJson = localMap;
+        if (select) { select.disabled = false; select.style.opacity = '1'; select.style.borderColor = '#22c55e'; }
         renderTable();
     } catch (err) {
         console.error('Update Status Error:', err);
-        alert('Failed to update status: ' + err.message);
+        alert('Failed to save status. Ensure SQL is run.');
         if (select) select.disabled = false;
     }
 };
@@ -778,64 +790,64 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     const btn = textarea ? textarea.nextElementSibling : null;
     const newText = textarea ? textarea.value.trim() : '';
 
-    if (!newText) {
-        alert('Please enter remarks before saving.');
-        return;
-    }
-
-    if (btn) {
-        btn.disabled = true;
-        btn.innerText = 'Saving...';
-    }
+    if (!newText) { alert('Please enter remarks.'); return; }
+    if (btn) { btn.disabled = true; btn.innerText = 'Saving...'; }
 
     try {
         const normTab = normalizeType(currentTab);
         const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
-        if (!group) throw new Error('Group context not found');
+        if (!group) throw new Error('Group context error');
 
-        // 1. Save to the new capstone_feedback table (Primary Storage)
-        const { error: fError } = await supabaseClient
+        // 1. Check/Upsert to capstone_feedback
+        const { data: existingFB, error: existingFBError } = await supabaseClient
             .from('capstone_feedback')
-            .upsert({
-                group_id: groupId,
-                defense_type: group.type,
-                file_key: fileKey,
-                user_name: userName,
-                remarks: newText,
-                updated_at: new Date()
-            }, { onConflict: 'group_id, defense_type, file_key, user_name' });
+            .select('id')
+            .eq('group_id', groupId)
+            .eq('defense_type', group.type)
+            .eq('file_key', fileKey)
+            .eq('user_name', userName)
+            .maybeSingle();
 
-        if (fError) throw fError;
+        if (existingFBError) console.error('Error checking existing capstone_feedback:', existingFBError);
 
-        // 2. Update Legacy JSON (for quick rendering in table)
+        if (existingFB) {
+            const { error: updateError } = await supabaseClient.from('capstone_feedback').update({ remarks: newText, updated_at: new Date() }).eq('id', existingFB.id);
+            if (updateError) throw updateError;
+            console.log('Updated capstone_feedback remarks record:', existingFB.id);
+        } else {
+            const { error: insertError } = await supabaseClient.from('capstone_feedback').insert({ group_id: groupId, defense_type: group.type, file_key: fileKey, user_name: userName, remarks: newText });
+            if (insertError) throw insertError;
+            console.log('Inserted new capstone_feedback remarks record.');
+        }
+
+        // 2. Update Legacy JSON
         let localMap = group.currentRemarksJson || {};
         if (typeof localMap[fileKey] !== 'object') localMap[fileKey] = {};
         localMap[fileKey][userName] = `${userName}: ${newText}`;
 
-        await supabaseClient.from('defense_statuses')
-            .upsert({
-                group_id: groupId,
-                defense_type: group.type,
-                remarks: localMap,
-                updated_at: new Date()
-            }, { onConflict: 'group_id, defense_type' });
+        if (group.defenseStatusId) {
+            const { error: updateDSerror } = await supabaseClient.from('defense_statuses').update({ remarks: localMap, updated_at: new Date() }).eq('id', group.defenseStatusId);
+            if (updateDSerror) console.error('Error updating defense_statuses (legacy) remarks:', updateDSerror);
+            console.log('Updated defense_statuses (legacy) remarks record:', group.defenseStatusId);
+        } else {
+            const { data: newDS, error: insertDSerror } = await supabaseClient.from('defense_statuses').insert({ group_id: groupId, defense_type: group.type, remarks: localMap }).select().single();
+            if (insertDSerror) console.error('Error inserting defense_statuses (legacy) remarks:', insertDSerror);
+            if (newDS) {
+                group.defenseStatusId = newDS.id;
+                console.log('Inserted new defense_statuses (legacy) remarks record:', newDS.id);
+            }
+        }
 
         group.currentRemarksJson = localMap;
-
         if (btn) {
             btn.innerText = 'Saved';
             btn.style.background = '#dcfce7';
             btn.style.color = '#166534';
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.innerText = 'Update Remarks';
-                btn.style.background = 'var(--primary-light)';
-                btn.style.color = 'var(--primary-color)';
-            }, 2000);
+            setTimeout(() => { btn.disabled = false; btn.innerText = 'Update Remarks'; btn.style.background = 'var(--primary-light)'; btn.style.color = 'var(--primary-color)'; }, 2000);
         }
     } catch (e) {
         console.error('Save Remarks Error:', e);
-        alert('Error saving remarks: ' + e.message);
+        alert('Error saving. Check if table exits.');
         if (btn) {
             btn.disabled = false;
             btn.innerText = 'Save Remarks';
