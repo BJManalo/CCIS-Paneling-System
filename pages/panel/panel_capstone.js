@@ -998,29 +998,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
                 console.log('ADOBE LOADING:', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID, userName });
 
-                // 1. REGISTER THE SAVE API IMMEDIATELY (Before Preview)
-                // This prevents the 'INVALID_CONFIG' error
-                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (metaData, content) => {
-                    try {
-                        console.log('ADOBE SAVE EVENT:', { groupId, fileKey });
-                        const { error } = await supabaseClient.from('pdf_annotations').upsert({
-                            group_id: groupId,
-                            file_key: fileKey,
-                            annotation_data: content,
-                            user_name: userName,
-                            updated_at: new Date()
-                        }, { onConflict: 'group_id, file_key' });
-
-                        if (error) throw error;
-                        console.log('PDF Annotations synced to database.');
-                        return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                    } catch (err) {
-                        console.error('DATABASE SAVE ERROR:', err);
-                        return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
-                    }
-                }, { autoSaveFrequency: 3, enableSaveShortcut: true });
-
-                // 2. Identify the user
+                // 1. Identify the user
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
                     return Promise.resolve({
                         userProfile: {
@@ -1036,7 +1014,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey || 'unique-id' }
                 }, {
-                    embedMode: "FULL_WINDOW", // Matches the rich UI in the 1st image
+                    embedMode: "FULL_WINDOW",
                     showAnnotationTools: true,
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
@@ -1046,21 +1024,47 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 });
 
                 adobeFilePromise.then(adobeViewer => {
-                    // 3. Load Existing Annotations
+                    // 2. Setup Real-Time Event Sync
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
+                        // A. Helper to sync all annotations to Supabase
+                        const syncAllAnnotations = async () => {
+                            try {
+                                console.log('🔄 SYNCING PDF COMMENTS...');
+                                const annotations = await annotationManager.getAnnotations();
+
+                                const { error } = await supabaseClient.from('pdf_annotations').upsert({
+                                    group_id: groupId,
+                                    file_key: fileKey,
+                                    annotation_data: annotations,
+                                    user_name: userName,
+                                    updated_at: new Date()
+                                }, { onConflict: 'group_id, file_key' });
+
+                                if (error) throw error;
+                                console.log('✅ PDF COMMENTS SAVED TO DATABASE');
+                            } catch (e) {
+                                console.error('❌ PDF SYNC FAILED:', e);
+                            }
+                        };
+
+                        // B. Load Existing
                         try {
                             const { data } = await supabaseClient.from('pdf_annotations')
-                                .select('annotation_data')
-                                .eq('group_id', groupId)
-                                .eq('file_key', fileKey)
-                                .maybeSingle();
+                                .select('annotation_data').eq('group_id', groupId)
+                                .eq('file_key', fileKey).maybeSingle();
+
                             if (data?.annotation_data) {
-                                console.log('Found existing annotations, adding to viewer...');
+                                console.log('📥 LOADING EXISTING COMMENTS...');
                                 annotationManager.addAnnotations(data.annotation_data);
                             }
                         } catch (e) { console.error('Error loading old annotations:', e); }
 
-                        // Set the author name correctly
+                        // C. Listen for Changes (Add, Update, Delete)
+                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_ADDED, syncAllAnnotations);
+                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_UPDATED, syncAllAnnotations);
+                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_DELETED, syncAllAnnotations);
+
+                        // Set author identity
                         annotationManager.setConfig({ authorName: userName });
                     });
 
