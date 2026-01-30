@@ -966,9 +966,17 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 async function renderPage(num) {
     if (!currentPdf) return;
     const target = document.getElementById('pdfRenderTarget');
-    target.innerHTML = '<div style="padding:40px; text-align:center;">Rendering page...</div>';
+    const container = document.getElementById('pdfViewerContainer');
+    target.innerHTML = '<div style="padding:40px; text-align:center; color:white;">Rendering page...</div>';
 
     const page = await currentPdf.getPage(num);
+
+    // Auto-calculate scale to fit width
+    const containerWidth = container.clientWidth - 80; // Margin
+    const unscaledViewport = page.getViewport({ scale: 1 });
+    const dynamicScale = containerWidth / unscaledViewport.width;
+    pdfScale = dynamicScale;
+
     const viewport = page.getViewport({ scale: pdfScale });
 
     target.innerHTML = '';
@@ -1006,6 +1014,7 @@ window.changePage = (offset) => {
     if (newPage >= 1 && newPage <= currentPdf.numPages) {
         currentPageNum = newPage;
         renderPage(currentPageNum);
+        document.getElementById('pdfViewerContainer').scrollTop = 0;
     }
 };
 
@@ -1022,7 +1031,7 @@ document.addEventListener('selectionchange', () => {
 
         const input = document.getElementById('commentInput');
         if (input && !input.value.startsWith('RE:')) {
-            input.value = `RE: "${text}" (Page ${currentPageNum})\n— `;
+            input.value = `RE Page ${currentPageNum}: "${text}"\n— `;
             input.focus();
             // Move cursor to end
             input.setSelectionRange(input.value.length, input.value.length);
@@ -1069,24 +1078,31 @@ function renderComments(comments) {
     list.innerHTML = comments.map(c => {
         const isMe = c.user_name === myName;
         const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const date = new Date(c.created_at).toLocaleDateString();
+
+        // Highlight correction references
+        let formattedText = c.comment_text;
+        if (formattedText.startsWith('RE ')) {
+            const parts = formattedText.split('\n— ');
+            if (parts.length > 1) {
+                formattedText = `<div style="background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isMe ? '#fff' : 'var(--primary-color)'}; font-size: 0.8rem; margin-bottom: 8px; font-style: italic; opacity: 0.9;">${parts[0]}</div>` + parts.slice(1).join('\n— ');
+            }
+        }
 
         return `
-            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'};">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                    <span style="font-size: 0.7rem; font-weight: 700; color: #64748b;">${c.user_name}</span>
-                    <span style="font-size: 0.65rem; color: #94a3b8;">${date} ${time}</span>
+            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'}; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: #475569;">${isMe ? 'You' : c.user_name}</span>
+                    <span style="font-size: 0.65rem; color: #94a3b8;">${time}</span>
                 </div>
-                <div style="background: ${isMe ? 'var(--primary-color)' : 'white'}; 
+                <div style="background: ${isMe ? 'var(--primary-color)' : '#f1f5f9'}; 
                             color: ${isMe ? 'white' : '#1e293b'}; 
-                            padding: 10px 14px; 
-                            border-radius: ${isMe ? '12px 12px 2px 12px' : '2px 12px 12px 12px'}; 
-                            font-size: 0.88rem; 
-                            line-height: 1.4; 
-                            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-                            max-width: 90%;
-                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};">
-                    ${c.comment_text}
+                            padding: 12px 16px; 
+                            border-radius: ${isMe ? '18px 18px 2px 18px' : '2px 18px 18px 18px'}; 
+                            font-size: 0.9rem; 
+                            line-height: 1.5; 
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                            max-width: 95%;">
+                    ${formattedText}
                 </div>
             </div>
         `;
