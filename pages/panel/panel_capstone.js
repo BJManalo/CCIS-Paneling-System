@@ -956,22 +956,11 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
                     return Promise.resolve({
                         userProfile: {
-                            id: user.id || user.email || 'panelist-id',
                             name: userName,
                             firstName: userName.split(' ')[0],
                             lastName: userName.split(' ').slice(1).join(' ') || '',
-                            email: user.email || 'user@example.com'
+                            email: user.email || ''
                         }
-                    });
-                });
-
-                // Set permissions: Only allow users to edit/delete their own comments
-                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_PERMISSION_API, (annotation) => {
-                    const currentUserId = user.id || user.email || 'panelist-id';
-                    const isOwner = annotation.creator && (annotation.creator.id === currentUserId || annotation.creator.name === userName);
-                    return Promise.resolve({
-                        canModify: isOwner,
-                        canDelete: isOwner
                     });
                 });
 
