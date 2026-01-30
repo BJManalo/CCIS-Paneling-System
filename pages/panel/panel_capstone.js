@@ -1018,25 +1018,31 @@ window.changePage = (offset) => {
     }
 };
 
-// --- HIGHLIGHT DETECTION ---
-document.addEventListener('selectionchange', () => {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
+// --- HIGHLIGHT DETECTION (Smooth Version) ---
+document.addEventListener('mouseup', () => {
+    // Small timeout to ensure selection is finalized
+    setTimeout(() => {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
+        const target = document.getElementById('pdfRenderTarget');
 
-    // Only capture if selection is inside our PDF target
-    const target = document.getElementById('pdfRenderTarget');
-    if (text && target && target.contains(selection.anchorNode)) {
+        if (!text || !target || !target.contains(selection.anchorNode)) return;
+
         currentHighlightedText = text;
         currentHighlightedPage = currentPageNum;
 
         const input = document.getElementById('commentInput');
-        if (input && !input.value.startsWith('RE:')) {
-            input.value = `RE Page ${currentPageNum}: "${text}"\n— `;
-            input.focus();
-            // Move cursor to end
-            input.setSelectionRange(input.value.length, input.value.length);
+        if (input) {
+            // Only auto-populate if the input is empty or doesn't have a reference yet
+            const hasReference = input.value.includes('RE Page');
+            if (!hasReference || input.value.trim() === '') {
+                input.value = `RE Page ${currentPageNum}: "${text}"\n— `;
+                // Focus and move cursor to end only after finalize
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
         }
-    }
+    }, 50);
 });
 
 // --- SIDEBAR COMMENT SYSTEM ---
