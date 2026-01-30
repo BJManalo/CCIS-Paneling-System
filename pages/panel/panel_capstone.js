@@ -710,7 +710,7 @@ window.openFileModal = (groupId) => {
                 interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
-                    <div style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
+                    <div id="status-badge-${categoryKey}-${label}" style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
                         <span class="material-icons-round" style="font-size: 14px;">${iconText}</span>
                         ${myStatus}
                     </div>
@@ -830,6 +830,23 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
         if (normTab.includes('title')) group.titleStatus = localMap;
         else if (normTab.includes('preoral')) group.preOralStatus = localMap;
         else if (normTab.includes('final')) group.finalStatus = localMap;
+
+        // --- Real-time Badge Update ---
+        const badge = document.getElementById(`status-badge-${categoryKey}-${fileKey}`);
+        if (badge) {
+            let sColor = '#64748b'; let sBg = '#f1f5f9'; let iText = 'hourglass_empty';
+            if (newStatus.includes('Approved')) {
+                sColor = '#059669'; sBg = '#dcfce7'; iText = 'check_circle';
+            } else if (newStatus.includes('Approve with Revisions')) {
+                sColor = '#d97706'; sBg = '#fef3c7'; iText = 'warning';
+            } else if (newStatus.includes('Rejected') || newStatus.includes('Redefense')) {
+                sColor = '#dc2626'; sBg = '#fee2e2'; iText = 'cancel';
+            }
+
+            badge.style.color = sColor;
+            badge.style.background = sBg;
+            badge.innerHTML = `<span class="material-icons-round" style="font-size: 14px;">${iText}</span> ${newStatus}`;
+        }
 
         if (select) {
             select.disabled = false;
