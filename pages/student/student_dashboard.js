@@ -143,6 +143,12 @@ async function loadSubmissionData() {
             if (document.getElementById('projectTitle2')) document.getElementById('projectTitle2').value = projectTitles.title2 || '';
             if (document.getElementById('projectTitle3')) document.getElementById('projectTitle3').value = projectTitles.title3 || '';
 
+            // Update sub-tab button labels with actual titles
+            const titleTabBtns = document.querySelectorAll('#tab-titles .sub-tab-btn');
+            if (titleTabBtns.length >= 1 && projectTitles.title1) titleTabBtns[0].innerText = projectTitles.title1;
+            if (titleTabBtns.length >= 2 && projectTitles.title2) titleTabBtns[1].innerText = projectTitles.title2;
+            if (titleTabBtns.length >= 3 && projectTitles.title3) titleTabBtns[2].innerText = projectTitles.title3;
+
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
 

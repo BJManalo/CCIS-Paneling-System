@@ -272,7 +272,8 @@ async function loadCapstoneData() {
 
                     status: sched ? (sched.status || 'Active') : 'Pending Schedule',
                     isAdviser: isAdviser,
-                    isPanelist: isPanelist
+                    isPanelist: isPanelist,
+                    projectTitle: group.project_title
                 });
             });
         });
@@ -573,7 +574,21 @@ window.openFileModal = (groupId) => {
             item.style.justifyContent = 'space-between';
             item.style.transition = 'all 0.2s';
 
-            const displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            let projectTitles = {};
+            if (categoryKey === 'titles' && group.projectTitle) {
+                try {
+                    projectTitles = typeof group.projectTitle === 'string' && group.projectTitle.startsWith('{')
+                        ? JSON.parse(group.projectTitle)
+                        : { title1: group.projectTitle };
+                } catch (e) {
+                    projectTitles = { title1: group.projectTitle };
+                }
+            }
+
+            let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            if (categoryKey === 'titles' && projectTitles[label]) {
+                displayLabel = projectTitles[label];
+            }
 
             item.innerHTML = `
                 <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
