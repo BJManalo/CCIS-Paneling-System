@@ -15,6 +15,8 @@ let adobeDCView = null;
 let currentViewerFileKey = null;
 let currentViewerGroupId = null;
 let currentBlobUrl = null;
+let autoSaveInterval = null;
+let isSaving = false;
 const ADOBE_CLIENT_ID = '5edc19dfde9349e3acb7ecc73bfa4848';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -935,6 +937,12 @@ window.closeFileModal = () => {
     const saveBtn = document.getElementById('saveAnnotationBtnContainer');
     if (saveBtn) saveBtn.style.display = 'none';
 
+    // Clear auto-save
+    if (autoSaveInterval) {
+        clearInterval(autoSaveInterval);
+        autoSaveInterval = null;
+    }
+
     // Clear iframe
     const pdfFrame = document.getElementById('pdfFrame');
     if (pdfFrame) pdfFrame.src = "";
@@ -1030,6 +1038,12 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             pdfFrame.src = viewerUrl;
         }, 50);
 
+        // Start Auto-save Timer (2 seconds)
+        if (autoSaveInterval) clearInterval(autoSaveInterval);
+        autoSaveInterval = setInterval(() => {
+            saveAnnotatedPDF(true);
+        }, 2000);
+
     } catch (e) {
         console.warn("Blob loading failed, falling back to direct URL:", e);
         const viewerUrl = `../../assets/library/web/viewer.html?file=${encodeURIComponent(finalUrl)}`;
@@ -1042,24 +1056,35 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         setTimeout(() => {
             pdfFrame.src = viewerUrl;
         }, 50);
+
+        // Start Auto-save Timer (2 seconds)
+        if (autoSaveInterval) clearInterval(autoSaveInterval);
+        autoSaveInterval = setInterval(() => {
+            saveAnnotatedPDF(true);
+        }, 2000);
     }
 };
 
-async function saveAnnotatedPDF() {
+async function saveAnnotatedPDF(isAuto = false) {
+    if (isSaving) return; // Prevent concurrent saves
+
     const frame = document.getElementById('pdfFrame');
-    const viewerApp = frame.contentWindow.PDFViewerApplication;
+    const viewerApp = frame ? frame.contentWindow.PDFViewerApplication : null;
 
-    if (!viewerApp || !viewerApp.pdfDocument) {
-        alert("Viewer not ready or PDF not loaded.");
-        return;
-    }
+    if (!viewerApp || !viewerApp.pdfDocument) return;
 
-    const btn = document.querySelector('#saveAnnotationBtnContainer button');
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons-round">sync</span> Saving...';
+    const statusText = document.getElementById('autoSaveText');
+    const statusIcon = document.querySelector('#autoSaveStatus span');
+
+    isSaving = true;
 
     try {
+        if (statusText) statusText.innerText = "Auto-saving...";
+        if (statusIcon) {
+            statusIcon.innerText = "sync";
+            statusIcon.style.animation = "viewer-spin 1s linear infinite";
+        }
+
         // 1. Get the annotated PDF bytes from PDF.js
         const data = await viewerApp.pdfDocument.saveDocument();
 
@@ -1067,9 +1092,11 @@ async function saveAnnotatedPDF() {
         const userJson = localStorage.getItem('loginUser');
         const user = JSON.parse(userJson || '{}');
         const userName = user.name || user.full_name || 'Panel';
-        const fileName = `annotated_${currentViewerGroupId}_${currentViewerFileKey}_${Date.now()}.pdf`;
+        // Stable filename to overwrite instead of creating new files
+        const cleanName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const fileName = `annotated_${currentViewerGroupId}_${currentViewerFileKey}_${cleanName}.pdf`;
 
-        // 3. Upload to Supabase Storage
+        // 3. Upload to Supabase Storage (upsert: true to overwrite)
         const { data: uploadData, error: uploadError } = await supabaseClient.storage
             .from('project-submissions')
             .upload(`submissions/annotations/${fileName}`, data, {
@@ -1098,20 +1125,21 @@ async function saveAnnotatedPDF() {
 
         if (dbError) throw dbError;
 
-        // Refresh allData locally to ensure the new annotation URL is captured
-        await loadCapstoneData();
+        if (statusText) statusText.innerText = "Changes Auto-saved";
+        if (statusIcon) {
+            statusIcon.innerText = "sync_lock";
+            statusIcon.style.animation = "none";
+        }
 
-        alert("Successfully saved annotated PDF to database!");
-        btn.innerHTML = '<span class="material-icons-round">check_circle</span> Saved!';
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }, 3000);
     } catch (err) {
-        console.error('Save Annotation Error:', err);
-        alert('Error saving annotations: ' + err.message);
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+        console.error('Auto-save Error:', err);
+        if (statusText) statusText.innerText = "Auto-save failed";
+        if (statusIcon) {
+            statusIcon.innerText = "error_outline";
+            statusIcon.style.animation = "none";
+        }
+    } finally {
+        isSaving = false;
     }
 }
 
