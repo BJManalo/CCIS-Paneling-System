@@ -746,14 +746,24 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
     try {
         // For PDF/Supabase files, use Blob loading to bypass CORS
         if (lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf')) {
-            console.log("Fetching PDF as blob...");
-            const response = await fetch(absoluteUrl);
+            console.log("Fetching PDF as blob with cache-buster...");
+
+            // Add cache-buster to the fetch URL
+            const urlObj = new URL(absoluteUrl);
+            urlObj.searchParams.set('v', Date.now());
+
+            const response = await fetch(urlObj.toString());
             if (!response.ok) throw new Error("Network response was not ok");
             const blob = await response.blob();
             currentBlobUrl = URL.createObjectURL(blob);
 
             const viewerPath = "../../assets/library/web/viewer.html";
-            iframe.src = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+            const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+
+            iframe.src = "";
+            setTimeout(() => {
+                iframe.src = viewerUrl;
+            }, 50);
         } else if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
             iframe.src = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
         } else {
