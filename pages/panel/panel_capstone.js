@@ -941,13 +941,16 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     divId: "adobe-dc-view"
                 });
 
-                const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
+                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)?.[1] || absoluteUrl.match(/id=([^\&]+)/)?.[1];
+                const fileName = (fileKey || 'document').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf';
+
                 let finalUrl = absoluteUrl;
-                if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    // Using drive.google.com with export=download to maximize direct file stream access
-                    finalUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                if (lowerUrl.includes('drive.google.com') && fileId) {
+                    // Try the 'uc?id=' format without export=download, sometimes more reliable for SDKs
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}`;
                 }
+
+                console.log('ADOBE LOADING:', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
 
                 const adobeFilePromise = adobeDCView.previewFile({
                     content: { location: { url: finalUrl } },

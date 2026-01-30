@@ -670,16 +670,19 @@ window.openFileViewer = async (url, fileKey) => {
             try {
                 adobeDCView = new AdobeDC.View({ clientId: ADOBE_CLIENT_ID, divId: "adobe-dc-view" });
 
+                const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)?.[1] || absoluteUrl.match(/id=([^\&]+)/)?.[1];
+                const fileName = (fileKey || 'document').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf';
+
                 let finalUrl = absoluteUrl;
-                if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    // Direct file stream
-                    finalUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                if (lowerUrl.includes('drive.google.com') && fileId) {
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}`;
                 }
+
+                console.log('ADOBE LOADING (Student):', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
 
                 const adobeFilePromise = adobeDCView.previewFile({
                     content: { location: { url: finalUrl } },
-                    metaData: { fileName: fileKey + ".pdf", id: fileKey }
+                    metaData: { fileName: fileName, id: fileKey }
                 }, {
                     embedMode: "SIZED_CONTAINER",
                     showAnnotationTools: true,
