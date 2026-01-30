@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (accountData.role === 'Admin') {
                         window.location.href = 'pages/admin/admin';
-                    } else if (accountData.role === 'Instructor') {
+                    } else if (accountData.role === 'Instructor' || accountData.role === 'Instructor/Adviser') {
                         window.location.href = 'pages/instructor/instructor_dashboard';
                     } else if (accountData.role === 'Panel' || accountData.role === 'Adviser') {
                         window.location.href = 'pages/panel/panel_capstone';

@@ -16,7 +16,7 @@ let displayRows = [];
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
-    if (!loginUser || loginUser.role !== 'Instructor') {
+    if (!loginUser || (loginUser.role !== 'Instructor' && loginUser.role !== 'Instructor/Adviser')) {
         window.location.href = '../../';
         return;
     }
