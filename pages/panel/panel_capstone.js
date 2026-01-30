@@ -1018,63 +1018,48 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             authorName: userName
                         });
 
-                        // Helper to enforce identity on annotation objects
-                        const enforceIdentity = (annotations) => {
-                            let wasModified = false;
-                            annotations.forEach(annot => {
-                                // 1. Force Title
-                                if (annot.title !== userName) {
-                                    annot.title = userName;
-                                    wasModified = true;
-                                }
-                                // 2. Hard-bake name into text content (Prefix)
-                                if (annot.bodyValue && !annot.bodyValue.startsWith(`[${userName}]`)) {
-                                    annot.bodyValue = `[${userName}]: ${annot.bodyValue}`;
-                                    wasModified = true;
-                                }
-                            });
-                            return wasModified;
-                        };
-
                         // Manual Save Logic
                         const saveAnnotations = async (annotations) => {
-                            // Ensure data sent to DB is enforced
-                            enforceIdentity(annotations);
+                            // Create a clean copy for the database with enforced identity
+                            // This ensures students see the correct name even if the Panel UI doesn't update immediately
+                            const dbAnnotations = annotations.map(annot => {
+                                const newAnnot = JSON.parse(JSON.stringify(annot));
+
+                                // 1. Enforce Title (Author Name)
+                                newAnnot.title = userName;
+
+                                // 2. Enforce Body Prefix
+                                // Ensure we don't double-prefix if it's already there
+                                if (newAnnot.bodyValue) {
+                                    const prefix = `[${userName}]:`;
+                                    if (!newAnnot.bodyValue.startsWith(`${prefix}`)) {
+                                        // Remove any old prefix if it exists to be safe, or just prepend
+                                        newAnnot.bodyValue = `${prefix} ${newAnnot.bodyValue.replace(/^\[.*?\]:\s*/, '')}`;
+                                    }
+                                }
+                                return newAnnot;
+                            });
 
                             try {
                                 const { error } = await supabaseClient.from('pdf_annotations').upsert({
                                     group_id: groupId,
                                     file_key: fileKey,
-                                    annotation_data: annotations,
+                                    annotation_data: dbAnnotations,
                                     user_name: userName,
                                     updated_at: new Date().toISOString()
                                 }, { onConflict: ['group_id', 'file_key'] });
                                 if (error) throw error;
-                                console.log('SAVE SUCCESSful:', annotations.length);
+                                console.log('SAVE SUCCESSful:', dbAnnotations.length);
                             } catch (err) {
                                 console.error('SAVE FAILED:', err);
                             }
                         };
 
-                        // IMMEDIATE SAVE & UI UPDATE on any change
+                        // IMMEDIATE SAVE on any change
                         annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
                             console.log('ANNOTATION EVENT:', event.type);
-
-                            if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED"].includes(event.type)) {
-                                const annotations = await annotationManager.getAnnotations();
-
-                                // Update the UI immediately so the panelist sees the name added
-                                if (enforceIdentity(annotations)) {
-                                    try {
-                                        await annotationManager.updateAnnotation(annotations);
-                                        console.log('UI Updated with Identity');
-                                    } catch (e) {
-                                        console.warn('UI Identity Update Failed (User editing?)', e);
-                                    }
-                                }
-
-                                saveAnnotations(annotations);
-                            } else if (event.type === "ANNOTATION_DELETED") {
+                            if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
+                                // Just get and save - do not try to update UI locally to avoid race conditions
                                 const annotations = await annotationManager.getAnnotations();
                                 saveAnnotations(annotations);
                             }
