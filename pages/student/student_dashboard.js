@@ -232,6 +232,12 @@ async function loadSubmissionData() {
 
                 el.value = linkMap[key] || '';
 
+                // Populate Revised Link if exists
+                const conflictEl = document.getElementById(elementId + '_revised');
+                if (conflictEl) {
+                    conflictEl.value = linkMap[key + '_revised'] || '';
+                }
+
                 const rawStatus = statusMap[key] || 'Pending';
                 const rawRemarks = remarksMap[key] || {};
 
@@ -616,10 +622,13 @@ window.saveSubmissions = async function (specificField) {
         if (tabId === 'titles') {
             if (specificField === 'title1') {
                 activeLinks.title1 = document.getElementById('titleLink1').value.trim();
+                activeLinks.title1_revised = document.getElementById('titleLink1_revised').value.trim();
             } else if (specificField === 'title2') {
                 activeLinks.title2 = document.getElementById('titleLink2').value.trim();
+                activeLinks.title2_revised = document.getElementById('titleLink2_revised').value.trim();
             } else if (specificField === 'title3') {
                 activeLinks.title3 = document.getElementById('titleLink3').value.trim();
+                activeLinks.title3_revised = document.getElementById('titleLink3_revised').value.trim();
             }
             updates.title_link = JSON.stringify(activeLinks);
 
@@ -637,14 +646,29 @@ window.saveSubmissions = async function (specificField) {
             updates.project_title = JSON.stringify(pTitles);
 
         } else if (tabId === 'preoral') {
-            if (specificField === 'ch1') activeLinks.ch1 = document.getElementById('preOralCh1').value.trim();
-            if (specificField === 'ch2') activeLinks.ch2 = document.getElementById('preOralCh2').value.trim();
-            if (specificField === 'ch3') activeLinks.ch3 = document.getElementById('preOralCh3').value.trim();
+            if (specificField === 'ch1') {
+                activeLinks.ch1 = document.getElementById('preOralCh1').value.trim();
+                activeLinks.ch1_revised = document.getElementById('preOralCh1_revised').value.trim();
+            }
+            if (specificField === 'ch2') {
+                activeLinks.ch2 = document.getElementById('preOralCh2').value.trim();
+                activeLinks.ch2_revised = document.getElementById('preOralCh2_revised').value.trim();
+            }
+            if (specificField === 'ch3') {
+                activeLinks.ch3 = document.getElementById('preOralCh3').value.trim();
+                activeLinks.ch3_revised = document.getElementById('preOralCh3_revised').value.trim();
+            }
             updates.pre_oral_link = JSON.stringify(activeLinks);
 
         } else if (tabId === 'final') {
-            if (specificField === 'ch4') activeLinks.ch4 = document.getElementById('finalCh4').value.trim();
-            if (specificField === 'ch5') activeLinks.ch5 = document.getElementById('finalCh5').value.trim();
+            if (specificField === 'ch4') {
+                activeLinks.ch4 = document.getElementById('finalCh4').value.trim();
+                activeLinks.ch4_revised = document.getElementById('finalCh4_revised').value.trim();
+            }
+            if (specificField === 'ch5') {
+                activeLinks.ch5 = document.getElementById('finalCh5').value.trim();
+                activeLinks.ch5_revised = document.getElementById('finalCh5_revised').value.trim();
+            }
             updates.final_link = JSON.stringify(activeLinks);
         }
 
