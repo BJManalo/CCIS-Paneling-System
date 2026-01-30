@@ -302,19 +302,20 @@ function applyFilters() {
     const filtered = loadedEvaluations.filter(ev => {
         // 1. Main Tab Filter (Advisory vs Evaluation)
         let matchesMain = true;
+        const adviser = (ev.adviser || '').toLowerCase();
+        const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
+
         if (currentMainTab === 'Advisory') {
             // Must be the Adviser
-            const adviser = (ev.adviser || '').toLowerCase();
-            matchesMain = adviser.includes(userName) || userName.includes(adviser);
+            matchesMain = isAdviser;
         } else {
             // Evaluation Tab: Groups I Created (Instructor)
-            // If createdBy exists, use it. Else fall back to "Not Adviser" logic?
             if (ev.createdBy) {
-                matchesMain = ev.createdBy === userId;
+                matchesMain = (ev.createdBy == userId); // Using loose equality for potential type mismatch (string vs number)
             } else {
-                // Approximate: I am logged in, so I see it. If I'm not the adviser, assume I'm the instructor?
-                const adviser = (ev.adviser || '').toLowerCase();
-                matchesMain = !(adviser.includes(userName) || userName.includes(adviser));
+                // If createdBy is missing, we fallback to showing it (better to show than hide)
+                // Previously we hid if (isAdviser), which caused the issue for dual roles.
+                matchesMain = true;
             }
         }
         if (!matchesMain) return false;
