@@ -973,6 +973,10 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                         }
                     }, { autoSaveFrequency: 2 });
                 });
+            }).catch(err => {
+                console.error('Adobe SDK Error:', err);
+                placeholder.style.display = 'flex';
+                placeholder.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;"><p>Failed to load PDF preview.</p></div>`;
             });
         };
 
