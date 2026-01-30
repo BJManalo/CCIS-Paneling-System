@@ -261,6 +261,16 @@ window.switchMainTab = (tab) => {
     // Update UI
     document.getElementById('tab-advisory').classList.toggle('active', tab === 'Advisory');
     document.getElementById('tab-evaluation').classList.toggle('active', tab === 'Evaluation');
+
+    // Hide/Show Defense Type Filters
+    const filterContainer = document.querySelector('.filter-container');
+    if (tab === 'Advisory') {
+        if (filterContainer) filterContainer.style.display = 'none';
+        currentTypeFilter = 'ALL'; // Reset
+    } else {
+        if (filterContainer) filterContainer.style.display = 'flex';
+    }
+
     applyFilters();
 }
 
