@@ -301,6 +301,28 @@ async function loadSubmissionData() {
                         window.verifyDriveLink(elementId);
                     };
                     wrapper.appendChild(checkBtn);
+
+                    const uploadBtn = document.createElement('button');
+                    uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
+                    uploadBtn.title = "Upload PDF directly";
+                    uploadBtn.style.cssText = `
+                        background: #f1f5f9;
+                        border: 1.5px solid #e2e8f0;
+                        border-radius: 8px;
+                        color: #64748b;
+                        padding: 10px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        transition: all 0.2s;
+                    `;
+                    uploadBtn.onclick = (e) => {
+                        e.preventDefault();
+                        const fileInput = wrapper.querySelector('input[type="file"]');
+                        if (fileInput) fileInput.click();
+                    };
+                    wrapper.appendChild(uploadBtn);
                 }
             };
 
@@ -719,6 +741,56 @@ window.openFileViewer = async (url, fileKey) => {
         showCompatibilityMode();
     }
 };
+
+window.handleFileUpload = async (input, targetId) => {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+        showToast('Only PDF files are allowed', 'warning');
+        return;
+    }
+
+    const targetInput = document.getElementById(targetId);
+    const btn = input.nextElementSibling || input.parentElement.querySelector('button[title="Upload PDF directly"]');
+    const originalContent = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round" style="font-size:18px; animation: spin 1s linear infinite;">sync</span>';
+
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${currentGroupId}/${targetId}_${Date.now()}.${fileExt}`;
+        const filePath = `submissions/${fileName}`;
+
+        const { data, error } = await supabaseClient.storage
+            .from('project-submissions')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabaseClient.storage
+            .from('project-submissions')
+            .getPublicUrl(filePath);
+
+        targetInput.value = publicUrl;
+        showToast('File uploaded successfully!', 'success');
+
+        // Visual indicator on the input
+        targetInput.style.borderColor = '#10b981';
+        targetInput.style.background = '#f0fdf4';
+
+    } catch (e) {
+        console.error('Upload error:', e);
+        showToast('Upload failed: ' + (e.message || 'Check storage permissions'), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
 
 window.verifyDriveLink = async (inputId) => {
     const input = document.getElementById(inputId);

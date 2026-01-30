@@ -225,6 +225,8 @@
                     </div>
                     <div class="form-group">
                         <input type="text" id="titleLink1" placeholder="Title 1 Link">
+                        <input type="file" id="fileTitle1" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'titleLink1')">
                     </div>
                 </div>
                 <div id="titles-content-2" class="sub-tab-content">
@@ -236,6 +238,8 @@
                     </div>
                     <div class="form-group">
                         <input type="text" id="titleLink2" placeholder="Title 2 Link">
+                        <input type="file" id="fileTitle2" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'titleLink2')">
                     </div>
                 </div>
                 <div id="titles-content-3" class="sub-tab-content">
@@ -247,6 +251,8 @@
                     </div>
                     <div class="form-group">
                         <input type="text" id="titleLink3" placeholder="Title 3 Link">
+                        <input type="file" id="fileTitle3" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'titleLink3')">
                     </div>
                 </div>
             </div>
@@ -258,13 +264,25 @@
                     <button class="sub-tab-btn" onclick="switchSubTab('preoral', 3, this)">Chapter 3</button>
                 </div>
                 <div id="preoral-content-1" class="sub-tab-content active">
-                    <div class="form-group"><input type="text" id="preOralCh1" placeholder="Chapter 1 Link"></div>
+                    <div class="form-group">
+                        <input type="text" id="preOralCh1" placeholder="Chapter 1 Link">
+                        <input type="file" id="filePreOral1" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'preOralCh1')">
+                    </div>
                 </div>
                 <div id="preoral-content-2" class="sub-tab-content">
-                    <div class="form-group"><input type="text" id="preOralCh2" placeholder="Chapter 2 Link"></div>
+                    <div class="form-group">
+                        <input type="text" id="preOralCh2" placeholder="Chapter 2 Link">
+                        <input type="file" id="filePreOral2" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'preOralCh2')">
+                    </div>
                 </div>
                 <div id="preoral-content-3" class="sub-tab-content">
-                    <div class="form-group"><input type="text" id="preOralCh3" placeholder="Chapter 3 Link"></div>
+                    <div class="form-group">
+                        <input type="text" id="preOralCh3" placeholder="Chapter 3 Link">
+                        <input type="file" id="filePreOral3" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'preOralCh3')">
+                    </div>
                 </div>
             </div>
 
@@ -274,10 +292,18 @@
                     <button class="sub-tab-btn" onclick="switchSubTab('final', 5, this)">Chapter 5</button>
                 </div>
                 <div id="final-content-4" class="sub-tab-content active">
-                    <div class="form-group"><input type="text" id="finalCh4" placeholder="Chapter 4 Link"></div>
+                    <div class="form-group">
+                        <input type="text" id="finalCh4" placeholder="Chapter 4 Link">
+                        <input type="file" id="fileFinal4" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'finalCh4')">
+                    </div>
                 </div>
                 <div id="final-content-5" class="sub-tab-content">
-                    <div class="form-group"><input type="text" id="finalCh5" placeholder="Chapter 5 Link"></div>
+                    <div class="form-group">
+                        <input type="text" id="finalCh5" placeholder="Chapter 5 Link">
+                        <input type="file" id="fileFinal5" accept=".pdf" style="display: none;"
+                            onchange="handleFileUpload(this, 'finalCh5')">
+                    </div>
                 </div>
             </div>
 
