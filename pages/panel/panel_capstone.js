@@ -1053,6 +1053,12 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
                         // Manual Save Logic (Robust Check -> Update/Insert)
                         const saveAnnotations = async (annotations) => {
+                            // Debug: Ensure we have valid IDs
+                            if (!groupId || !fileKey) {
+                                alert(`Critical Error: Missing GroupID (${groupId}) or FileKey (${fileKey})`);
+                                return;
+                            }
+
                             // Create a clean copy for the database
                             const dbAnnotations = annotations.map(annot => {
                                 const newAnnot = JSON.parse(JSON.stringify(annot));
@@ -1065,7 +1071,12 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             });
 
                             try {
-                                showToast('Saving comments...');
+                                showToast('Saving comments...'); // Keep toast for visual
+
+                                // Explicitly log for debugging
+                                console.log(`Saving ${dbAnnotations.length} annotations for Group ${groupId}, File ${fileKey}`);
+
+                                // Check existence
                                 const { data: existing, error: fetchError } = await supabaseClient
                                     .from('pdf_annotations')
                                     .select('id')
@@ -1073,11 +1084,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                                     .eq('file_key', fileKey)
                                     .maybeSingle();
 
-                                if (fetchError) throw fetchError;
+                                if (fetchError) {
+                                    alert(`Fetch Error: ${fetchError.message} - ${fetchError.details}`);
+                                    throw fetchError;
+                                }
 
                                 let error = null;
 
                                 if (existing) {
+                                    // Update
                                     const { error: updateError } = await supabaseClient
                                         .from('pdf_annotations')
                                         .update({
@@ -1088,6 +1103,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                                         .eq('id', existing.id);
                                     error = updateError;
                                 } else {
+                                    // Insert
                                     const { error: insertError } = await supabaseClient
                                         .from('pdf_annotations')
                                         .insert({
@@ -1099,12 +1115,18 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                                     error = insertError;
                                 }
 
-                                if (error) throw error;
-                                showToast('Comments Saved!');
+                                if (error) {
+                                    alert(`Database Save Error: ${error.message}\nDetails: ${error.details || 'None'}\nHint: Check if table 'pdf_annotations' exists and columns match.`);
+                                    throw error;
+                                }
+
                                 console.log('SAVE SUCCESSful:', dbAnnotations.length);
+                                // Optional: Alert success only if user requested confirmation, otherwise Toast implies it
+                                // alert('Saved Successfully!'); 
                             } catch (err) {
                                 console.error('SAVE FAILED:', err);
-                                showToast(`Save Failed: ${err.message}`, true);
+                                // Fallback alert ensures user sees it even if Toast fails
+                                alert(`Save Failed Exception: ${err.message}`);
                             }
                         };
 
