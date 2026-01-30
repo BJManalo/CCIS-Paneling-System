@@ -516,10 +516,14 @@ window.openFileModal = (groupId) => {
     const fileList = document.getElementById('fileList');
     fileList.innerHTML = '';
 
-    // reset viewer
-    document.getElementById('fileViewer').style.display = 'none';
-    document.getElementById('viewerPlaceholder').style.display = 'flex';
-    document.getElementById('viewerToolbar').style.display = 'none';
+    // Reset Viewer State
+    const pdfContainer = document.getElementById('pdfViewerContainer');
+    const placeholder = document.getElementById('viewerPlaceholder');
+    const toolbar = document.getElementById('viewerToolbar');
+
+    if (pdfContainer) pdfContainer.style.display = 'none';
+    if (placeholder) placeholder.style.display = 'flex';
+    if (toolbar) toolbar.style.display = 'none';
 
     // Helper to create sections
     const createSection = (sectionTitle, fileObj, icon, categoryKey) => {
