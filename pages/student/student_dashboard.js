@@ -260,13 +260,13 @@ async function loadSubmissionData() {
                         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                             ${badgesHtml}
                             <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 2px;">
-                                ${linkMap[key] ? `<button onclick="openFileViewer('${linkMap[key]}', '${key}')" style="background: var(--primary-light); color: var(--primary-color); border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;"><span class="material-icons-round" style="font-size: 14px;">visibility</span> View Draft</button>` : ''}
-                                ${Object.entries(annotationsMap[key] || {}).map(([panel, url]) => `
-                                    <button onclick="openFileViewer('${url}', '${key}', '${panel}')" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" title="Annotated by ${panel}">
-                                        <span class="material-icons-round" style="font-size: 14px;">edit_note</span> 
-                                        Feedback (${panel})
+                                ${(linkMap[key] || (annotationsMap[key] && Object.keys(annotationsMap[key]).length > 0)) ? `
+                                    <button onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: linkMap[key], annotations: annotationsMap[key] || {} }))}', '${key}')" 
+                                            style="background: var(--primary-light); color: var(--primary-color); border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                                        <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
+                                        View Feedback
                                     </button>
-                                `).join('')}
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -654,25 +654,65 @@ window.saveSubmissions = async function (specificField) {
 }
 
 let currentViewerFileKey = null;
+let currentViewerData = null; // Stores all URLs for the dropdown
 
-window.closeFileModal = () => {
-    document.getElementById('fileModal').style.display = 'none';
-    const viewer = document.getElementById('fileViewer');
-    if (viewer) viewer.src = '';
+window.prepareViewer = (encodedData, fileKey) => {
+    const data = JSON.parse(decodeURIComponent(encodedData));
+    currentViewerData = data;
+    currentViewerFileKey = fileKey;
 
-    // Revoke blob if exists
-    if (currentBlobUrl) {
-        URL.revokeObjectURL(currentBlobUrl);
-        currentBlobUrl = null;
+    const selector = document.getElementById('feedbackSelector');
+    if (selector) {
+        selector.innerHTML = "";
+
+        // 1. Add Draft Option if exists
+        if (data.draft) {
+            const opt = document.createElement('option');
+            opt.value = "draft";
+            opt.innerText = "Original Draft";
+            selector.appendChild(opt);
+        }
+
+        // 2. Add Annotation Options
+        Object.keys(data.annotations).forEach(panel => {
+            const opt = document.createElement('option');
+            opt.value = panel;
+            opt.innerText = `Feedback (${panel})`;
+            selector.appendChild(opt);
+        });
+
+        // 3. Selection visibility
+        const container = document.getElementById('feedbackSelectorContainer');
+        if (container) {
+            container.style.display = (selector.options.length > 1) ? "flex" : "none";
+        }
     }
 
-    currentViewerFileKey = null;
+    // Default to first option or specific logic
+    if (selector && selector.options.length > 0) {
+        selector.selectedIndex = 0;
+        window.handlePanelSwitch(selector.value);
+    }
 };
 
-// --- SIDEBAR COMMENT SYSTEM (Student Side) ---
+window.handlePanelSwitch = async (value) => {
+    if (!currentViewerData || !currentViewerFileKey) return;
+
+    let targetUrl = "";
+    let panelName = null;
+
+    if (value === "draft") {
+        targetUrl = currentViewerData.draft;
+    } else {
+        targetUrl = currentViewerData.annotations[value];
+        panelName = value;
+    }
+
+    window.openFileViewer(targetUrl, currentViewerFileKey, panelName);
+};
+
 window.openFileViewer = async (url, fileKey, panelName = null) => {
     if (!url) return;
-    currentViewerFileKey = fileKey;
 
     const modal = document.getElementById('fileModal');
     const placeholder = document.getElementById('viewerPlaceholder');
@@ -690,11 +730,7 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
     }
 
     let displayTitle = fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-    if (panelName) {
-        titleEl.innerText = `Feedback from ${panelName}: ${displayTitle}`;
-    } else {
-        titleEl.innerText = 'Draft Submission: ' + displayTitle;
-    }
+    titleEl.innerText = displayTitle;
 
     let absoluteUrl = url.trim();
     if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
@@ -702,9 +738,9 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
     const lowerUrl = absoluteUrl.toLowerCase();
 
     try {
-        // For PDF/Supabase files, use Blob loading to bypass CORS and ensure annotations show
+        // For PDF/Supabase files, use Blob loading to bypass CORS
         if (lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf')) {
-            console.log("Fetching PDF as blob for student viewer...");
+            console.log("Fetching PDF as blob...");
             const response = await fetch(absoluteUrl);
             if (!response.ok) throw new Error("Network response was not ok");
             const blob = await response.blob();
@@ -721,13 +757,28 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
         iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
 
     } catch (e) {
-        console.warn("Blob loading failed for student, falling back to direct URL:", e);
+        console.warn("Blob loading failed, falling back:", e);
         const viewerPath = "../../assets/library/web/viewer.html";
         iframe.src = `${viewerPath}?file=${encodeURIComponent(absoluteUrl)}`;
         iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
     }
 };
 
+window.closeFileModal = () => {
+    document.getElementById('fileModal').style.display = 'none';
+    const viewer = document.getElementById('fileViewer');
+    if (viewer) viewer.src = '';
+
+    // Revoke blob if exists
+    if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+    }
+
+    currentViewerFileKey = null;
+};
+
+// --- SIDEBAR COMMENT SYSTEM (Student Side) ---
 window.handleFileUpload = async (input, targetId) => {
     const file = input.files[0];
     if (!file) return;
