@@ -14,6 +14,7 @@ let currentRole = 'Panel'; // Default
 let adobeDCView = null;
 let currentViewerFileKey = null;
 let currentViewerGroupId = null;
+let currentBlobUrl = null;
 const ADOBE_CLIENT_ID = '5edc19dfde9349e3acb7ecc73bfa4848';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -938,7 +939,12 @@ window.closeFileModal = () => {
     const pdfFrame = document.getElementById('pdfFrame');
     if (pdfFrame) pdfFrame.src = "";
 
-    currentPdf = null;
+    // Revoke blob if exists
+    if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+    }
+
     currentViewerFileKey = null;
     currentViewerGroupId = null;
     currentHighlightedText = "";
@@ -946,7 +952,17 @@ window.closeFileModal = () => {
 
 // --- PDF.js CORE VIEWER ---
 window.loadViewer = async (url, groupId = null, fileKey = null) => {
-    if (!url) return;
+    if (!url) {
+        console.error("loadViewer: No URL provided");
+        return;
+    }
+
+    // Revoke previous blob if exists
+    if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+    }
+
     currentViewerGroupId = groupId;
     currentViewerFileKey = fileKey;
     currentHighlightedText = "";
@@ -956,20 +972,29 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     const pdfFrame = document.getElementById('pdfFrame');
     const saveBtn = document.getElementById('saveAnnotationBtnContainer');
 
-    if (placeholder) placeholder.style.display = 'none';
-    if (container) container.style.display = 'block';
-    if (saveBtn) saveBtn.style.display = 'block';
+    // Show loading state in placeholder
+    if (placeholder) {
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center;">
+                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: viewer-spin 1s linear infinite;"></div>
+                <p style="margin-top: 15px; font-weight: 500; color: #64748b; font-family: inherit;">Preparing PDF Viewer...</p>
+            </div>
+            <style>
+                @keyframes viewer-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+        `;
+    }
+    if (container) container.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = 'none';
 
-
-
-    // Point iframe to local PDF.js viewer
+    // Resolve URL (check for annotations)
     let finalUrl = url;
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
     const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
     if (groupId && fileKey) {
-        // Find the group in allData to check for existing annotations
         const normTab = normalizeType(currentTab);
         const group = allData.find(g => String(g.id) === String(groupId) && g.normalizedType === normTab);
 
@@ -980,21 +1005,44 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             else if (normTab.includes('final')) annotationsMap = group.finalAnnotations || {};
 
             if (annotationsMap[fileKey] && annotationsMap[fileKey][userName]) {
-                console.log("Loading existing annotation for:", userName);
+                console.log("Loading existing annotation version");
                 finalUrl = annotationsMap[fileKey][userName];
             }
         }
     }
 
-    // Use absolute path for viewer if possible to avoid relative resolution issues
-    const viewerPath = "../../assets/library/web/viewer.html";
-    const viewerUrl = `${viewerPath}?file=${encodeURIComponent(finalUrl)}`;
+    try {
+        console.log("Fetching PDF as blob for CORS bypass...");
+        const response = await fetch(finalUrl);
+        if (!response.ok) throw new Error("Network response was not ok");
+        const blob = await response.blob();
+        currentBlobUrl = URL.createObjectURL(blob);
 
-    // Clear first to force reload
-    pdfFrame.src = "";
-    setTimeout(() => {
-        pdfFrame.src = viewerUrl;
-    }, 50);
+        const viewerPath = "../../assets/library/web/viewer.html";
+        const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+
+        if (container) container.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'block';
+
+        pdfFrame.src = ""; // Clear first
+        setTimeout(() => {
+            pdfFrame.src = viewerUrl;
+        }, 50);
+
+    } catch (e) {
+        console.warn("Blob loading failed, falling back to direct URL:", e);
+        const viewerUrl = `../../assets/library/web/viewer.html?file=${encodeURIComponent(finalUrl)}`;
+
+        if (container) container.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'block';
+
+        pdfFrame.src = "";
+        setTimeout(() => {
+            pdfFrame.src = viewerUrl;
+        }, 50);
+    }
 };
 
 async function saveAnnotatedPDF() {
