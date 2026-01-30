@@ -171,25 +171,16 @@ async function loadCapstoneData() {
                 // Original logic used filter but usually 1:1.
                 const sched = schedules.find(s => s.group_id === group.id && normalizeType(s.schedule_type) === normType);
 
-                // 2. Check for files (Handle both JSON objects and raw URL strings)
-                let filesObj = { titles: {}, pre_oral: {}, final: {} };
-                const parseSafe = (val, defaultLabel) => {
-                    if (!val) return {};
-                    try {
-                        const parsed = JSON.parse(val);
-                        // If it's just a string, JSON.parse might return the string itself
-                        if (typeof parsed === 'object' && parsed !== null) return parsed;
-                        return { [defaultLabel]: val };
-                    } catch (e) {
-                        return { [defaultLabel]: val };
-                    }
-                };
-
-                filesObj.titles = parseSafe(group.title_link, 'Title Proposal');
-                filesObj.pre_oral = parseSafe(group.pre_oral_link, 'Pre-Oral Document');
-                filesObj.final = parseSafe(group.final_link, 'Final Manuscript');
-
+                // 2. Check for files
                 let hasFiles = false;
+                let filesObj = {};
+                try {
+                    filesObj = {
+                        titles: group.title_link ? JSON.parse(group.title_link) : {},
+                        pre_oral: group.pre_oral_link ? JSON.parse(group.pre_oral_link) : {},
+                        final: group.final_link ? JSON.parse(group.final_link) : {}
+                    };
+                } catch (e) { console.error('JSON Parse error', e); }
 
                 if (normType.includes('title') && Object.keys(filesObj.titles).length > 0) hasFiles = true;
                 else if (normType.includes('preoral') && Object.keys(filesObj.pre_oral).length > 0) hasFiles = true;
@@ -450,9 +441,8 @@ function renderTable() {
              `;
             row.style.background = '#fafafa';
         } else {
-            // Enhanced debug logging in the button itself
             actionBtn = `
-                <button onclick="console.log('View Files clicked for group:', '${g.id}'); openFileModal('${g.id}')" 
+                <button onclick="${hasFiles ? `openFileModal(${g.id})` : ''}" 
                     style="background: ${hasFiles ? 'var(--primary-light)' : '#f1f5f9'}; opacity: ${hasFiles ? '1' : '0.6'}; border: none; color: ${hasFiles ? 'var(--primary-color)' : '#94a3b8'}; cursor: ${hasFiles ? 'pointer' : 'default'}; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; transition: all 0.2s;">
                     <span class="material-icons-round" style="font-size: 18px;">${hasFiles ? 'folder_open' : 'folder_off'}</span>
                     <span style="font-size: 12px; font-weight: 600;">${hasFiles ? 'View Files' : 'No Files'}</span>
@@ -492,182 +482,164 @@ function renderTable() {
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 window.openFileModal = (groupId) => {
-    try {
-        console.log('DEBUG: openFileModal triggered with ID:', groupId);
-        const normTab = normalizeType(currentTab);
-        console.log('DEBUG: normTab:', normTab);
-        const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
-        console.log('DEBUG: group found:', group ? group.groupName : 'NOT FOUND');
+    // FIX: Find group matching ID AND the current active tab (Defense Type)
+    // This ensures we get the correct object (Title, Pre, or Final) from allData
+    const normTab = normalizeType(currentTab);
+    const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
 
-        if (!group) {
-            console.error('DEBUG ERROR: Could not find group in allData Matching Tab:', normTab, 'Target ID:', groupId);
-            alert('Cannot open: Group data not found for the ' + currentTab + ' phase.');
-            return;
-        }
+    if (!group) {
+        console.error('Group not found for this tab context');
+        return;
+    }
 
-        const modalGroupName = document.getElementById('modalGroupName');
-        const fileList = document.getElementById('fileList');
-        const viewerPlaceholder = document.getElementById('viewerPlaceholder');
-        const viewerToolbar = document.getElementById('viewerToolbar');
-        const viewerContainer = document.getElementById('pdfViewerContainer');
+    document.getElementById('modalGroupName').innerText = group.groupName;
+    const fileList = document.getElementById('fileList');
+    fileList.innerHTML = '';
 
-        if (!modalGroupName || !fileList || !viewerPlaceholder || !viewerToolbar || !viewerContainer) {
-            console.error('DEBUG ERROR: Missing UI element(s):', {
-                modalGroupName: !!modalGroupName,
-                fileList: !!fileList,
-                viewerPlaceholder: !!viewerPlaceholder,
-                viewerToolbar: !!viewerToolbar,
-                viewerContainer: !!viewerContainer
-            });
-            throw new Error('One or more modal elements are missing from the page.');
-        }
+    // reset viewer
+    document.getElementById('fileViewer').style.display = 'none';
+    document.getElementById('viewerPlaceholder').style.display = 'flex';
+    document.getElementById('viewerToolbar').style.display = 'none';
 
-        modalGroupName.innerText = group.groupName;
-        fileList.innerHTML = '';
-        viewerContainer.innerHTML = '';
-        viewerPlaceholder.style.display = 'flex';
-        viewerToolbar.style.display = 'none';
+    // Helper to create sections
+    const createSection = (sectionTitle, fileObj, icon, categoryKey) => {
+        if (!fileObj || Object.keys(fileObj).length === 0) return;
 
-        // Helper to create sections
-        const createSection = (sectionTitle, fileObj, icon, categoryKey) => {
-            console.log('DEBUG: Creating section:', sectionTitle, 'FileCount:', Object.keys(fileObj || {}).length);
-            if (!fileObj || Object.keys(fileObj).length === 0) return;
+        const section = document.createElement('div');
+        section.style.marginBottom = '20px';
 
-            const section = document.createElement('div');
-            section.style.marginBottom = '20px';
+        const header = document.createElement('h4');
+        header.innerHTML = `<span class="material-icons-round" style="font-size:16px; vertical-align:middle; margin-right:4px;">${icon}</span> ${sectionTitle}`;
+        header.style.fontSize = '0.85rem';
+        header.style.textTransform = 'uppercase';
+        header.style.color = '#64748b';
+        header.style.letterSpacing = '0.5px';
+        header.style.marginBottom = '10px';
+        section.appendChild(header);
 
-            const header = document.createElement('h4');
-            header.innerHTML = `<span class="material-icons-round" style="font-size:16px; vertical-align:middle; margin-right:4px;">${icon}</span> ${sectionTitle}`;
-            header.style.fontSize = '0.85rem';
-            header.style.textTransform = 'uppercase';
-            header.style.color = '#64748b';
-            header.style.letterSpacing = '0.5px';
-            header.style.marginBottom = '10px';
-            section.appendChild(header);
+        Object.entries(fileObj).forEach(([label, url]) => {
+            const itemContainer = document.createElement('div');
+            itemContainer.style.background = 'white';
+            itemContainer.style.border = '1px solid #e2e8f0';
+            itemContainer.style.borderRadius = '8px';
+            itemContainer.style.marginBottom = '8px';
+            itemContainer.style.overflow = 'hidden';
 
-            Object.entries(fileObj).forEach(([label, url]) => {
-                const itemContainer = document.createElement('div');
-                itemContainer.style.background = 'white';
-                itemContainer.style.border = '1px solid #e2e8f0';
-                itemContainer.style.borderRadius = '8px';
-                itemContainer.style.marginBottom = '8px';
-                itemContainer.style.overflow = 'hidden';
+            // File Item
+            const item = document.createElement('div');
+            item.className = 'file-item';
+            item.style.padding = '10px 12px';
+            item.style.cursor = 'pointer';
+            item.style.display = 'flex';
+            item.style.alignItems = 'center';
+            item.style.justifyContent = 'space-between';
+            item.style.transition = 'all 0.2s';
 
-                // File Item
-                const item = document.createElement('div');
-                item.className = 'file-item';
-                item.style.padding = '10px 12px';
-                item.style.cursor = 'pointer';
-                item.style.display = 'flex';
-                item.style.alignItems = 'center';
-                item.style.justifyContent = 'space-between';
-                item.style.transition = 'all 0.2s';
+            const displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
-                const displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-
-                item.innerHTML = `
+            item.innerHTML = `
                 <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
                 <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">arrow_forward_ios</span>
             `;
 
-                item.onclick = () => {
-                    document.querySelectorAll('.file-item').forEach(el => {
-                        el.style.background = 'white';
-                        el.parentElement.style.borderColor = '#e2e8f0';
-                    });
-                    item.style.background = '#f0f9ff';
-                    itemContainer.style.borderColor = 'var(--primary-color)';
-                    loadViewer(url, groupId, label);
-                };
+            item.onclick = () => {
+                document.querySelectorAll('.file-item').forEach(el => {
+                    el.style.background = 'white';
+                    el.parentElement.style.borderColor = '#e2e8f0';
+                });
+                item.style.background = '#f0f9ff';
+                itemContainer.style.borderColor = 'var(--primary-color)';
+                loadViewer(url, groupId, label);
+            };
 
-                itemContainer.appendChild(item);
+            itemContainer.appendChild(item);
 
-                // Approval Controls logic (same as before)
-                // ... (We assume the status/remarks update logic remains valid)
-                // Re-implement simplified version here to save space or reuse if function available
+            // Approval Controls logic (same as before)
+            // ... (We assume the status/remarks update logic remains valid)
+            // Re-implement simplified version here to save space or reuse if function available
 
-                // To ensure it works, I'll inject the controls logic directly again (safest)
-                const userJson = localStorage.getItem('loginUser');
-                const user = userJson ? JSON.parse(userJson) : null;
-                const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+            // To ensure it works, I'll inject the controls logic directly again (safest)
+            const userJson = localStorage.getItem('loginUser');
+            const user = userJson ? JSON.parse(userJson) : null;
+            const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
-                let currentStatusMap = {};
-                let currentRemarksMap = {};
+            let currentStatusMap = {};
+            let currentRemarksMap = {};
 
-                if (categoryKey === 'titles') {
-                    currentStatusMap = group.titleStatus || {};
-                    currentRemarksMap = group.titleRemarks || {};
-                } else if (categoryKey === 'pre_oral') {
-                    currentStatusMap = group.preOralStatus || {};
-                    currentRemarksMap = group.preOralRemarks || {};
-                } else if (categoryKey === 'final') {
-                    currentStatusMap = group.finalStatus || {};
-                    currentRemarksMap = group.finalRemarks || {};
-                }
+            if (categoryKey === 'titles') {
+                currentStatusMap = group.titleStatus || {};
+                currentRemarksMap = group.titleRemarks || {};
+            } else if (categoryKey === 'pre_oral') {
+                currentStatusMap = group.preOralStatus || {};
+                currentRemarksMap = group.preOralRemarks || {};
+            } else if (categoryKey === 'final') {
+                currentStatusMap = group.finalStatus || {};
+                currentRemarksMap = group.finalRemarks || {};
+            }
 
-                // --- Multi-Panel Logic ---
-                // If the map value is a string (old version), we ignore it for multi-panel or try to adapt.
-                // New structure: currentStatusMap[label] = { "Panel Name": "Status" }
-                const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
-                const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
+            // --- Multi-Panel Logic ---
+            // If the map value is a string (old version), we ignore it for multi-panel or try to adapt.
+            // New structure: currentStatusMap[label] = { "Panel Name": "Status" }
+            const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
+            const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
 
-                const myStatus = fileStatuses[userName] || 'Pending';
-                const myRemarks = fileRemarks[userName] || '';
+            const myStatus = fileStatuses[userName] || 'Pending';
+            const myRemarks = fileRemarks[userName] || '';
 
-                // ... (Controls Rendering Code) ...
-                const controls = document.createElement('div');
-                controls.style.padding = '12px';
-                controls.style.background = '#f8fafc';
-                controls.style.borderTop = '1px solid #e2e8f0';
-                controls.style.display = 'flex';
-                controls.style.flexDirection = 'column';
-                controls.style.gap = '8px';
+            // ... (Controls Rendering Code) ...
+            const controls = document.createElement('div');
+            controls.style.padding = '12px';
+            controls.style.background = '#f8fafc';
+            controls.style.borderTop = '1px solid #e2e8f0';
+            controls.style.display = 'flex';
+            controls.style.flexDirection = 'column';
+            controls.style.gap = '8px';
 
-                let statusColor = '#64748b';
-                let statusBg = '#f1f5f9';
-                let iconText = 'hourglass_empty';
+            let statusColor = '#64748b';
+            let statusBg = '#f1f5f9';
+            let iconText = 'hourglass_empty';
 
-                if (myStatus.includes('Approved')) {
-                    statusColor = '#059669'; statusBg = '#dcfce7'; iconText = 'check_circle';
-                } else if (myStatus.includes('Approve with Revisions')) {
-                    statusColor = '#d97706'; statusBg = '#fef3c7'; iconText = 'warning';
-                } else if (myStatus.includes('Rejected') || myStatus.includes('Redefense')) {
-                    statusColor = '#dc2626'; statusBg = '#fee2e2'; iconText = 'cancel';
-                }
+            if (myStatus.includes('Approved')) {
+                statusColor = '#059669'; statusBg = '#dcfce7'; iconText = 'check_circle';
+            } else if (myStatus.includes('Approve with Revisions')) {
+                statusColor = '#d97706'; statusBg = '#fef3c7'; iconText = 'warning';
+            } else if (myStatus.includes('Rejected') || myStatus.includes('Redefense')) {
+                statusColor = '#dc2626'; statusBg = '#fee2e2'; iconText = 'cancel';
+            }
 
-                let optionsHtml = '';
-                // ... (option generation omitted for brevity if not used in read-only)
+            let optionsHtml = '';
+            // ... (option generation omitted for brevity if not used in read-only)
 
-                if (categoryKey === 'titles') {
-                    optionsHtml = `
+            if (categoryKey === 'titles') {
+                optionsHtml = `
                     <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
                     <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
                     <option value="Rejected" ${myStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
                 `;
-                } else {
-                    optionsHtml = `
+            } else {
+                optionsHtml = `
                     <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
                     <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
                     <option value="Redefense" ${myStatus === 'Redefense' ? 'selected' : ''}>Redefense</option>
                 `;
-                }
+            }
 
-                // Other Panel Feedback HTML (Visible to everyone)
-                let otherFeedbackHtml = '';
-                // For Adviser, we want to see ALL panel feedback, not just "others".
-                // Since Adviser name isn't in the status map as a KEY usually (unless they are also a panel), 
-                // "others" logic works fine if we consider Adviser is not a panel key.
-                // But if currentRole is Adviser, we want to see ALL entries in fileStatuses.
+            // Other Panel Feedback HTML (Visible to everyone)
+            let otherFeedbackHtml = '';
+            // For Adviser, we want to see ALL panel feedback, not just "others".
+            // Since Adviser name isn't in the status map as a KEY usually (unless they are also a panel), 
+            // "others" logic works fine if we consider Adviser is not a panel key.
+            // But if currentRole is Adviser, we want to see ALL entries in fileStatuses.
 
-                let panelsToDisplay = [];
-                if (currentRole === 'Adviser') {
-                    panelsToDisplay = Object.keys(fileStatuses);
-                } else {
-                    panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
-                }
+            let panelsToDisplay = [];
+            if (currentRole === 'Adviser') {
+                panelsToDisplay = Object.keys(fileStatuses);
+            } else {
+                panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
+            }
 
-                if (panelsToDisplay.length > 0) {
-                    otherFeedbackHtml = `
+            if (panelsToDisplay.length > 0) {
+                otherFeedbackHtml = `
                     <div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">
                         <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Panel Evaluations</div>
                         ${panelsToDisplay.map(panel => `
@@ -678,11 +650,11 @@ window.openFileModal = (groupId) => {
                         `).join('')}
                     </div>
                 `;
-                }
+            }
 
-                let interactiveControls = '';
-                if (currentRole === 'Panel') {
-                    interactiveControls = `
+            let interactiveControls = '';
+            if (currentRole === 'Panel') {
+                interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
                     <div style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
@@ -690,7 +662,7 @@ window.openFileModal = (groupId) => {
                         ${myStatus}
                     </div>
                 </div>
-                <select onchange="updateStatus('${group.id}', '${categoryKey}', '${label}', this.value)" 
+                <select onchange="updateStatus(${group.id}, '${categoryKey}', '${label}', this.value)" 
                     style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; cursor: pointer; background: white; color: #334155; font-weight: 500; outline: none; margin-bottom: 5px;">
                     <option value="Pending" ${myStatus === 'Pending' ? 'selected' : ''}>Change Your Status...</option>
                     ${optionsHtml}
@@ -699,55 +671,51 @@ window.openFileModal = (groupId) => {
                     <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Your Remarks</div>
                     <textarea id="remarks-${categoryKey}-${label}" placeholder="Add your feedback..." 
                         style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 13px; min-height: 60px; resize: vertical;">${myRemarks.includes(':') ? myRemarks.split(':').slice(1).join(':').trim() : myRemarks}</textarea>
-                    <button onclick="saveRemarks('${group.id}', '${categoryKey}', '${label}')" 
+                    <button onclick="saveRemarks(${group.id}, '${categoryKey}', '${label}')" 
                         style="width: 100%; margin-top: 5px; background: ${myRemarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${myRemarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
                         ${myRemarks ? 'Update Remarks' : 'Save Remarks'}
                     </button>
                 </div>
                 `;
-                } else {
-                    // Adviser View (Read Only)
-                    interactiveControls = `
+            } else {
+                // Adviser View (Read Only)
+                interactiveControls = `
                     <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
                         <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
                         Viewing as Adviser (Read Only)
                     </div>
                 `;
-                }
+            }
 
-                controls.innerHTML = `
+            controls.innerHTML = `
                 ${interactiveControls}
                 ${otherFeedbackHtml}
             `;
-                itemContainer.appendChild(controls);
-                section.appendChild(itemContainer);
-            });
+            itemContainer.appendChild(controls);
+            section.appendChild(itemContainer);
+        });
 
-            fileList.appendChild(section);
-        };
+        fileList.appendChild(section);
+    };
 
-        // Filter which sections to show based on locking/tab? 
-        // Usually if I open the "Title Defense" group row, I might want to see ONLY Title files?
-        // Or see all history?
-        // Let's show ONLY the current tab's files to be focused. 
-        // Or allow seeing previous approved ones?
-        // Generally, context is "grading this stage".
-        // I will show ALL for context, but maybe collapse others?
-        // For simplicity, showing all is safer so they can reference previous docs.
+    // Filter which sections to show based on locking/tab? 
+    // Usually if I open the "Title Defense" group row, I might want to see ONLY Title files?
+    // Or see all history?
+    // Let's show ONLY the current tab's files to be focused. 
+    // Or allow seeing previous approved ones?
+    // Generally, context is "grading this stage".
+    // I will show ALL for context, but maybe collapse others?
+    // For simplicity, showing all is safer so they can reference previous docs.
 
-        if (normTab.includes('title')) {
-            createSection('Title Defense', group.files.titles, 'article', 'titles');
-        } else if (normTab.includes('preoral')) {
-            createSection('Pre-Oral Defense', group.files.pre_oral, 'description', 'pre_oral');
-        } else if (normTab.includes('final')) {
-            createSection('Final Defense', group.files.final, 'menu_book', 'final');
-        }
-
-        document.getElementById('fileModal').style.display = 'flex';
-    } catch (err) {
-        console.error('CRITICAL UI ERROR in openFileModal:', err);
-        alert('An error occurred while opening the file viewer. Check console for details.');
+    if (normTab.includes('title')) {
+        createSection('Title Defense', group.files.titles, 'article', 'titles');
+    } else if (normTab.includes('preoral')) {
+        createSection('Pre-Oral Defense', group.files.pre_oral, 'description', 'pre_oral');
+    } else if (normTab.includes('final')) {
+        createSection('Final Defense', group.files.final, 'menu_book', 'final');
     }
+
+    document.getElementById('fileModal').style.display = 'flex';
 };
 
 // Re-attach other globals (updateStatus, saveRemarks, loadViewer, etc.)
@@ -766,7 +734,7 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
 
     try {
         const normTab = normalizeType(currentTab);
-        const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
+        const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
         if (!group) throw new Error('Could not find group data in current view.');
 
         // 1. Save to individual feedback table
@@ -915,219 +883,135 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     }
 };
 
+// --- PDF.js Integration Variables ---
+let currentPdf = null;
+let currentPageNum = 1;
+let pdfScale = 1.5;
+let currentHighlightedText = "";
+let currentHighlightedPage = 0;
+const pdfjsLib = window['pdfjs-dist/build/pdf'];
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     const container = document.getElementById('pdfViewerContainer');
-    if (container) container.innerHTML = '';
-
+    if (container) container.style.display = 'none';
     const sidebar = document.getElementById('commentsSidebar');
     if (sidebar) sidebar.style.display = 'none';
+
+    currentPdf = null;
     currentViewerFileKey = null;
     currentViewerGroupId = null;
+    currentHighlightedText = "";
 };
 
-// --- ADVANCED PDF.JS VIEWER WITH SELECTION CAPTURE ---
-let pdfDoc = null;
-let currentSelection = { text: '', page: 0 };
-
+// --- PDF.js CORE VIEWER ---
 window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) return;
-    console.log('Loading Viewer for:', url);
-
-    // Initialize PDF.js worker
-    if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-    }
-
     currentViewerGroupId = groupId;
     currentViewerFileKey = fileKey;
+    currentHighlightedText = ""; // Reset highlight
 
-    const container = document.getElementById('pdfViewerContainer');
     const placeholder = document.getElementById('viewerPlaceholder');
+    const container = document.getElementById('pdfViewerContainer');
     const toolbar = document.getElementById('viewerToolbar');
+    const sidebar = document.getElementById('commentsSidebar');
     const nameDisplay = document.getElementById('currentFileNameDisplay');
-    const tooltip = document.getElementById('highlightTooltip');
+    const linkBtn = document.getElementById('externalLinkBtn');
 
-    // Clear previous
-    container.innerHTML = '';
-    placeholder.style.display = 'flex';
-    tooltip.style.display = 'none';
-    resetCommentInput();
+    if (placeholder) placeholder.style.display = 'none';
+    if (container) container.style.display = 'block';
+    if (toolbar) toolbar.style.display = 'flex';
+    if (sidebar) sidebar.style.display = 'flex';
+    if (nameDisplay) nameDisplay.innerText = (fileKey || 'File').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    if (linkBtn) linkBtn.href = url;
 
-    let absoluteUrl = url.trim();
-    if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
-
+    // Load PDF
     try {
-        const loadingTask = pdfjsLib.getDocument(absoluteUrl);
-        pdfDoc = await loadingTask.promise;
-
-        placeholder.style.display = 'none';
-        toolbar.style.display = 'flex';
-        nameDisplay.innerText = (fileKey || 'File').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-
-        // Render all pages
-        for (let i = 1; i <= pdfDoc.numPages; i++) {
-            await renderPage(i);
-        }
-
-        // Setup Selection Listener
-        container.addEventListener('mouseup', handleSelection);
-
+        const loadingTask = pdfjsLib.getDocument(url);
+        currentPdf = await loadingTask.promise;
+        currentPageNum = 1;
+        renderPage(currentPageNum);
         loadComments(groupId, fileKey);
     } catch (e) {
-        console.error('PDF.js Load Error:', e);
-        placeholder.innerHTML = `<p style="color:#ef4444;">Error loading PDF. Please use "Open Original".</p>`;
+        console.error('PDF Load Error:', e);
+        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Failed to load PDF. It might be restricted or not a PDF file.</div>`;
     }
-
-    if (document.getElementById('externalLinkBtn')) document.getElementById('externalLinkBtn').href = absoluteUrl;
 };
 
 async function renderPage(num) {
-    const container = document.getElementById('pdfViewerContainer');
-    const page = await pdfDoc.getPage(num);
+    if (!currentPdf) return;
+    const target = document.getElementById('pdfRenderTarget');
+    target.innerHTML = '<div style="padding:40px; text-align:center;">Rendering page...</div>';
 
-    // Auto-calculate scale to fit container width (minus padding)
-    const containerWidth = container.clientWidth || (window.innerWidth * 0.7);
-    const unscaledViewport = page.getViewport({ scale: 1.0 });
-    const scale = (containerWidth - 40) / unscaledViewport.width;
+    const page = await currentPdf.getPage(num);
+    const viewport = page.getViewport({ scale: pdfScale });
 
-    // Safety cap: allow much larger zoom for desktop clarity
-    const finalScale = Math.min(Math.max(scale, 1.0), 3.0);
-    const viewport = page.getViewport({ scale: finalScale });
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'pdf-page-wrapper';
-    wrapper.dataset.pageNumber = num;
-    wrapper.style.width = viewport.width + 'px';
-    wrapper.style.height = viewport.height + 'px';
-    wrapper.style.margin = '0 auto 30px auto'; // Better vertical spacing
-    wrapper.style.boxShadow = '0 15px 40px rgba(0,0,0,0.2)';
-    wrapper.style.background = 'white';
-
+    target.innerHTML = '';
     const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
+    const context = canvas.getContext('2d');
     canvas.height = viewport.height;
-    wrapper.appendChild(canvas);
+    canvas.width = viewport.width;
+    target.style.width = viewport.width + 'px';
+    target.style.height = viewport.height + 'px';
+    target.appendChild(canvas);
 
-    const textLayer = document.createElement('div');
-    textLayer.className = 'textLayer';
-    wrapper.appendChild(textLayer);
-
-    container.appendChild(wrapper);
-
-    const renderContext = { canvasContext: canvas.getContext('2d'), viewport: viewport };
+    const renderContext = { canvasContext: context, viewport: viewport };
     await page.render(renderContext).promise;
 
+    // Render Text Layer for Selection
     const textContent = await page.getTextContent();
+    const textLayerDiv = document.createElement('div');
+    textLayerDiv.className = 'textLayer';
+    textLayerDiv.style.width = viewport.width + 'px';
+    textLayerDiv.style.height = viewport.height + 'px';
+    target.appendChild(textLayerDiv);
+
     pdfjsLib.renderTextLayer({
         textContent: textContent,
-        container: textLayer,
+        container: textLayerDiv,
         viewport: viewport,
         textDivs: []
     });
+
+    document.getElementById('pageCountDisplay').innerText = `PAGE ${num} / ${currentPdf.numPages}`;
 }
 
-function handleSelection(e) {
+window.changePage = (offset) => {
+    const newPage = currentPageNum + offset;
+    if (newPage >= 1 && newPage <= currentPdf.numPages) {
+        currentPageNum = newPage;
+        renderPage(currentPageNum);
+    }
+};
+
+// --- HIGHLIGHT DETECTION ---
+document.addEventListener('selectionchange', () => {
     const selection = window.getSelection();
     const text = selection.toString().trim();
-    const tooltip = document.getElementById('highlightTooltip');
 
-    if (text && text.length > 3) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+    // Only capture if selection is inside our PDF target
+    const target = document.getElementById('pdfRenderTarget');
+    if (text && target && target.contains(selection.anchorNode)) {
+        currentHighlightedText = text;
+        currentHighlightedPage = currentPageNum;
 
-        // Find which page this selection belongs to
-        let pageNum = 0;
-        let node = range.startContainer;
-        while (node && node !== document.body) {
-            if (node.classList?.contains('pdf-page-wrapper')) {
-                pageNum = node.dataset.pageNumber;
-                break;
-            }
-            node = node.parentNode;
+        const input = document.getElementById('commentInput');
+        if (input && !input.value.startsWith('RE:')) {
+            input.value = `RE: "${text}" (Page ${currentPageNum})\n— `;
+            input.focus();
+            // Move cursor to end
+            input.setSelectionRange(input.value.length, input.value.length);
         }
-
-        currentSelection = { text: text, page: pageNum };
-
-        tooltip.style.left = `${e.clientX}px`;
-        tooltip.style.top = `${e.clientY}px`;
-        tooltip.style.display = 'flex';
-    } else {
-        tooltip.style.display = 'none';
     }
-}
+});
 
-window.captureHighlight = () => {
-    const hint = document.getElementById('selectionHint');
-    const quoted = document.getElementById('quotedText');
-    const input = document.getElementById('commentInput');
-    const btn = document.getElementById('postCommentBtn');
-    const tooltip = document.getElementById('highlightTooltip');
-
-    quoted.innerText = `[Page ${currentSelection.page}] "${currentSelection.text.substring(0, 50)}${currentSelection.text.length > 50 ? '...' : ''}"`;
-    hint.style.display = 'block';
-
-    input.placeholder = "Now type your correction/feedback here...";
-    input.focus();
-
-    btn.disabled = false;
-    btn.style.background = 'var(--primary-color)';
-    btn.style.cursor = 'pointer';
-
-    tooltip.style.display = 'none';
-    window.getSelection().removeAllRanges();
-};
-
-function resetCommentInput() {
-    const hint = document.getElementById('selectionHint');
-    const input = document.getElementById('commentInput');
-    const btn = document.getElementById('postCommentBtn');
-
-    hint.style.display = 'none';
-    input.value = '';
-    input.placeholder = "First, highlight text in the document...";
-    btn.disabled = true;
-    btn.style.background = '#cbd5e1';
-    btn.style.cursor = 'not-allowed';
-}
-
-window.postComment = async () => {
-    const input = document.getElementById('commentInput');
-    const text = input.value.trim();
-    if (!text || !currentViewerGroupId || !currentViewerFileKey) return;
-
-    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-    const userName = user.name || user.full_name || 'Panelist';
-
-    // Combine selection context with comment
-    const fullComment = `**Ref Page ${currentSelection.page}:** _"${currentSelection.text}"_\n\n**FEEDBACK:** ${text}`;
-
-    input.disabled = true;
-
-    try {
-        const { error } = await supabaseClient.from('file_comments').insert({
-            group_id: currentViewerGroupId,
-            file_key: currentViewerFileKey,
-            user_name: userName,
-            user_role: 'Panelist',
-            comment_text: fullComment
-        });
-
-        if (error) throw error;
-        resetCommentInput();
-        loadComments(currentViewerGroupId, currentViewerFileKey);
-    } catch (e) {
-        alert('Error: ' + e.message);
-    } finally {
-        input.disabled = false;
-    }
-};
-
+// --- SIDEBAR COMMENT SYSTEM ---
 async function loadComments(groupId, fileKey) {
     const list = document.getElementById('commentsList');
     if (!list) return;
 
-    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;">Loading...</div>`;
+    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;"><div class="viewer-loader" style="width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; margin-bottom:10px;"></div><br>Loading discussion...</div>`;
 
     try {
         const { data: comments, error } = await supabaseClient
@@ -1140,14 +1024,18 @@ async function loadComments(groupId, fileKey) {
         if (error) throw error;
         renderComments(comments || []);
     } catch (e) {
-        list.innerHTML = `<div style="text-align:center; color:#ef4444;">Sync Error</div>`;
+        console.error('Comments Load Error:', e);
+        list.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px; font-size:0.8rem;">Error loading comments.</div>`;
     }
 }
 
 function renderComments(comments) {
     const list = document.getElementById('commentsList');
     if (comments.length === 0) {
-        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;"><p>No feedback yet.</p></div>`;
+        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;">
+            <span class="material-icons-round" style="font-size: 40px; opacity: 0.3;">forum</span>
+            <p style="font-size: 0.85rem; margin-top: 10px;">No feedback yet.<br>Start the discussion below.</p>
+        </div>`;
         return;
     }
 
@@ -1156,31 +1044,70 @@ function renderComments(comments) {
 
     list.innerHTML = comments.map(c => {
         const isMe = c.user_name === myName;
-        // Parse the markdown-like content for better student display
-        const displayBody = c.comment_text
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/_(.*?)_/g, '<em>$1</em>')
-            .replace(/\n/g, '<br>');
+        const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const date = new Date(c.created_at).toLocaleDateString();
 
         return `
             <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'};">
                 <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
                     <span style="font-size: 0.7rem; font-weight: 700; color: #64748b;">${c.user_name}</span>
+                    <span style="font-size: 0.65rem; color: #94a3b8;">${date} ${time}</span>
                 </div>
                 <div style="background: ${isMe ? 'var(--primary-color)' : 'white'}; 
                             color: ${isMe ? 'white' : '#1e293b'}; 
-                            padding: 12px; 
-                            border-radius: 12px; 
-                            font-size: 0.85rem; 
-                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};
-                            max-width: 95%;">
-                    ${displayBody}
+                            padding: 10px 14px; 
+                            border-radius: ${isMe ? '12px 12px 2px 12px' : '2px 12px 12px 12px'}; 
+                            font-size: 0.88rem; 
+                            line-height: 1.4; 
+                            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                            max-width: 90%;
+                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};">
+                    ${c.comment_text}
                 </div>
             </div>
         `;
     }).join('');
+
     setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
 }
+
+window.postComment = async () => {
+    const input = document.getElementById('commentInput');
+    const text = input.value.trim();
+
+    // FORCE HIGHLIGHT LOGIC: Check if text contains "RE:" reference
+    if (!text.includes('RE:') || !text.includes('Page')) {
+        alert('❌ FORCE REFERENCE: Please highlight text in the PDF first to auto-generate a correction reference.');
+        return;
+    }
+
+    if (!text || !currentViewerGroupId || !currentViewerFileKey) return;
+
+    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+    const userName = user.name || user.full_name || 'Panelist';
+
+    input.disabled = true;
+
+    try {
+        const { error } = await supabaseClient.from('file_comments').insert({
+            group_id: currentViewerGroupId,
+            file_key: currentViewerFileKey,
+            user_name: userName,
+            user_role: 'Panelist',
+            comment_text: text
+        });
+
+        if (error) throw error;
+        input.value = '';
+        currentHighlightedText = ""; // Clear for next use
+        loadComments(currentViewerGroupId, currentViewerFileKey);
+    } catch (e) {
+        alert('Could not post comment: ' + e.message);
+    } finally {
+        input.disabled = false;
+        input.focus();
+    }
+};
 
 window.filterTable = (program) => {
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
