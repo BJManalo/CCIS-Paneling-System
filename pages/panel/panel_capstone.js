@@ -982,14 +982,16 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     });
                 }).catch(err => {
                     console.error('CRITICAL ADOBE ERROR:', err);
-                    // If you see "NOT_FOUND" or "FORBIDDEN" here, it's the URL/Sharing.
-                    // If you see "INVALID_CLIENT_ID" or "UNAUTHORIZED_DOMAIN", it's the Adobe Key.
+                    let specificError = 'Check Console';
+                    if (err) {
+                        specificError = err.type || err.code || err.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 50));
+                    }
                     delete adobeContainer.dataset.activeUrl;
-                    showCompatibilityMode('Adobe Failed to Render: ' + (err.type || 'Check Console'));
+                    showCompatibilityMode('Adobe SDK Error: ' + specificError);
                 });
             } catch (e) {
                 console.error('Adobe init error:', e);
-                showCompatibilityMode('SDK Init Failed');
+                showCompatibilityMode('Init Failed: ' + e.message);
             }
         };
 

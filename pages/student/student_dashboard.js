@@ -694,10 +694,14 @@ window.openFileViewer = async (url, fileKey) => {
                     });
                 }).catch(err => {
                     console.error('CRITICAL ADOBE ERROR (Student):', err);
+                    let specificError = 'Check Console';
+                    if (err) {
+                        specificError = err.type || err.code || err.message || (typeof err === 'string' ? err : JSON.stringify(err).substring(0, 50));
+                    }
                     delete adobeContainer.dataset.activeUrl;
-                    showCompatibilityMode(err.type || 'Adobe View Blocked');
+                    showCompatibilityMode(specificError);
                 });
-            } catch (e) { showCompatibilityMode('Init Failed'); }
+            } catch (e) { showCompatibilityMode('Init Failed: ' + e.message); }
         };
 
         if (window.AdobeDC) initAdobe();
