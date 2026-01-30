@@ -74,8 +74,8 @@
 
         /* PDF.js Text Selection Color */
         .textLayer ::selection {
-            background-color: #1e40af !important;
-            /* Darker blue */
+            background-color: #002d72 !important;
+            /* Rich Navy Blue */
             color: white !important;
             fill: white !important;
         }
@@ -254,7 +254,6 @@
                     align-items: center;
                     padding: 20px 0;
                     position: relative;
-                    cursor: crosshair;
                 }
 
                 .pdf-page-wrapper {
@@ -271,7 +270,8 @@
                     right: 0;
                     bottom: 0;
                     overflow: hidden;
-                    opacity: 0.2;
+                    opacity: 1;
+                    /* Standard PDF.js selection layer */
                     line-height: 1.0;
                 }
 
