@@ -1002,28 +1002,54 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        // Restore existing annotations (v2: from student_groups JSON)
+                        // Restore existing annotations (Strategy: Schedules -> StudentGroups -> LocalStorage)
                         try {
-                            console.log(`FETCHING v2 for Group: ${groupId}, File: ${fileKey}`);
-                            const { data: groupData, error } = await supabaseClient
-                                .from('student_groups')
+                            console.log(`FETCHING for Group: ${groupId}, File: ${fileKey}`);
+
+                            // 1. Try DB (Schedules)
+                            let foundAnnotations = null;
+                            const { data: schedData } = await supabaseClient
+                                .from('schedules')
                                 .select('pdf_comments')
-                                .eq('id', groupId)
-                                .single();
+                                .eq('group_id', groupId)
+                                .maybeSingle();
 
-                            if (error) console.error('Error fetching annotations (v2):', error);
+                            if (schedData?.pdf_comments?.[fileKey]) {
+                                foundAnnotations = schedData.pdf_comments[fileKey];
+                                console.log('Loaded from SCHEDULES table');
+                            }
 
-                            const commentsJson = groupData?.pdf_comments || {};
-                            const fileAnnotations = commentsJson[fileKey];
+                            // 2. Fallback DB (Student Groups) if empty
+                            if (!foundAnnotations) {
+                                const { data: groupData } = await supabaseClient
+                                    .from('student_groups')
+                                    .select('pdf_comments')
+                                    .eq('id', groupId)
+                                    .maybeSingle();
+                                if (groupData?.pdf_comments?.[fileKey]) {
+                                    foundAnnotations = groupData.pdf_comments[fileKey];
+                                    console.log('Loaded from STUDENT_GROUPS table (legacy)');
+                                }
+                            }
 
-                            if (fileAnnotations && Array.isArray(fileAnnotations)) {
-                                console.log('FOUND SAVED ANNOTATIONS (v2):', fileAnnotations.length);
-                                const imported = await annotationManager.addAnnotations(fileAnnotations);
-                                console.log('Import result:', imported);
+                            // 3. Fallback LocalStorage (Personal Backup) if still empty
+                            if (!foundAnnotations) {
+                                try {
+                                    const localKey = `pdf_backup_${groupId}_${fileKey}`;
+                                    const localData = localStorage.getItem(localKey);
+                                    if (localData) {
+                                        foundAnnotations = JSON.parse(localData);
+                                        console.log('Loaded from LOCAL_STORAGE backup');
+                                        showToast('Loaded local backup (unsync?)', true);
+                                    }
+                                } catch (e) { }
+                            }
+
+                            if (foundAnnotations && Array.isArray(foundAnnotations)) {
+                                console.log('Applying Annotations:', foundAnnotations.length);
+                                await annotationManager.addAnnotations(foundAnnotations);
                             } else {
-                                console.log('NO PREVIOUS ANNOTATIONS FOUND (v2). Checking migration...');
-                                // Optional: Migration Logic - verify if old table had data?
-                                // For now, cleaner to just start fresh or manual migrate
+                                console.log('No annotations found anywhere.');
                             }
                         } catch (e) {
                             console.error('Exception restoring annotations:', e);
@@ -1053,15 +1079,22 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             }, 3000);
                         };
 
-                        // Manual Save Logic (FALLBACK STRATEGY: Store in student_groups)
+                        // Manual Save Logic (STRATEGY: Schedules Table + LocalStorage Backup)
                         const saveAnnotations = async (annotations) => {
+                            // 1. LocalStorage Backup (Immediate Persistence for YOU)
+                            try {
+                                const localKey = `pdf_backup_${groupId}_${fileKey}`;
+                                localStorage.setItem(localKey, JSON.stringify(annotations));
+                                console.log('Saved to LocalStorage backup');
+                            } catch (e) { console.warn('Local backup failed', e); }
+
+                            // 2. Database Save (Persistence for OTHERS)
                             // Debug: Ensure we have valid IDs
                             if (!groupId || !fileKey) {
                                 alert(`Critical Error: Missing GroupID (${groupId}) or FileKey (${fileKey})`);
                                 return;
                             }
 
-                            // Create a clean copy for the database
                             const dbAnnotations = annotations.map(annot => {
                                 const newAnnot = JSON.parse(JSON.stringify(annot));
                                 newAnnot.title = userName;
@@ -1075,38 +1108,41 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             try {
                                 showToast('Saving comments...');
 
-                                // 1. Get current JSON object
-                                const { data: groupData, error: fetchError } = await supabaseClient
-                                    .from('student_groups')
+                                // Fetch from SCHEDULES table (known to be permissive)
+                                const { data: schedData, error: fetchError } = await supabaseClient
+                                    .from('schedules')
                                     .select('pdf_comments')
-                                    .eq('id', groupId)
-                                    .single();
+                                    .eq('group_id', groupId)
+                                    .maybeSingle();
+
+                                // If no schedule exists yet, we can't save to it. Fallback to warning.
+                                if (!schedData && !fetchError) {
+                                    alert("Warning: This group has no Schedule entry yet. Comments are saved locally but students might not see them until a schedule is created.");
+                                    return;
+                                }
 
                                 if (fetchError) throw fetchError;
 
-                                let commentsJson = groupData.pdf_comments || {};
-                                // Update only this file's key
+                                let commentsJson = schedData.pdf_comments || {};
                                 commentsJson[fileKey] = dbAnnotations;
 
-                                // 2. Write back to student_groups
                                 const { error: updateError } = await supabaseClient
-                                    .from('student_groups')
+                                    .from('schedules')
                                     .update({ pdf_comments: commentsJson })
-                                    .eq('id', groupId);
+                                    .eq('group_id', groupId);
 
                                 if (updateError) throw updateError;
 
-                                showToast('Comments Saved (v2)!');
-                                console.log('SAVE SUCCESSful (v2):', dbAnnotations.length);
+                                showToast('Comments Saved (via Schedule)!');
+                                console.log('SAVE SUCCESSful (Schedule):', dbAnnotations.length);
                             } catch (err) {
                                 console.error('SAVE FAILED:', err);
-                                alert(`Save Failed: ${err.message}\n\nDid you run ADD_COMMENTS_COLUMN.sql?`);
+                                alert(`Save Failed: ${err.message}\n\nHint: Did you run ADD_TO_SCHEDULES.sql?`);
                             }
                         };
 
                         // IMMEDIATE SAVE on any change
                         annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
-                            // console.log('ANNOTATION EVENT:', event.type);
                             if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
                                 const annotations = await annotationManager.getAnnotations();
                                 saveAnnotations(annotations);
