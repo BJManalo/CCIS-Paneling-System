@@ -680,6 +680,14 @@ window.openFileModal = (groupId) => {
 
 window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
     if (newStatus === 'Pending') return;
+
+    // UI Loading state
+    const select = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
+    if (select) {
+        select.disabled = true;
+        select.style.opacity = '0.5';
+    }
+
     try {
         const normTab = normalizeType(currentTab);
         const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
@@ -730,8 +738,25 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
         else if (categoryKey === 'pre_oral') group.preOralStatus = localMap;
         else if (categoryKey === 'final') group.finalStatus = localMap;
 
-        openFileModal(groupId);
-    } catch (err) { console.error(err); alert('Failed to update status: ' + (err.message || err)); }
+        // Fast UI Update
+        const select = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
+        if (select) {
+            select.disabled = false;
+            select.style.opacity = '1';
+            select.style.borderColor = '#22c55e'; // Green success border
+        }
+
+        // Refresh the main table background data
+        renderTable();
+    } catch (err) {
+        console.error(err);
+        alert('Failed to update status: ' + (err.message || err));
+        const select = document.querySelector(`select[onchange*="'${categoryKey}'"][onchange*="'${fileKey}'"]`);
+        if (select) {
+            select.disabled = false;
+            select.style.opacity = '1';
+        }
+    }
 };
 
 window.saveRemarks = async (groupId, categoryKey, fileKey) => {
@@ -740,8 +765,14 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     const user = JSON.parse(userJson);
     const userName = user.name || 'Panel';
     const textarea = document.getElementById(`remarks-${categoryKey}-${fileKey}`);
-    const newText = textarea.value.trim();
+    const btn = textarea ? textarea.nextElementSibling : null;
+    const newText = textarea ? textarea.value.trim() : '';
     if (!newText) return;
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Saving...';
+    }
 
     let formattedText = newText;
     const prefix = `${userName}:`;
@@ -789,13 +820,21 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
         else if (categoryKey === 'final') group.finalRemarks = localMap;
 
         // Persistent visual feedback
-        if (textarea) {
-            const btn = textarea.nextElementSibling;
+        if (textarea && btn) {
             btn.innerText = 'Saved';
             btn.style.background = '#dcfce7';
             btn.style.color = '#166534';
+            btn.disabled = false;
         }
-    } catch (e) { console.error(e); alert('Error saving remarks: ' + (e.message || e)); }
+    } catch (e) {
+        console.error(e);
+        alert('Error saving remarks: ' + (e.message || e));
+        const btn = document.querySelector(`button[onclick*="'${categoryKey}'"][onclick*="'${fileKey}'"]`);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Save Remarks';
+        }
+    }
 };
 
 window.closeFileModal = () => {
@@ -824,7 +863,10 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     }
 
     const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co/storage/v1/object/public');
+    const isPDF = lowerUrl.includes('.pdf') ||
+        lowerUrl.includes('supabase.co/storage/v1/object/public') ||
+        lowerUrl.includes('drive.google.com') ||
+        lowerUrl.includes('docs.google.com/viewer');
 
     const iframe = document.getElementById('fileViewer');
     const adobeContainer = document.getElementById('adobe-dc-view');
@@ -844,7 +886,14 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         const userName = user.name || user.full_name || 'Panelist';
 
         adobeContainer.style.display = 'block';
-        placeholder.style.display = 'none';
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div class="viewer-loader" style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+                <p style="font-size: 1.1rem; font-weight: 500; color: #64748b;">Loading document with annotations...</p>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">This may take a few seconds.</p>
+            </div>
+        `;
         if (iframe) iframe.style.display = 'none';
 
         const initAdobe = async () => {
@@ -882,6 +931,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             }, previewConfig);
 
             adobeFilePromise.then(adobeViewer => {
+                placeholder.style.display = 'none';
                 adobeViewer.getAnnotationManager().then(async annotationManager => {
                     try {
                         const { data } = await supabaseClient

@@ -566,7 +566,10 @@ window.openFileViewer = async (url, fileKey) => {
     }
 
     const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = lowerUrl.includes('.pdf') || lowerUrl.includes('supabase.co/storage/v1/object/public');
+    const isPDF = lowerUrl.includes('.pdf') ||
+        lowerUrl.includes('supabase.co/storage/v1/object/public') ||
+        lowerUrl.includes('drive.google.com') ||
+        lowerUrl.includes('docs.google.com/viewer');
 
     if (isPDF) {
         const initAdobe = async () => {
@@ -598,6 +601,7 @@ window.openFileViewer = async (url, fileKey) => {
             });
 
             adobeFilePromise.then(adobeViewer => {
+                if (placeholder) placeholder.style.display = 'none';
                 adobeViewer.getAnnotationManager().then(async annotationManager => {
                     // Fetch existing annotations from Supabase
                     try {
@@ -612,8 +616,6 @@ window.openFileViewer = async (url, fileKey) => {
                             annotationManager.addAnnotations(data.annotation_data);
                         }
                     } catch (e) { console.log('No annotations found'); }
-
-                    if (placeholder) placeholder.style.display = 'none';
                 });
             });
         };
