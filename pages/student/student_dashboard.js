@@ -725,17 +725,18 @@ window.openFileViewer = async (url, fileKey) => {
                 console.log('ADOBE LOADING (Student):', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
 
                 const loginUser = JSON.parse(localStorage.getItem('loginUser') || '{}');
-                const displayName = loginUser.group_name || loginUser.name || 'Student Group';
-
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
+                    const profile = {
+                        id: loginUser.id || loginUser.email || 'student-id',
+                        name: displayName,
+                        displayName: displayName,
+                        firstName: displayName.split(' ')[0],
+                        lastName: displayName.split(' ').slice(1).join(' ') || '.',
+                        email: loginUser.email || ''
+                    };
                     return Promise.resolve({
-                        userProfile: {
-                            name: displayName,
-                            displayName: displayName,
-                            firstName: displayName.split(' ')[0],
-                            lastName: displayName.split(' ').slice(1).join(' ') || '',
-                            email: loginUser.email || ''
-                        }
+                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+                        data: { userProfile: profile }
                     });
                 });
 
@@ -744,7 +745,7 @@ window.openFileViewer = async (url, fileKey) => {
                     metaData: { fileName: fileName, id: fileKey }
                 }, {
                     embedMode: "FULL_WINDOW",
-                    showAnnotationTools: true,
+                    showAnnotationTools: false, // Students are READ-ONLY for comments
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
                     showPageControls: true,
@@ -755,23 +756,17 @@ window.openFileViewer = async (url, fileKey) => {
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        // Optional: Identify user again directly to the annotation manager
+                        // Restore existing annotations
                         try {
-                            if (annotationManager.setUserProfile) {
-                                annotationManager.setUserProfile({
-                                    name: displayName,
-                                    firstName: displayName.split(' ')[0]
-                                });
-                            }
-                        } catch (e) { }
-
-                        try {
-                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
-                                .eq('group_id', currentGroupId).eq('file_key', fileKey).single();
+                            const { data } = await supabaseClient.from('pdf_annotations')
+                                .select('annotation_data')
+                                .eq('group_id', currentGroupId)
+                                .eq('file_key', fileKey)
+                                .maybeSingle();
                             if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
                         } catch (e) { }
 
-                        // Force settings to ensure name is picked up correctly
+                        // Students only need the view configuration
                         annotationManager.setConfig({
                             showAuthorName: true,
                             authorName: displayName

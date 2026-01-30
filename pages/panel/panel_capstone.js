@@ -110,6 +110,17 @@ async function loadCapstoneData() {
 
         if (dsError) throw dsError;
 
+        // 6. Fetch Global Annotations Metadata (to know who commented where)
+        const { data: annotMeta } = await supabaseClient
+            .from('pdf_annotations')
+            .select('group_id, file_key, user_name, updated_at');
+
+        window.fileAnnotationsMap = {};
+        (annotMeta || []).forEach(a => {
+            if (!window.fileAnnotationsMap[a.group_id]) window.fileAnnotationsMap[a.group_id] = {};
+            window.fileAnnotationsMap[a.group_id][a.file_key] = a.user_name || 'Anonymous';
+        });
+
         // 5. Process Data
         allData = [];
 
@@ -409,7 +420,10 @@ function renderTable() {
         row.innerHTML = `
             <td><span class="type-badge ${typeClass}">${g.type}</span></td>
             <td>
-                <div style="font-weight: 600;">${g.groupName}</div>
+                <div style="font-weight: 600; display: flex; align-items: center; gap: 5px;">
+                    ${g.groupName}
+                    ${(window.fileAnnotationsMap && window.fileAnnotationsMap[g.id]) ? '<span title="Has file comments" style="color: #ef4444; font-size: 14px; cursor: help;">💬</span>' : ''}
+                </div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${g.isAdviser ? 'Adviser View' : 'Panel View'}</div>
             </td>
             <td><span class="prog-badge ${progClass}">${program}</span></td>
@@ -493,8 +507,14 @@ window.openFileModal = (groupId) => {
 
             const displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
+            const commenterName = window.fileAnnotationsMap?.[groupId]?.[label];
+            const commentInfo = commenterName ? `<div style="font-size: 10px; color: #ef4444; font-weight: 700; margin-top: 2px;">💬 Commented by ${commenterName}</div>` : '';
+
             item.innerHTML = `
-                <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
+                <div style="display: flex; flex-direction: column;">
+                    <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
+                    ${commentInfo}
+                </div>
                 <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">arrow_forward_ios</span>
             `;
 
@@ -954,14 +974,19 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
                 // Identify the user to Adobe so comments don't show as 'Guest'
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
+                    const profile = {
+                        id: user.id || user.email || 'panelist-id', // Unique ID is often required for names to show
+                        name: userName,
+                        displayName: userName,
+                        firstName: userName.split(' ')[0],
+                        lastName: userName.split(' ').slice(1).join(' ') || '.',
+                        email: user.email || ''
+                    };
+                    console.log('ADOBE PROFILE:', profile);
+                    // Wrapped in 'data' object is sometimes required depending on SDK version
                     return Promise.resolve({
-                        userProfile: {
-                            name: userName,
-                            displayName: userName,
-                            firstName: userName.split(' ')[0],
-                            lastName: userName.split(' ').slice(1).join(' ') || '',
-                            email: user.email || ''
-                        }
+                        code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+                        data: { userProfile: profile }
                     });
                 });
 
@@ -969,7 +994,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey || 'unique-id' }
                 }, {
-                    embedMode: "FULL_WINDOW", // Matches the rich UI in the 1st image
+                    embedMode: "FULL_WINDOW",
                     showAnnotationTools: true,
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
@@ -981,35 +1006,52 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        // Optional: Identify user again directly to the annotation manager
+                        // Restore existing annotations
                         try {
-                            if (annotationManager.setUserProfile) {
-                                annotationManager.setUserProfile({
-                                    name: userName,
-                                    firstName: userName.split(' ')[0]
-                                });
-                            }
-                        } catch (e) { }
-
-                        try {
-                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
-                                .eq('group_id', groupId).eq('file_key', fileKey).single();
+                            const { data } = await supabaseClient.from('pdf_annotations')
+                                .select('annotation_data')
+                                .eq('group_id', groupId)
+                                .eq('file_key', fileKey)
+                                .maybeSingle();
                             if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
                         } catch (e) { }
 
-                        // Force settings to ensure name is picked up correctly
+                        // Settings to ensure name is picked up
                         annotationManager.setConfig({
                             showAuthorName: true,
                             authorName: userName
                         });
-                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
+
+                        // Manual Save Logic
+                        const saveAnnotations = async (annotations) => {
                             try {
-                                await supabaseClient.from('pdf_annotations').upsert({
-                                    group_id: groupId, file_key: fileKey, annotation_data: annotations,
-                                    user_name: userName, updated_at: new Date()
-                                }, { onConflict: 'group_id, file_key' });
-                                return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                            } catch (err) { return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL }; }
+                                const { error } = await supabaseClient.from('pdf_annotations').upsert({
+                                    group_id: groupId,
+                                    file_key: fileKey,
+                                    annotation_data: annotations,
+                                    user_name: userName,
+                                    updated_at: new Date().toISOString()
+                                }, { onConflict: ['group_id', 'file_key'] });
+                                if (error) throw error;
+                                console.log('SAVE SUCCESSful:', annotations.length);
+                            } catch (err) {
+                                console.error('SAVE FAILED:', err);
+                            }
+                        };
+
+                        // IMMEDIATE SAVE on any change
+                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
+                            console.log('ANNOTATION EVENT:', event.type);
+                            if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
+                                const annotations = await annotationManager.getAnnotations();
+                                saveAnnotations(annotations);
+                            }
+                        });
+
+                        // Fallback periodic save
+                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
+                            await saveAnnotations(annotations);
+                            return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
                         }, { autoSaveFrequency: 2 });
                     });
                 }).catch(err => {
