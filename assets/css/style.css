@@ -1644,3 +1644,10 @@ button {
     background-color: #ffffff !important;
     min-height: 20px;
 }
+
+/* Force container background and color defaults to prevent theme bleeding into the PDF iframe */
+#adobe-dc-view {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    filter: none !important;
+}
