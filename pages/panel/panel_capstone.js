@@ -1031,7 +1031,6 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
         if (container) container.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
-        if (saveBtn) saveBtn.style.display = 'block';
 
         pdfFrame.src = ""; // Clear first
         setTimeout(() => {
@@ -1050,7 +1049,6 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
         if (container) container.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
-        if (saveBtn) saveBtn.style.display = 'block';
 
         pdfFrame.src = "";
         setTimeout(() => {
