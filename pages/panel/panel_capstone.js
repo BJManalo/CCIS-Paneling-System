@@ -998,7 +998,29 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
                 console.log('ADOBE LOADING:', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID, userName });
 
-                // Identify the user to Adobe so comments don't show as 'Guest'
+                // 1. REGISTER THE SAVE API IMMEDIATELY (Before Preview)
+                // This prevents the 'INVALID_CONFIG' error
+                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (metaData, content) => {
+                    try {
+                        console.log('ADOBE SAVE EVENT:', { groupId, fileKey });
+                        const { error } = await supabaseClient.from('pdf_annotations').upsert({
+                            group_id: groupId,
+                            file_key: fileKey,
+                            annotation_data: content,
+                            user_name: userName,
+                            updated_at: new Date()
+                        }, { onConflict: 'group_id, file_key' });
+
+                        if (error) throw error;
+                        console.log('PDF Annotations synced to database.');
+                        return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                    } catch (err) {
+                        console.error('DATABASE SAVE ERROR:', err);
+                        return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
+                    }
+                }, { autoSaveFrequency: 3, enableSaveShortcut: true });
+
+                // 2. Identify the user
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
                     return Promise.resolve({
                         userProfile: {
@@ -1024,7 +1046,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 });
 
                 adobeFilePromise.then(adobeViewer => {
-                    // 1. Handle Annotations (Loading)
+                    // 3. Load Existing Annotations
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
                         try {
                             const { data } = await supabaseClient.from('pdf_annotations')
@@ -1032,32 +1054,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                                 .eq('group_id', groupId)
                                 .eq('file_key', fileKey)
                                 .maybeSingle();
-                            if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
-                        } catch (e) { console.error('Load Annotations Error:', e); }
+                            if (data?.annotation_data) {
+                                console.log('Found existing annotations, adding to viewer...');
+                                annotationManager.addAnnotations(data.annotation_data);
+                            }
+                        } catch (e) { console.error('Error loading old annotations:', e); }
 
-                        // Note: Author name setup
-                        annotationManager.setConfig({ showAuthorName: true, authorName: userName });
+                        // Set the author name correctly
+                        annotationManager.setConfig({ authorName: userName });
                     });
-
-                    // 2. Register Global Save Callback (Correct Signature)
-                    adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (metaData, content) => {
-                        try {
-                            console.log('PDF SAVE TRIGGERED:', { groupId, fileKey });
-                            const { error } = await supabaseClient.from('pdf_annotations').upsert({
-                                group_id: groupId,
-                                file_key: fileKey,
-                                annotation_data: content,
-                                user_name: userName,
-                                updated_at: new Date()
-                            }, { onConflict: 'group_id, file_key' });
-
-                            if (error) throw error;
-                            return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                        } catch (err) {
-                            console.error('PDF DB SAVE FAILED:', err);
-                            return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
-                        }
-                    }, { autoSaveFrequency: 2 });
 
                     if (placeholder) placeholder.style.display = 'none';
                 }).catch(err => {
