@@ -442,7 +442,7 @@ function renderTable() {
             row.style.background = '#fafafa';
         } else {
             actionBtn = `
-                <button onclick="${hasFiles ? `openFileModal(${g.id})` : ''}" 
+                <button onclick="${hasFiles ? `openFileModal('${g.id}')` : ''}" 
                     style="background: ${hasFiles ? 'var(--primary-light)' : '#f1f5f9'}; opacity: ${hasFiles ? '1' : '0.6'}; border: none; color: ${hasFiles ? 'var(--primary-color)' : '#94a3b8'}; cursor: ${hasFiles ? 'pointer' : 'default'}; display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 6px; transition: all 0.2s;">
                     <span class="material-icons-round" style="font-size: 18px;">${hasFiles ? 'folder_open' : 'folder_off'}</span>
                     <span style="font-size: 12px; font-weight: 600;">${hasFiles ? 'View Files' : 'No Files'}</span>
@@ -482,13 +482,12 @@ function renderTable() {
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 // Global functions for Modal (Reusing existing logic roughly, but checking context)
 window.openFileModal = (groupId) => {
-    // FIX: Find group matching ID AND the current active tab (Defense Type)
-    // This ensures we get the correct object (Title, Pre, or Final) from allData
+    const stringGroupId = String(groupId);
     const normTab = normalizeType(currentTab);
-    const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+    const group = allData.find(g => String(g.id) === stringGroupId && normalizeType(g.type) === normTab);
 
     if (!group) {
-        console.error('Group not found for this tab context');
+        console.error('Group not found for this tab context', { stringGroupId, normTab });
         return;
     }
 
