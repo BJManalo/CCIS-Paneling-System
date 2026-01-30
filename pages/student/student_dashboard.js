@@ -319,8 +319,14 @@ async function loadSubmissionData() {
                     `;
                     uploadBtn.onclick = (e) => {
                         e.preventDefault();
-                        const fileInput = wrapper.querySelector('input[type="file"]');
-                        if (fileInput) fileInput.click();
+                        // Search for the file input in the parent 'form-group' container
+                        const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
+                        if (fileInput) {
+                            fileInput.click();
+                        } else {
+                            console.error('File input not found in form-group for:', elementId);
+                            showToast('Upload feature initialization error', 'error');
+                        }
                     };
                     wrapper.appendChild(uploadBtn);
                 }
