@@ -543,14 +543,14 @@ window.openFileModal = (groupId) => {
             let currentRemarksMap = {};
 
             if (categoryKey === 'titles') {
-                currentStatusMap = group.titleStatus || {};
-                currentRemarksMap = group.titleRemarks || {};
+                currentStatusMap = group.title_status || group.titleStatus || {};
+                currentRemarksMap = group.title_remarks || group.titleRemarks || {};
             } else if (categoryKey === 'pre_oral') {
-                currentStatusMap = group.preOralStatus || {};
-                currentRemarksMap = group.preOralRemarks || {};
+                currentStatusMap = group.pre_oral_status || group.preOralStatus || {};
+                currentRemarksMap = group.pre_oral_remarks || group.preOralRemarks || {};
             } else if (categoryKey === 'final') {
-                currentStatusMap = group.finalStatus || {};
-                currentRemarksMap = group.finalRemarks || {};
+                currentStatusMap = group.final_status || group.finalStatus || {};
+                currentRemarksMap = group.final_remarks || group.finalRemarks || {};
             }
 
             // --- Multi-Panel Logic ---
@@ -1177,20 +1177,20 @@ window.updateStatus = async (groupId, category, label, newStatus) => {
         const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
         const userName = user.name || user.full_name || 'Panel';
 
-        // Update Map Logic
+        // Update Map Logic (Fixed snake_case)
         let statusMap = {};
-        if (category === 'titles') statusMap = group.titleStatus || {};
-        else if (category === 'pre_oral') statusMap = group.preOralStatus || {};
-        else if (category === 'final') statusMap = group.finalStatus || {};
+        if (category === 'titles') statusMap = group.title_status || group.titleStatus || {};
+        else if (category === 'pre_oral') statusMap = group.pre_oral_status || group.preOralStatus || {};
+        else if (category === 'final') statusMap = group.final_status || group.finalStatus || {};
 
         if (typeof statusMap[label] !== 'object') statusMap[label] = { [userName]: newStatus };
         else statusMap[label][userName] = newStatus;
 
-        // DB Update
+        // DB Update (Fixed snake_case)
         let updatePayload = {};
-        if (category === 'titles') updatePayload.titleStatus = statusMap;
-        else if (category === 'pre_oral') updatePayload.preOralStatus = statusMap;
-        else if (category === 'final') updatePayload.finalStatus = statusMap;
+        if (category === 'titles') updatePayload.title_status = statusMap;
+        else if (category === 'pre_oral') updatePayload.pre_oral_status = statusMap;
+        else if (category === 'final') updatePayload.final_status = statusMap;
 
         const { error: updateError } = await supabaseClient
             .from('student_groups')
@@ -1227,20 +1227,20 @@ window.saveRemarks = async (groupId, category, label) => {
         const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
         const userName = user.name || user.full_name || 'Panel';
 
-        // Update Map Logic
+        // Update Map Logic (Fixed snake_case)
         let remarksMap = {};
-        if (category === 'titles') remarksMap = group.titleRemarks || {};
-        else if (category === 'pre_oral') remarksMap = group.preOralRemarks || {};
-        else if (category === 'final') remarksMap = group.finalRemarks || {};
+        if (category === 'titles') remarksMap = group.title_remarks || group.titleRemarks || {};
+        else if (category === 'pre_oral') remarksMap = group.pre_oral_remarks || group.preOralRemarks || {};
+        else if (category === 'final') remarksMap = group.final_remarks || group.finalRemarks || {};
 
         if (typeof remarksMap[label] !== 'object') remarksMap[label] = { [userName]: remarkText };
         else remarksMap[label][userName] = remarkText;
 
-        // DB Update
+        // DB Update (Fixed snake_case)
         let updatePayload = {};
-        if (category === 'titles') updatePayload.titleRemarks = remarksMap;
-        else if (category === 'pre_oral') updatePayload.preOralRemarks = remarksMap;
-        else if (category === 'final') updatePayload.finalRemarks = remarksMap;
+        if (category === 'titles') updatePayload.title_remarks = remarksMap;
+        else if (category === 'pre_oral') updatePayload.pre_oral_remarks = remarksMap;
+        else if (category === 'final') updatePayload.final_remarks = remarksMap;
 
         const { error: updateError } = await supabaseClient
             .from('student_groups')
