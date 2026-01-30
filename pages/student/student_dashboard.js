@@ -412,16 +412,25 @@ function updateSaveButtonState(tabId) {
         return;
     }
 
+    const hasAnyData = (obj) => Object.values(obj || {}).some(val => val && val.trim() !== '');
     const stageLinks = window.currentLinks[tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final'] || {};
+    const isSubmitted = hasAnyData(stageLinks);
 
-    // Check if ALL fields in this stage are already approved (optional logic)
-    // For now, let's just keep the Save button active so they can update/add titles.
-    saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
-    saveBtn.disabled = false;
-    saveBtn.style.opacity = '1';
-    saveBtn.style.cursor = 'pointer';
-    saveBtn.title = "";
-    lockInputs(false, "");
+    if (isSubmitted) {
+        saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = '0.7';
+        saveBtn.style.cursor = 'default';
+        saveBtn.title = "This stage has already been submitted.";
+        lockInputs(true, "Submitted (Changes Restricted)");
+    } else {
+        saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = '1';
+        saveBtn.style.cursor = 'pointer';
+        saveBtn.title = "";
+        lockInputs(false, "");
+    }
 }
 
 const showToast = (message, type = 'info') => {
