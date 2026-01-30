@@ -931,8 +931,6 @@ window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     const container = document.getElementById('pdfViewerContainer');
     if (container) container.style.display = 'none';
-    const sidebar = document.getElementById('commentsSidebar');
-    if (sidebar) sidebar.style.display = 'none';
     const saveBtn = document.getElementById('saveAnnotationBtnContainer');
     if (saveBtn) saveBtn.style.display = 'none';
 
@@ -956,58 +954,13 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     const placeholder = document.getElementById('viewerPlaceholder');
     const container = document.getElementById('pdfViewerContainer');
     const pdfFrame = document.getElementById('pdfFrame');
-    const sidebar = document.getElementById('commentsSidebar');
     const saveBtn = document.getElementById('saveAnnotationBtnContainer');
 
     if (placeholder) placeholder.style.display = 'none';
     if (container) container.style.display = 'block';
-    if (sidebar) sidebar.style.display = 'flex';
     if (saveBtn) saveBtn.style.display = 'block';
 
-    // Set up highlight sync after iframe loads
-    pdfFrame.onload = () => {
-        try {
-            const frameDoc = pdfFrame.contentDocument || pdfFrame.contentWindow.document;
-            frameDoc.addEventListener('mouseup', () => {
-                setTimeout(() => {
-                    const selection = pdfFrame.contentWindow.getSelection();
-                    let text = selection.toString().trim();
-                    if (!text) return;
 
-                    text = text.replace(/\s+/g, ' ').trim();
-                    currentHighlightedText = text;
-
-                    const viewerApp = pdfFrame.contentWindow.PDFViewerApplication;
-                    const pageNum = viewerApp ? viewerApp.page : 1;
-
-                    const input = document.getElementById('commentInput');
-                    const postBtn = input ? input.parentElement.querySelector('button') : null;
-
-                    if (input) {
-                        input.disabled = false;
-                        input.placeholder = "Type your feedback after the '—' symbol...";
-                        if (postBtn) postBtn.disabled = false;
-
-                        const newReference = `RE Page ${pageNum}: "${text}"`;
-                        const currentVal = input.value;
-
-                        if (currentVal.includes('—')) {
-                            const parts = currentVal.split('—');
-                            const existingFeedback = parts.length > 1 ? parts.slice(1).join('—') : "";
-                            input.value = `${newReference}\n— ${existingFeedback.trim()}`;
-                        } else {
-                            input.value = `${newReference}\n— `;
-                        }
-
-                        input.focus();
-                        input.setSelectionRange(input.value.length, input.value.length);
-                    }
-                }, 50);
-            });
-        } catch (e) {
-            console.warn("Could not attach selection listener to PDF (likely cross-origin). Students can still use annotation tools inside the viewer.");
-        }
-    };
 
     // Point iframe to local PDF.js viewer
     let finalUrl = url;
@@ -1033,10 +986,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         }
     }
 
-    const viewerUrl = `../../assets/library/web/viewer.html?file=${encodeURIComponent(finalUrl)}`;
-    pdfFrame.src = viewerUrl;
+    // Use absolute path for viewer if possible to avoid relative resolution issues
+    const viewerPath = "../../assets/library/web/viewer.html";
+    const viewerUrl = `${viewerPath}?file=${encodeURIComponent(finalUrl)}`;
 
-    loadComments(groupId, fileKey);
+    // Clear first to force reload
+    pdfFrame.src = "";
+    setTimeout(() => {
+        pdfFrame.src = viewerUrl;
+    }, 50);
 };
 
 async function saveAnnotatedPDF() {
@@ -1113,120 +1071,6 @@ async function saveAnnotatedPDF() {
 
 // --- HIGHLIGHT DETECTION (Real-time Sync & Clean Version) ---
 // --- (Global mouseup listener removed, handled by iframe) ---
-
-// --- SIDEBAR COMMENT SYSTEM ---
-async function loadComments(groupId, fileKey) {
-    const list = document.getElementById('commentsList');
-    if (!list) return;
-
-    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;"><div class="viewer-loader" style="width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; margin-bottom:10px;"></div><br>Loading discussion...</div>`;
-
-    try {
-        const { data: comments, error } = await supabaseClient
-            .from('file_comments')
-            .select('*')
-            .eq('group_id', groupId)
-            .eq('file_key', fileKey)
-            .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        renderComments(comments || []);
-    } catch (e) {
-        console.error('Comments Load Error:', e);
-        list.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px; font-size:0.8rem;">Error loading comments.</div>`;
-    }
-}
-
-function renderComments(comments) {
-    const list = document.getElementById('commentsList');
-    if (comments.length === 0) {
-        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;">
-            <span class="material-icons-round" style="font-size: 40px; opacity: 0.3;">forum</span>
-            <p style="font-size: 0.85rem; margin-top: 10px;">No feedback yet.<br>Start the discussion below.</p>
-        </div>`;
-        return;
-    }
-
-    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-    const myName = user.name || user.full_name || 'Panelist';
-
-    list.innerHTML = comments.map(c => {
-        const isMe = c.user_name === myName;
-        const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        // Highlight correction references
-        let formattedText = c.comment_text;
-        if (formattedText.startsWith('RE ')) {
-            const parts = formattedText.split('\n— ');
-            if (parts.length > 1) {
-                formattedText = `<div style="background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isMe ? '#fff' : 'var(--primary-color)'}; font-size: 0.8rem; margin-bottom: 8px; font-style: italic; opacity: 0.9;">${parts[0]}</div>` + parts.slice(1).join('\n— ');
-            }
-        }
-
-        return `
-            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'}; margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: #475569;">${isMe ? 'You' : c.user_name}</span>
-                    <span style="font-size: 0.65rem; color: #94a3b8;">${time}</span>
-                </div>
-                <div style="background: ${isMe ? 'var(--primary-color)' : '#f1f5f9'}; 
-                            color: ${isMe ? 'white' : '#1e293b'}; 
-                            padding: 12px 16px; 
-                            border-radius: ${isMe ? '18px 18px 2px 18px' : '2px 18px 18px 18px'}; 
-                            font-size: 0.9rem; 
-                            line-height: 1.5; 
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-                            max-width: 95%;">
-                    ${formattedText}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
-}
-
-window.postComment = async () => {
-    const input = document.getElementById('commentInput');
-    const text = input.value.trim();
-
-    // FORCE HIGHLIGHT LOGIC: Strict validation
-    if (!text.includes('RE Page') || !text.includes('—')) {
-        alert('❌ FORCE REFERENCE: You must highlight text in the PDF first! Do not delete the auto-generated reference.');
-        return;
-    }
-
-    if (!text || !currentViewerGroupId || !currentViewerFileKey) return;
-
-    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-    const userName = user.name || user.full_name || 'Panelist';
-
-    input.disabled = true;
-
-    try {
-        const { error } = await supabaseClient.from('file_comments').insert({
-            group_id: currentViewerGroupId,
-            file_key: currentViewerFileKey,
-            user_name: userName,
-            user_role: 'Panelist',
-            comment_text: text
-        });
-
-        if (error) throw error;
-        input.value = '';
-        input.disabled = true; // Re-lock until next highlight
-        input.placeholder = "⚠️ Highlight next section to comment...";
-        currentHighlightedText = "";
-        loadComments(currentViewerGroupId, currentViewerFileKey);
-    } catch (e) {
-        alert('Could not post comment: ' + e.message);
-    } finally {
-        if (!input.value) {
-            // Success case handled above, but if error we might want to keep it enabled?
-            // Actually, let's just use the logic in 'try'
-        }
-    }
-};
 
 window.filterTable = (program) => {
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
