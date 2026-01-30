@@ -730,11 +730,20 @@ window.openFileViewer = async (url, fileKey) => {
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
                     return Promise.resolve({
                         userProfile: {
+                            id: loginUser.id || loginUser.email || 'student-id',
                             name: displayName,
                             firstName: displayName.split(' ')[0],
                             lastName: displayName.split(' ').slice(1).join(' ') || '',
                             email: loginUser.email || 'student@example.com'
                         }
+                    });
+                });
+
+                // Student Permissions: View only, no editing panelist comments
+                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_PERMISSION_API, (annotation) => {
+                    return Promise.resolve({
+                        canModify: false,
+                        canDelete: false
                     });
                 });
 
