@@ -950,7 +950,19 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     finalUrl = `https://drive.google.com/uc?id=${fileId}&export=media&confirm=t`;
                 }
 
-                console.log('ADOBE LOADING:', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
+                console.log('ADOBE LOADING:', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID, userName });
+
+                // Identify the user to Adobe so comments don't show as 'Guest'
+                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
+                    return Promise.resolve({
+                        userProfile: {
+                            name: userName,
+                            firstName: userName.split(' ')[0],
+                            lastName: userName.split(' ').slice(1).join(' ') || '',
+                            email: user.email || ''
+                        }
+                    });
+                });
 
                 const adobeFilePromise = adobeDCView.previewFile({
                     content: { location: { url: finalUrl } },

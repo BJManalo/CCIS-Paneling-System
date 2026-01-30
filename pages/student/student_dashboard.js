@@ -724,6 +724,20 @@ window.openFileViewer = async (url, fileKey) => {
 
                 console.log('ADOBE LOADING (Student):', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
 
+                const loginUser = JSON.parse(localStorage.getItem('loginUser') || '{}');
+                const displayName = loginUser.group_name || loginUser.name || 'Student Group';
+
+                adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
+                    return Promise.resolve({
+                        userProfile: {
+                            name: displayName,
+                            firstName: displayName.split(' ')[0],
+                            lastName: displayName.split(' ').slice(1).join(' ') || '',
+                            email: loginUser.email || ''
+                        }
+                    });
+                });
+
                 const adobeFilePromise = adobeDCView.previewFile({
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey }
