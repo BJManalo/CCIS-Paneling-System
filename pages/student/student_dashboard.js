@@ -217,6 +217,13 @@ async function loadSubmissionData() {
             let pStatus = preOralData.statuses;
             let fStatus = finalData.statuses;
 
+            // EXPOSE TO WINDOW FOR BUTTON STATE LOGIC
+            window.feedbackStatus = {
+                titles: tStatus,
+                preoral: pStatus,
+                final: fStatus
+            };
+
             let tRemarks = titleData.remarks;
             let pRemarks = preOralData.remarks;
             let fRemarks = finalData.remarks;
@@ -529,17 +536,61 @@ function updateSaveButtonState(tabId) {
         const isSubmitted = fieldKey && stageLinks[fieldKey] && stageLinks[fieldKey].trim() !== '';
 
         if (isSubmitted) {
-            if (saveBtn) {
-                saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
-                saveBtn.disabled = true;
-                saveBtn.style.opacity = '0.7';
-                saveBtn.style.cursor = 'default';
+            // CHECK IF PANELS HAVE REPLIED (Allow Revision)
+            let hasFeedback = false;
+            if (window.feedbackStatus && window.feedbackStatus[tabId] && window.feedbackStatus[tabId][fieldKey]) {
+                const fStat = window.feedbackStatus[tabId][fieldKey];
+                // Check if any panel has a status key (meaning they took action)
+                if (fStat && Object.keys(fStat).length > 0) {
+                    hasFeedback = true;
+                }
             }
-            inputs.forEach(input => {
-                input.readOnly = true;
-                input.style.backgroundColor = '#f1f5f9';
-                input.title = "Submitted (Changes Restricted)";
-            });
+
+            if (hasFeedback) {
+                // PARTIAL LOCK: Original Locked, Revision Open
+                if (saveBtn) {
+                    // Check if Revision is already submitted? Optional, but for now allow overwriting revision
+                    const isRevSubmitted = stageLinks[fieldKey + '_revised'] && stageLinks[fieldKey + '_revised'].trim() !== '';
+
+                    if (isRevSubmitted) {
+                        saveBtn.innerHTML = '<span class="material-icons-round">update</span> Update Revision';
+                    } else {
+                        saveBtn.innerHTML = '<span class="material-icons-round">upload_file</span> Submit Revision';
+                    }
+
+                    saveBtn.disabled = false;
+                    saveBtn.style.opacity = '1';
+                    saveBtn.style.cursor = 'pointer';
+                    // Re-bind click to save (it handles both fields, but only revision is editable)
+                }
+
+                inputs.forEach(input => {
+                    if (input.id.includes('_revised')) {
+                        // Allow Revision Input
+                        input.readOnly = false;
+                        input.style.backgroundColor = '#fffbeb'; // Ensure amber bg
+                        input.title = "Upload your revised version here";
+                    } else {
+                        // Lock Original
+                        input.readOnly = true;
+                        input.style.backgroundColor = '#f1f5f9';
+                        input.title = "Original submission is locked";
+                    }
+                });
+            } else {
+                // FULL LOCK: Submitted but no feedback yet
+                if (saveBtn) {
+                    saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.7';
+                    saveBtn.style.cursor = 'default';
+                }
+                inputs.forEach(input => {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f1f5f9';
+                    input.title = "Submitted (Waiting for Panel Feedback)";
+                });
+            }
         } else {
             if (saveBtn) {
                 saveBtn.innerHTML = `<span class="material-icons-round">save</span> Save ${fieldKey ? fieldKey.toUpperCase() : 'Submission'}`;
