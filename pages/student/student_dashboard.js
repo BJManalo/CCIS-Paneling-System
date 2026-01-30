@@ -407,10 +407,7 @@ window.switchSubmissionTab = (tabId, btn) => {
 };
 
 function updateSaveButtonState(tabId) {
-    const saveBtn = document.querySelector('.save-btn');
-    if (!saveBtn) return;
-
-    // --- Schedule Check ---
+    // 1. Check Global Schedule for the whole tab
     let isScheduled = true;
     if (window.scheduleStatus) {
         if (tabId === 'titles') isScheduled = window.scheduleStatus.title;
@@ -418,47 +415,76 @@ function updateSaveButtonState(tabId) {
         else if (tabId === 'final') isScheduled = window.scheduleStatus.final;
     }
 
-    // Helper to lock inputs
-    const lockInputs = (readonly, placeholderText) => {
-        const tabEl = document.querySelector(`#tab-${tabId}`);
-        if (tabEl) {
-            tabEl.querySelectorAll('input').forEach(input => {
-                input.readOnly = readonly;
-                input.style.backgroundColor = readonly ? '#f1f5f9' : '#f8fafc';
-                if (placeholderText) input.title = placeholderText; // Use title for hover info
-            });
-        }
+    const tabEl = document.querySelector(`#tab-${tabId}`);
+    if (!tabEl) return;
+
+    // Helper to identify the field key from a button or container
+    const getFieldKey = (el) => {
+        const input = el.querySelector('input[id*="Link"], input[id*="Ch"]');
+        if (!input) return null;
+        const id = input.id.toLowerCase();
+        if (id.includes('titlelink1')) return 'title1';
+        if (id.includes('titlelink2')) return 'title2';
+        if (id.includes('titlelink3')) return 'title3';
+        if (id.includes('preoralch1')) return 'ch1';
+        if (id.includes('preoralch2')) return 'ch2';
+        if (id.includes('preoralch3')) return 'ch3';
+        if (id.includes('finalch4')) return 'ch4';
+        if (id.includes('finalch5')) return 'ch5';
+        return null;
     };
 
-    if (!isScheduled) {
-        saveBtn.innerHTML = '<span class="material-icons-round">event_busy</span> Not Scheduled';
-        saveBtn.disabled = true;
-        saveBtn.style.opacity = '0.7';
-        saveBtn.style.cursor = 'not-allowed';
-        saveBtn.title = "You have not been scheduled for this defense phase yet.";
-        lockInputs(true, "Not Scheduled yet");
-        return;
-    }
+    // 2. Process each sub-tab content independently
+    tabEl.querySelectorAll('.sub-tab-content').forEach(subContent => {
+        const saveBtn = subContent.querySelector('.save-btn');
+        const inputs = subContent.querySelectorAll('input');
+        const fieldKey = getFieldKey(subContent);
 
-    const hasAnyData = (obj) => Object.values(obj || {}).some(val => val && val.trim() !== '');
-    const stageLinks = window.currentLinks[tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final'] || {};
-    const isSubmitted = hasAnyData(stageLinks);
+        if (!isScheduled) {
+            if (saveBtn) {
+                saveBtn.innerHTML = '<span class="material-icons-round">event_busy</span> Not Scheduled';
+                saveBtn.disabled = true;
+                saveBtn.style.opacity = '0.7';
+            }
+            inputs.forEach(input => {
+                input.readOnly = true;
+                input.style.backgroundColor = '#f1f5f9';
+                input.title = "Not Scheduled yet";
+            });
+            return;
+        }
 
-    if (isSubmitted) {
-        saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
-        saveBtn.disabled = true;
-        saveBtn.style.opacity = '0.7';
-        saveBtn.style.cursor = 'default';
-        saveBtn.title = "This stage has already been submitted.";
-        lockInputs(true, "Submitted (Changes Restricted)");
-    } else {
-        saveBtn.innerHTML = '<span class="material-icons-round">save</span> Save Submissions';
-        saveBtn.disabled = false;
-        saveBtn.style.opacity = '1';
-        saveBtn.style.cursor = 'pointer';
-        saveBtn.title = "";
-        lockInputs(false, "");
-    }
+        // Check if THIS specific field is already submitted
+        const stageName = tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final';
+        const stageLinks = window.currentLinks[stageName] || {};
+        const isSubmitted = fieldKey && stageLinks[fieldKey] && stageLinks[fieldKey].trim() !== '';
+
+        if (isSubmitted) {
+            if (saveBtn) {
+                saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
+                saveBtn.disabled = true;
+                saveBtn.style.opacity = '0.7';
+                saveBtn.style.cursor = 'default';
+            }
+            inputs.forEach(input => {
+                input.readOnly = true;
+                input.style.backgroundColor = '#f1f5f9';
+                input.title = "Submitted (Changes Restricted)";
+            });
+        } else {
+            if (saveBtn) {
+                saveBtn.innerHTML = `<span class="material-icons-round">save</span> Save ${fieldKey ? fieldKey.toUpperCase() : 'Submission'}`;
+                saveBtn.disabled = false;
+                saveBtn.style.opacity = '1';
+                saveBtn.style.cursor = 'pointer';
+            }
+            inputs.forEach(input => {
+                input.readOnly = false;
+                input.style.backgroundColor = '#f8fafc';
+                input.title = "";
+            });
+        }
+    });
 }
 
 const showToast = (message, type = 'info') => {
@@ -498,81 +524,74 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-window.saveSubmissions = async function () {
+window.saveSubmissions = async function (specificField) {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     if (!loginUser) {
         showToast('You must be logged in to save.', 'error');
         return;
     }
 
-    const btn = document.querySelector('.save-btn');
-    const originalContent = btn.innerHTML; // Save original HTML (icon + text)
-
-    btn.innerHTML = '<span class="material-icons-round spin">sync</span> Saving...';
-    btn.disabled = true;
-
     const activeTab = document.querySelector('.tab-btn.active');
     const tabId = activeTab.innerText.toLowerCase().includes('title') ? 'titles' :
         activeTab.innerText.toLowerCase().includes('pre') ? 'preoral' : 'final';
+
+    // Find the specific button that was clicked
+    const btn = document.getElementById(`save-${specificField}`);
+    const originalContent = btn ? btn.innerHTML : 'Save';
+
+    if (btn) {
+        btn.innerHTML = '<span class="material-icons-round spin">sync</span> Saving...';
+        btn.disabled = true;
+    }
 
     // Collect data - MERGE with existing links to prevent overwriting
     const existingLinks = window.currentLinks[tabId] || {};
     let updates = {};
     let activeLinks = { ...existingLinks };
 
-    if (tabId === 'titles') {
-        const t1 = document.getElementById('titleLink1').value.trim();
-        const t2 = document.getElementById('titleLink2').value.trim();
-        const t3 = document.getElementById('titleLink3').value.trim();
-        if (t1) activeLinks.title1 = t1;
-        if (t2) activeLinks.title2 = t2;
-        if (t3) activeLinks.title3 = t3;
-
-        updates.title_link = JSON.stringify(activeLinks);
-
-        // Merge Project Titles
-        let existingTitles = {};
-        try {
-            const group = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
-            existingTitles = JSON.parse(group.project_title || '{}');
-        } catch (e) { }
-
-        const pt1 = document.getElementById('projectTitle1')?.value.trim();
-        const pt2 = document.getElementById('projectTitle2')?.value.trim();
-        const pt3 = document.getElementById('projectTitle3')?.value.trim();
-
-        const pTitles = {
-            ...existingTitles,
-            ...(pt1 && { title1: pt1 }),
-            ...(pt2 && { title2: pt2 }),
-            ...(pt3 && { title3: pt3 })
-        };
-        updates.project_title = JSON.stringify(pTitles);
-    } else if (tabId === 'preoral') {
-        const ch1 = document.getElementById('preOralCh1').value.trim();
-        const ch2 = document.getElementById('preOralCh2').value.trim();
-        const ch3 = document.getElementById('preOralCh3').value.trim();
-        if (ch1) activeLinks.ch1 = ch1;
-        if (ch2) activeLinks.ch2 = ch2;
-        if (ch3) activeLinks.ch3 = ch3;
-        updates.pre_oral_link = JSON.stringify(activeLinks);
-    } else if (tabId === 'final') {
-        const ch4 = document.getElementById('finalCh4').value.trim();
-        const ch5 = document.getElementById('finalCh5').value.trim();
-        if (ch4) activeLinks.ch4 = ch4;
-        if (ch5) activeLinks.ch5 = ch5;
-        updates.final_link = JSON.stringify(activeLinks);
-    }
-
-    // Basic Validation: Ensure at least one link is provided
-    if (!Object.values(activeLinks).some(v => v !== '')) {
-        showToast('Please provide at least one link before saving.', 'warning');
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-        return;
-    }
-
     try {
+        if (tabId === 'titles') {
+            if (specificField === 'title1') {
+                activeLinks.title1 = document.getElementById('titleLink1').value.trim();
+            } else if (specificField === 'title2') {
+                activeLinks.title2 = document.getElementById('titleLink2').value.trim();
+            } else if (specificField === 'title3') {
+                activeLinks.title3 = document.getElementById('titleLink3').value.trim();
+            }
+            updates.title_link = JSON.stringify(activeLinks);
+
+            // Per-title project title update
+            let existingTitles = {};
+            try {
+                const group = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
+                existingTitles = JSON.parse(group.project_title || '{}');
+            } catch (e) { }
+
+            const pTitles = { ...existingTitles };
+            if (specificField === 'title1') pTitles.title1 = document.getElementById('projectTitle1')?.value.trim();
+            if (specificField === 'title2') pTitles.title2 = document.getElementById('projectTitle2')?.value.trim();
+            if (specificField === 'title3') pTitles.title3 = document.getElementById('projectTitle3')?.value.trim();
+            updates.project_title = JSON.stringify(pTitles);
+
+        } else if (tabId === 'preoral') {
+            if (specificField === 'ch1') activeLinks.ch1 = document.getElementById('preOralCh1').value.trim();
+            if (specificField === 'ch2') activeLinks.ch2 = document.getElementById('preOralCh2').value.trim();
+            if (specificField === 'ch3') activeLinks.ch3 = document.getElementById('preOralCh3').value.trim();
+            updates.pre_oral_link = JSON.stringify(activeLinks);
+
+        } else if (tabId === 'final') {
+            if (specificField === 'ch4') activeLinks.ch4 = document.getElementById('finalCh4').value.trim();
+            if (specificField === 'ch5') activeLinks.ch5 = document.getElementById('finalCh5').value.trim();
+            updates.final_link = JSON.stringify(activeLinks);
+        }
+
+        // Validation
+        if (!activeLinks[specificField] || activeLinks[specificField].trim() === '') {
+            showToast('Please provide a link before saving.', 'warning');
+            if (btn) { btn.innerHTML = originalContent; btn.disabled = false; }
+            return;
+        }
+
         const { error } = await supabaseClient
             .from('student_groups')
             .update(updates)
@@ -580,24 +599,16 @@ window.saveSubmissions = async function () {
 
         if (error) throw error;
 
-        showToast('Submissions saved successfully!', 'success');
+        showToast(`${specificField.toUpperCase()} saved successfully!`, 'success');
 
-        // Update local state and lock current tab only
+        // Update local state and lock current sub-tab only
         window.currentLinks[tabId] = activeLinks;
-        window.switchSubmissionTab(tabId, activeTab);
+        updateSaveButtonState(tabId);
 
     } catch (err) {
         console.error('Submission error:', err);
-
-        // Restore button only if there was an error
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-
-        if (err.message && err.message.includes('schema cache')) {
-            showToast('System Error: Database schema out of sync. Please contact Administrator.', 'error');
-        } else {
-            showToast('Failed to save: ' + err.message, 'error');
-        }
+        if (btn) { btn.innerHTML = originalContent; btn.disabled = false; }
+        showToast('Failed to save: ' + err.message, 'error');
     }
 }
 
