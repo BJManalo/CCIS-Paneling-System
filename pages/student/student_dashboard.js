@@ -305,21 +305,26 @@ async function loadSubmissionData() {
                     const uploadBtn = document.createElement('button');
                     uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
                     uploadBtn.title = "Upload PDF directly";
+
+                    const isUploaded = linkMap[key] && (linkMap[key].includes('supabase.co') || linkMap[key].includes('project-submissions'));
+
                     uploadBtn.style.cssText = `
-                        background: #f1f5f9;
-                        border: 1.5px solid #e2e8f0;
+                        background: ${isUploaded ? '#f1f5f9' : 'var(--primary-color)'};
+                        border: 1.5px solid ${isUploaded ? '#e2e8f0' : 'var(--primary-color)'};
                         border-radius: 8px;
-                        color: #64748b;
+                        color: ${isUploaded ? '#94a3b8' : 'white'};
                         padding: 10px;
-                        cursor: pointer;
+                        cursor: ${isUploaded ? 'default' : 'pointer'};
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         transition: all 0.2s;
+                        box-shadow: ${isUploaded ? 'none' : '0 2px 6px rgba(26, 86, 219, 0.2)'};
                     `;
+                    if (isUploaded) uploadBtn.disabled = true;
+
                     uploadBtn.onclick = (e) => {
                         e.preventDefault();
-                        // Search for the file input in the parent 'form-group' container
                         const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
                         if (fileInput) {
                             fileInput.click();
@@ -796,6 +801,15 @@ window.handleFileUpload = async (input, targetId) => {
         targetInput.value = publicUrl;
         showToast('File uploaded successfully!', 'success');
 
+        // Update button to gray and disabled
+        btn.style.background = '#f1f5f9';
+        btn.style.borderColor = '#e2e8f0';
+        btn.style.color = '#94a3b8';
+        btn.style.cursor = 'default';
+        btn.style.boxShadow = 'none';
+        btn.disabled = true;
+        btn.dataset.uploaded = 'true';
+
         // Visual indicator on the input
         targetInput.style.borderColor = '#10b981';
         targetInput.style.background = '#f0fdf4';
@@ -804,8 +818,12 @@ window.handleFileUpload = async (input, targetId) => {
         console.error('Upload error:', e);
         showToast('Upload failed: ' + (e.message || 'Check storage permissions'), 'error');
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
+        if (!btn.dataset.uploaded) {
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        } else {
+            btn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">task_alt</span>';
+        }
     }
 }
 
