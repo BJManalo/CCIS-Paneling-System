@@ -162,6 +162,7 @@ async function loadSubmissionData() {
                 const norm = type.toLowerCase().replace(/[^a-z0-9]/g, '');
                 const statuses = {};
                 const remarks = {};
+                const annotations = {};
 
                 // Load from legacy first
                 const legacy = defStatuses.find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
@@ -174,12 +175,14 @@ async function loadSubmissionData() {
                 capstoneFeedback.filter(cf => cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
                     if (!statuses[cf.file_key] || typeof statuses[cf.file_key] !== 'object') statuses[cf.file_key] = {};
                     if (!remarks[cf.file_key] || typeof remarks[cf.file_key] !== 'object') remarks[cf.file_key] = {};
+                    if (!annotations[cf.file_key] || typeof annotations[cf.file_key] !== 'object') annotations[cf.file_key] = {};
 
                     if (cf.status) statuses[cf.file_key][cf.user_name] = cf.status;
                     if (cf.remarks) remarks[cf.file_key][cf.user_name] = cf.remarks;
+                    if (cf.annotated_file_url) annotations[cf.file_key][cf.user_name] = cf.annotated_file_url;
                 });
 
-                return { statuses, remarks };
+                return { statuses, remarks, annotations };
             };
 
             const titleData = getFeedbackMaps('Title Defense');
@@ -195,8 +198,12 @@ async function loadSubmissionData() {
             let pRemarks = preOralData.remarks;
             let fRemarks = finalData.remarks;
 
+            let tAnnot = titleData.annotations;
+            let pAnnot = preOralData.annotations;
+            let fAnnot = finalData.annotations;
+
             // Helper to render status badge and remarks
-            const renderField = (linkMap, statusMap, remarksMap, key, elementId) => {
+            const renderField = (linkMap, statusMap, remarksMap, annotationsMap, key, elementId) => {
                 const el = document.getElementById(elementId);
                 if (!el) return;
 
@@ -251,7 +258,15 @@ async function loadSubmissionData() {
                         <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Submission Link</span>
                         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                             ${badgesHtml}
-                            ${linkMap[key] ? `<button onclick="openFileViewer('${linkMap[key]}', '${key}')" style="background: var(--primary-light); color: var(--primary-color); border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;"><span class="material-icons-round" style="font-size: 14px;">visibility</span> View Feedback</button>` : ''}
+                            <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 2px;">
+                                ${linkMap[key] ? `<button onclick="openFileViewer('${linkMap[key]}', '${key}')" style="background: var(--primary-light); color: var(--primary-color); border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;"><span class="material-icons-round" style="font-size: 14px;">visibility</span> View Draft</button>` : ''}
+                                ${Object.entries(annotationsMap[key] || {}).map(([panel, url]) => `
+                                    <button onclick="openFileViewer('${url}', '${key}', '${panel}')" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" title="Annotated by ${panel}">
+                                        <span class="material-icons-round" style="font-size: 14px;">edit_note</span> 
+                                        Feedback (${panel})
+                                    </button>
+                                `).join('')}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -358,18 +373,18 @@ async function loadSubmissionData() {
             };
 
             // Render Titles
-            renderField(tLinks, tStatus, tRemarks, 'title1', 'titleLink1');
-            renderField(tLinks, tStatus, tRemarks, 'title2', 'titleLink2');
-            renderField(tLinks, tStatus, tRemarks, 'title3', 'titleLink3');
+            renderField(tLinks, tStatus, tRemarks, tAnnot, 'title1', 'titleLink1');
+            renderField(tLinks, tStatus, tRemarks, tAnnot, 'title2', 'titleLink2');
+            renderField(tLinks, tStatus, tRemarks, tAnnot, 'title3', 'titleLink3');
 
             // Render Pre-Oral
-            renderField(pLinks, pStatus, pRemarks, 'ch1', 'preOralCh1');
-            renderField(pLinks, pStatus, pRemarks, 'ch2', 'preOralCh2');
-            renderField(pLinks, pStatus, pRemarks, 'ch3', 'preOralCh3');
+            renderField(pLinks, pStatus, pRemarks, pAnnot, 'ch1', 'preOralCh1');
+            renderField(pLinks, pStatus, pRemarks, pAnnot, 'ch2', 'preOralCh2');
+            renderField(pLinks, pStatus, pRemarks, pAnnot, 'ch3', 'preOralCh3');
 
             // Render Final
-            renderField(fLinks, fStatus, fRemarks, 'ch4', 'finalCh4');
-            renderField(fLinks, fStatus, fRemarks, 'ch5', 'finalCh5');
+            renderField(fLinks, fStatus, fRemarks, fAnnot, 'ch4', 'finalCh4');
+            renderField(fLinks, fStatus, fRemarks, fAnnot, 'ch5', 'finalCh5');
 
             // Store links in window.currentLinks
             window.currentLinks = {
@@ -647,7 +662,7 @@ window.closeFileModal = () => {
 };
 
 // --- SIDEBAR COMMENT SYSTEM (Student Side) ---
-window.openFileViewer = async (url, fileKey) => {
+window.openFileViewer = async (url, fileKey, panelName = null) => {
     if (!url) return;
     currentViewerFileKey = fileKey;
 
@@ -659,7 +674,13 @@ window.openFileViewer = async (url, fileKey) => {
     if (modal) modal.style.display = 'flex';
     if (placeholder) placeholder.style.display = 'flex';
     if (iframe) iframe.style.display = 'block';
-    if (titleEl) titleEl.innerText = 'Reviewing feedback: ' + fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+
+    let displayTitle = fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    if (panelName) {
+        titleEl.innerText = `Feedback from ${panelName}: ${displayTitle}`;
+    } else {
+        titleEl.innerText = 'Draft Submission: ' + displayTitle;
+    }
 
     let absoluteUrl = url.trim();
     if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
@@ -667,10 +688,13 @@ window.openFileViewer = async (url, fileKey) => {
     // Stable Viewer Logic
     let finalViewerUrl = absoluteUrl;
     const lowerUrl = absoluteUrl.toLowerCase();
-    if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+
+    // Use specialized viewer for Supabase/PDF files to show annotations
+    if (lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf')) {
+        const viewerPath = "../../assets/library/web/viewer.html";
+        finalViewerUrl = `${viewerPath}?file=${encodeURIComponent(absoluteUrl)}`;
+    } else if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
         finalViewerUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
-    } else if (lowerUrl.endsWith('.pdf') || lowerUrl.includes('supabase.co')) {
-        finalViewerUrl = absoluteUrl;
     } else {
         finalViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
     }
