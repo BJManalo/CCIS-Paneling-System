@@ -12,7 +12,7 @@
     <!-- Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <!-- Styles -->
-    <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../../assets/css/style.css?v=3">
     <link rel="icon" type="image/png" href="../../assets/images/favicon.png">
     <!-- PDF.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -209,9 +209,9 @@
     </nav>
     <!-- File Viewer Modal -->
     <div id="fileModal" class="modal-overlay"
-        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); z-index: 4000; justify-content: center; align-items: center; padding: 0;">
+        style="display: none; position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background: rgba(15, 23, 42, 0.98) !important; backdrop-filter: blur(15px) !important; z-index: 9999 !important; justify-content: center !important; align-items: center !important; padding: 0 !important; margin: 0 !important;">
         <div class="modal-content"
-            style="background: #f8fafc; width: 100vw; height: 100vh; border-radius: 0; display: flex; flex-direction: column; box-shadow: none; overflow: hidden; border: none;">
+            style="background: #f8fafc !important; width: 100vw !important; height: 100vh !important; border-radius: 0 !important; display: flex !important; flex-direction: column !important; box-shadow: none !important; overflow: hidden !important; border: none !important; margin: 0 !important;">
 
             <!-- Modal Header -->
             <div class="modal-header"
@@ -399,7 +399,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="panel_capstone.js?v=2"></script>
+    <script src="panel_capstone.js?v=3"></script>
 </body>
 
 </html>
