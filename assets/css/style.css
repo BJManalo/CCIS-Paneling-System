@@ -1620,34 +1620,3 @@ button {
         opacity: 1;
     }
 }
-
-/* --- Adobe PDF Viewer Fixes --- */
-/* Ensures comment text and inputs are always visible (not white-on-white) */
-#adobe-dc-view textarea,
-#adobe-dc-view input,
-#adobe-dc-view [contenteditable="true"],
-#adobe-dc-view span,
-#adobe-dc-view div,
-#adobe-dc-view .spectrum-Body,
-#adobe-dc-view .spectrum-Heading,
-#adobe-dc-view [class*="author-name"],
-#adobe-dc-view [class*="comment-text"],
-#adobe-dc-view [class*="label"],
-#adobe-dc-view .spectrum-Textfield-input {
-    color: #1f2937 !important;
-    /* Force dark gray text */
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-#adobe-dc-view [contenteditable="true"] {
-    background-color: #ffffff !important;
-    min-height: 20px;
-}
-
-/* Force container background and color defaults to prevent theme bleeding into the PDF iframe */
-#adobe-dc-view {
-    background-color: #ffffff !important;
-    color: #1f2937 !important;
-    filter: none !important;
-}

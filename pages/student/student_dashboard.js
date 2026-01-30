@@ -725,14 +725,14 @@ window.openFileViewer = async (url, fileKey) => {
                 console.log('ADOBE LOADING (Student):', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
 
                 const loginUser = JSON.parse(localStorage.getItem('loginUser') || '{}');
+                const displayName = loginUser.group_name || loginUser.name || 'Student Group';
+
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
                     return Promise.resolve({
                         userProfile: {
-                            id: loginUser.id || loginUser.email || 'student-id',
                             name: displayName,
-                            displayName: displayName,
                             firstName: displayName.split(' ')[0],
-                            lastName: displayName.split(' ').slice(1).join(' ') || '.',
+                            lastName: displayName.split(' ').slice(1).join(' ') || '',
                             email: loginUser.email || ''
                         }
                     });
@@ -743,7 +743,7 @@ window.openFileViewer = async (url, fileKey) => {
                     metaData: { fileName: fileName, id: fileKey }
                 }, {
                     embedMode: "FULL_WINDOW",
-                    showAnnotationTools: false, // Students are READ-ONLY for comments
+                    showAnnotationTools: true,
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
                     showPageControls: true,
@@ -754,21 +754,11 @@ window.openFileViewer = async (url, fileKey) => {
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        // Restore existing annotations
                         try {
-                            const { data } = await supabaseClient.from('pdf_annotations')
-                                .select('annotation_data')
-                                .eq('group_id', currentGroupId)
-                                .eq('file_key', fileKey)
-                                .maybeSingle();
+                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
+                                .eq('group_id', currentGroupId).eq('file_key', fileKey).single();
                             if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
                         } catch (e) { }
-
-                        // Students only need the view configuration
-                        annotationManager.setConfig({
-                            showAuthorName: true,
-                            authorName: displayName
-                        });
                     });
                 }).catch(err => {
                     console.error('CRITICAL ADOBE ERROR (Student):', err);

@@ -110,17 +110,6 @@ async function loadCapstoneData() {
 
         if (dsError) throw dsError;
 
-        // 6. Fetch Global Annotations Metadata (to know who commented where)
-        const { data: annotMeta } = await supabaseClient
-            .from('pdf_annotations')
-            .select('group_id, file_key, user_name, updated_at');
-
-        window.fileAnnotationsMap = {};
-        (annotMeta || []).forEach(a => {
-            if (!window.fileAnnotationsMap[a.group_id]) window.fileAnnotationsMap[a.group_id] = {};
-            window.fileAnnotationsMap[a.group_id][a.file_key] = a.user_name || 'Anonymous';
-        });
-
         // 5. Process Data
         allData = [];
 
@@ -420,10 +409,7 @@ function renderTable() {
         row.innerHTML = `
             <td><span class="type-badge ${typeClass}">${g.type}</span></td>
             <td>
-                <div style="font-weight: 600; display: flex; align-items: center; gap: 5px;">
-                    ${g.groupName}
-                    ${(window.fileAnnotationsMap && window.fileAnnotationsMap[g.id]) ? '<span title="Has file comments" style="color: #ef4444; font-size: 14px; cursor: help;">💬</span>' : ''}
-                </div>
+                <div style="font-weight: 600;">${g.groupName}</div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${g.isAdviser ? 'Adviser View' : 'Panel View'}</div>
             </td>
             <td><span class="prog-badge ${progClass}">${program}</span></td>
@@ -507,14 +493,8 @@ window.openFileModal = (groupId) => {
 
             const displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
-            const commenterName = window.fileAnnotationsMap?.[groupId]?.[label];
-            const commentInfo = commenterName ? `<div style="font-size: 10px; color: #ef4444; font-weight: 700; margin-top: 2px;">💬 Commented by ${commenterName}</div>` : '';
-
             item.innerHTML = `
-                <div style="display: flex; flex-direction: column;">
-                    <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
-                    ${commentInfo}
-                </div>
+                <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
                 <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">arrow_forward_ios</span>
             `;
 
@@ -543,14 +523,14 @@ window.openFileModal = (groupId) => {
             let currentRemarksMap = {};
 
             if (categoryKey === 'titles') {
-                currentStatusMap = group.title_status || group.titleStatus || {};
-                currentRemarksMap = group.title_remarks || group.titleRemarks || {};
+                currentStatusMap = group.titleStatus || {};
+                currentRemarksMap = group.titleRemarks || {};
             } else if (categoryKey === 'pre_oral') {
-                currentStatusMap = group.pre_oral_status || group.preOralStatus || {};
-                currentRemarksMap = group.pre_oral_remarks || group.preOralRemarks || {};
+                currentStatusMap = group.preOralStatus || {};
+                currentRemarksMap = group.preOralRemarks || {};
             } else if (categoryKey === 'final') {
-                currentStatusMap = group.final_status || group.finalStatus || {};
-                currentRemarksMap = group.final_remarks || group.finalRemarks || {};
+                currentStatusMap = group.finalStatus || {};
+                currentRemarksMap = group.finalRemarks || {};
             }
 
             // --- Multi-Panel Logic ---
@@ -976,11 +956,9 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 adobeDCView.registerCallback(AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API, () => {
                     return Promise.resolve({
                         userProfile: {
-                            id: user.id || user.email || 'panelist-id',
                             name: userName,
-                            displayName: userName,
                             firstName: userName.split(' ')[0],
-                            lastName: userName.split(' ').slice(1).join(' ') || '.',
+                            lastName: userName.split(' ').slice(1).join(' ') || '',
                             email: user.email || ''
                         }
                     });
@@ -990,7 +968,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey || 'unique-id' }
                 }, {
-                    embedMode: "FULL_WINDOW",
+                    embedMode: "FULL_WINDOW", // Matches the rich UI in the 1st image
                     showAnnotationTools: true,
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
@@ -1002,136 +980,21 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
-                        // Restore existing annotations (Strategy: pdf_annotations -> LocalStorage)
                         try {
-                            console.log(`FETCHING for Group: ${groupId}, File: ${fileKey}`);
+                            const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
+                                .eq('group_id', groupId).eq('file_key', fileKey).single();
+                            if (data?.annotation_data) annotationManager.addAnnotations(data.annotation_data);
+                        } catch (e) { }
 
-                            // 1. Try DB (pdf_annotations table)
-                            let foundAnnotations = null;
-                            const { data: dbData } = await supabaseClient
-                                .from('pdf_annotations')
-                                .select('annotation_data')
-                                .eq('group_id', groupId)
-                                .eq('file_key', fileKey)
-                                .order('updated_at', { ascending: false }) // Get latest
-                                .limit(1)
-                                .maybeSingle();
-
-                            if (dbData?.annotation_data) {
-                                foundAnnotations = dbData.annotation_data;
-                                console.log('Loaded from PDF_ANNOTATIONS table');
-                            }
-
-                            // 2. Fallback LocalStorage (Personal Backup)
-                            if (!foundAnnotations) {
-                                try {
-                                    const localKey = `pdf_backup_${groupId}_${fileKey}`;
-                                    const localData = localStorage.getItem(localKey);
-                                    if (localData) {
-                                        foundAnnotations = JSON.parse(localData);
-                                        console.log('Loaded from LOCAL_STORAGE backup');
-                                        showToast('Loaded local backup', true);
-                                    }
-                                } catch (e) { }
-                            }
-
-                            if (foundAnnotations && Array.isArray(foundAnnotations)) {
-                                console.log('Applying Annotations:', foundAnnotations.length);
-                                await annotationManager.addAnnotations(foundAnnotations);
-                            }
-                        } catch (e) {
-                            console.error('Exception restoring annotations:', e);
-                        }
-
-                        // Visual Toast Helper
-                        const showToast = (message, isError = false) => {
-                            const toast = document.createElement('div');
-                            toast.innerText = message;
-                            toast.style.position = 'fixed';
-                            toast.style.bottom = '20px';
-                            toast.style.right = '20px';
-                            toast.style.padding = '12px 24px';
-                            toast.style.background = isError ? '#ef4444' : '#10b981';
-                            toast.style.color = 'white';
-                            toast.style.borderRadius = '8px';
-                            toast.style.zIndex = '9999';
-                            toast.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                            toast.style.fontWeight = '600';
-                            toast.style.opacity = '0';
-                            toast.style.transition = 'opacity 0.3s ease';
-                            document.body.appendChild(toast);
-                            requestAnimationFrame(() => toast.style.opacity = '1');
-                            setTimeout(() => {
-                                toast.style.opacity = '0';
-                                setTimeout(() => toast.remove(), 300);
-                            }, 3000);
-                        };
-
-                        // Manual Save Logic (Restored to pdf_annotations table)
-                        const saveAnnotations = async (annotations) => {
-                            // 1. LocalStorage Backup (Immediate Persistence)
-                            try {
-                                const localKey = `pdf_backup_${groupId}_${fileKey}`;
-                                localStorage.setItem(localKey, JSON.stringify(annotations));
-                            } catch (e) { }
-
-                            // Debug: Ensure we have valid IDs
-                            if (!groupId || !fileKey) return;
-
-                            // Clean data
-                            const dbAnnotations = annotations.map(annot => {
-                                const newAnnot = JSON.parse(JSON.stringify(annot));
-                                newAnnot.title = userName;
-                                const prefix = `[${userName}]:`;
-                                if (newAnnot.bodyValue && !newAnnot.bodyValue.startsWith(prefix)) {
-                                    newAnnot.bodyValue = `${prefix} ${newAnnot.bodyValue.replace(/^\[.*?\]:\s*/, '')}`;
-                                }
-                                return newAnnot;
-                            });
-
-                            try {
-                                showToast('Saving...');
-
-                                // Direct Upsert to pdf_annotations
-                                // If this table is missing, script needs to be run.
-                                const { error } = await supabaseClient.from('pdf_annotations').upsert({
-                                    group_id: groupId,
-                                    file_key: fileKey,
-                                    annotation_data: dbAnnotations,
-                                    user_name: userName,
-                                    updated_at: new Date().toISOString()
-                                }, { onConflict: ['group_id', 'file_key'] });
-
-                                if (error) {
-                                    // If table missing, we try to create it dynamic? No, just alert.
-                                    console.error('Save Error:', error);
-                                    if (error.code === '42P01') { // undefined_table
-                                        alert("System Error: The 'pdf_annotations' database table is missing. Please contact developer.");
-                                    } else {
-                                        throw error;
-                                    }
-                                } else {
-                                    showToast('Saved!');
-                                    console.log('SAVE SUCCESSful:', dbAnnotations.length);
-                                }
-                            } catch (err) {
-                                console.error('SAVE FAILED:', err);
-                                showToast('Save Failed!', true);
-                            }
-                        };
-
-                        // IMMEDIATE SAVE on any change
-                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
-                            if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
-                                const annotations = await annotationManager.getAnnotations();
-                                saveAnnotations(annotations);
-                            }
-                        });
-
-                        // Fallback periodic save
+                        annotationManager.setConfig({ showAuthorName: true, authorName: userName });
                         annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
-                            await saveAnnotations(annotations);
-                            return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                            try {
+                                await supabaseClient.from('pdf_annotations').upsert({
+                                    group_id: groupId, file_key: fileKey, annotation_data: annotations,
+                                    user_name: userName, updated_at: new Date()
+                                }, { onConflict: 'group_id, file_key' });
+                                return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                            } catch (err) { return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL }; }
                         }, { autoSaveFrequency: 2 });
                     });
                 }).catch(err => {
@@ -1160,105 +1023,25 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     showCompatibilityMode('Non-PDF detected');
 };
 
-// --- RESTORED GLOBAL FUNCTIONS ---
-
-window.updateStatus = async (groupId, category, label, newStatus) => {
-    if (newStatus === 'Pending') return;
-
-    try {
-        const { data: group, error: fetchError } = await supabaseClient
-            .from('student_groups')
-            .select('*')
-            .eq('id', groupId)
-            .single();
-
-        if (fetchError) throw fetchError;
-
-        const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-        const userName = user.name || user.full_name || 'Panel';
-
-        // Update Map Logic
-        let statusMap = {};
-        if (category === 'titles') statusMap = group.titleStatus || {};
-        else if (category === 'pre_oral') statusMap = group.preOralStatus || {};
-        else if (category === 'final') statusMap = group.finalStatus || {};
-
-        if (typeof statusMap[label] !== 'object') statusMap[label] = { [userName]: newStatus };
-        else statusMap[label][userName] = newStatus;
-
-        // DB Update (Reverted to camelCase as per user request/working state)
-        let updatePayload = {};
-        if (category === 'titles') updatePayload.titleStatus = statusMap;
-        else if (category === 'pre_oral') updatePayload.preOralStatus = statusMap;
-        else if (category === 'final') updatePayload.finalStatus = statusMap;
-
-        const { error: updateError } = await supabaseClient
-            .from('student_groups')
-            .update(updatePayload)
-            .eq('id', groupId);
-
-        if (updateError) throw updateError;
-
-        // alert('Status Updated!'); // Silent update is better for UI
-        // Refresh local data to reflect change
-        // We could call renderTable() but it might reset view. 
-        // Best to just let user see it changed locally in dropdown.
-        console.log('Status updated to', newStatus);
-
-    } catch (err) {
-        console.error('Update Status Error:', err);
-        alert('Failed to update status: ' + err.message);
+window.filterTable = (program) => {
+    const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
+    if (currentProgram === program) {
+        currentProgram = 'ALL';
+        btns.forEach(btn => btn.classList.remove('active'));
+    } else {
+        currentProgram = program;
+        btns.forEach(btn => btn.classList.toggle('active', btn.innerText === program));
     }
+    renderTable();
 };
 
-window.saveRemarks = async (groupId, category, label) => {
-    const remarkInput = document.getElementById(`remarks-${category}-${label}`);
-    const remarkText = remarkInput ? remarkInput.value : '';
+document.getElementById('searchInput')?.addEventListener('input', (e) => {
+    searchTerm = e.target.value;
+    renderTable();
+});
 
-    try {
-        const { data: group, error: fetchError } = await supabaseClient
-            .from('student_groups')
-            .select('*')
-            .eq('id', groupId)
-            .single();
-
-        if (fetchError) throw fetchError;
-
-        const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-        const userName = user.name || user.full_name || 'Panel';
-
-        // Update Map Logic
-        let remarksMap = {};
-        if (category === 'titles') remarksMap = group.titleRemarks || {};
-        else if (category === 'pre_oral') remarksMap = group.preOralRemarks || {};
-        else if (category === 'final') remarksMap = group.finalRemarks || {};
-
-        if (typeof remarksMap[label] !== 'object') remarksMap[label] = { [userName]: remarkText };
-        else remarksMap[label][userName] = remarkText;
-
-        // DB Update (Reverted to camelCase)
-        let updatePayload = {};
-        if (category === 'titles') updatePayload.titleRemarks = remarksMap;
-        else if (category === 'pre_oral') updatePayload.preOralRemarks = remarksMap;
-        else if (category === 'final') updatePayload.finalRemarks = remarksMap;
-
-        const { error: updateError } = await supabaseClient
-            .from('student_groups')
-            .update(updatePayload)
-            .eq('id', groupId);
-
-        if (updateError) throw updateError;
-
-        alert('Remarks Saved!');
-
-    } catch (err) {
-        console.error('Save Remarks Error:', err);
-        alert('Failed to save remarks: ' + err.message);
-    }
-};
-
-window.logout = function () { // Ensure logout is still here
+function logout() {
     localStorage.removeItem('loginUser');
     window.location.href = '../../';
-};
+}
 
