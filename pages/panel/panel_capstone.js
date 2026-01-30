@@ -985,13 +985,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 async function renderPage(num) {
     const container = document.getElementById('pdfViewerContainer');
     const page = await pdfDoc.getPage(num);
-    const viewport = page.getViewport({ scale: 1.5 });
+    const scale = 2.0; // Increased for smoother/sharper display
+    const viewport = page.getViewport({ scale: scale });
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pdf-page-wrapper';
     wrapper.dataset.pageNumber = num;
     wrapper.style.width = viewport.width + 'px';
     wrapper.style.height = viewport.height + 'px';
+    wrapper.style.transition = 'transform 0.3s ease'; // Smooth scroll feel
 
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
@@ -1054,7 +1056,16 @@ window.captureHighlight = () => {
     const tooltip = document.getElementById('highlightTooltip');
 
     quoted.innerText = `[Page ${currentSelection.page}] "${currentSelection.text.substring(0, 50)}${currentSelection.text.length > 50 ? '...' : ''}"`;
+
+    // Smooth transition for showing hint
+    hint.style.opacity = '0';
     hint.style.display = 'block';
+    setTimeout(() => {
+        hint.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+        hint.style.opacity = '1';
+        hint.style.transform = 'translateY(0)';
+    }, 10);
+    hint.style.transform = 'translateY(-10px)';
 
     input.placeholder = "Now type your correction/feedback here...";
     input.focus();
@@ -1168,7 +1179,12 @@ function renderComments(comments) {
             </div>
         `;
     }).join('');
-    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
+    setTimeout(() => {
+        list.scrollTo({
+            top: list.scrollHeight,
+            behavior: 'smooth'
+        });
+    }, 150);
 }
 
 window.filterTable = (program) => {

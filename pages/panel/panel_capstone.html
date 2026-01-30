@@ -254,6 +254,7 @@
                     align-items: center;
                     padding: 20px 0;
                     position: relative;
+                    cursor: crosshair;
                 }
 
                 .pdf-page-wrapper {
@@ -270,8 +271,11 @@
                     right: 0;
                     bottom: 0;
                     overflow: hidden;
-                    opacity: 0.2;
+                    opacity: 1;
+                    /* Keep at 1 for vibrant selection colors */
                     line-height: 1.0;
+                    mix-blend-mode: multiply;
+                    /* Helps selection look more natural */
                 }
 
                 .textLayer>span {
@@ -282,25 +286,37 @@
                     transform-origin: 0% 0%;
                 }
 
-                ::selection {
-                    background: rgba(37, 99, 235, 0.3);
-                }
+
 
                 #highlightTooltip {
                     position: fixed;
                     display: none;
                     background: var(--primary-color);
                     color: white;
-                    padding: 8px 14px;
-                    border-radius: 8px;
+                    padding: 10px 18px;
+                    border-radius: 12px;
                     font-size: 0.85rem;
-                    font-weight: 700;
+                    font-weight: 800;
                     cursor: pointer;
-                    z-index: 2000;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                    z-index: 3001;
+                    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
                     align-items: center;
-                    gap: 6px;
+                    gap: 8px;
+                    animation: tooltipPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    border: 2px solid rgba(255, 255, 255, 0.2);
                     transform: translate(-50%, -120%);
+                }
+
+                @keyframes tooltipPop {
+                    from {
+                        opacity: 0;
+                        transform: translate(-50%, -100%) scale(0.8);
+                    }
+
+                    to {
+                        opacity: 1;
+                        transform: translate(-50%, -120%) scale(1);
+                    }
                 }
             </style>
 
