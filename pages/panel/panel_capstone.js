@@ -1133,10 +1133,30 @@ async function saveAnnotatedPDF(isAuto = false) {
                 file_key: currentViewerFileKey,
                 user_name: userName,
                 annotated_file_url: publicUrl,
-                updated_at: new Date()
+                updated_at: new Date().toISOString()
             }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
         if (dbError) throw dbError;
+
+        // --- CRITICAL: Sync with local allData so it doesn't "vanish" when switching files ---
+        if (allData && currentViewerGroupId) {
+            const normTab = normalizeType(currentTab);
+            const group = allData.find(g => String(g.id) === String(currentViewerGroupId) && g.normalizedType === normTab);
+
+            if (group) {
+                let fieldKey = "";
+                if (normTab.includes('title')) fieldKey = "titleAnnotations";
+                else if (normTab.includes('preoral')) fieldKey = "preOralAnnotations";
+                else if (normTab.includes('final')) fieldKey = "finalAnnotations";
+
+                if (fieldKey) {
+                    if (!group[fieldKey]) group[fieldKey] = {};
+                    if (!group[fieldKey][currentViewerFileKey]) group[fieldKey][currentViewerFileKey] = {};
+                    group[fieldKey][currentViewerFileKey][userName] = publicUrl;
+                    console.log(`Local sync: Updated ${fieldKey} for ${currentViewerFileKey}`);
+                }
+            }
+        }
 
         if (statusText) statusText.innerText = "Changes Auto-saved";
         if (statusIcon) {
