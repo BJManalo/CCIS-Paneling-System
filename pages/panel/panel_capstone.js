@@ -1018,45 +1018,63 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             authorName: userName
                         });
 
+                        // Helper to enforce identity on annotation objects
+                        const enforceIdentity = (annotations) => {
+                            let wasModified = false;
+                            annotations.forEach(annot => {
+                                // 1. Force Title
+                                if (annot.title !== userName) {
+                                    annot.title = userName;
+                                    wasModified = true;
+                                }
+                                // 2. Hard-bake name into text content (Prefix)
+                                if (annot.bodyValue && !annot.bodyValue.startsWith(`[${userName}]`)) {
+                                    annot.bodyValue = `[${userName}]: ${annot.bodyValue}`;
+                                    wasModified = true;
+                                }
+                            });
+                            return wasModified;
+                        };
+
                         // Manual Save Logic
                         const saveAnnotations = async (annotations) => {
-                            // Enforce Author Name in the data being saved
-                            // This ensures that even if local UI shows 'A', the student sees the correct name
-                            const processedAnnotations = annotations.map(annot => {
-                                // 1. Force the Title (Author Name)
-                                // If name is missing, generic, or just initials, overwrite it
-                                if (!annot.title || annot.title === 'Guest' || annot.title === 'A' || annot.title.length <= 2) {
-                                    annot.title = userName;
-                                }
-
-                                // 2. Hard-bake name into text content (Double-Fail-Safe)
-                                // "I wanted that in any way it wil display the name of the panel in comment"
-                                if (annot.bodyValue && !annot.bodyValue.startsWith(`[`) && !annot.bodyValue.includes(`${userName}:`)) {
-                                    annot.bodyValue = `[${userName}]: ${annot.bodyValue}`;
-                                }
-
-                                return annot;
-                            });
+                            // Ensure data sent to DB is enforced
+                            enforceIdentity(annotations);
 
                             try {
                                 const { error } = await supabaseClient.from('pdf_annotations').upsert({
                                     group_id: groupId,
                                     file_key: fileKey,
-                                    annotation_data: processedAnnotations,
+                                    annotation_data: annotations,
                                     user_name: userName,
                                     updated_at: new Date().toISOString()
                                 }, { onConflict: ['group_id', 'file_key'] });
                                 if (error) throw error;
-                                console.log('SAVE SUCCESSful:', processedAnnotations.length);
+                                console.log('SAVE SUCCESSful:', annotations.length);
                             } catch (err) {
                                 console.error('SAVE FAILED:', err);
                             }
                         };
 
-                        // IMMEDIATE SAVE on any change
+                        // IMMEDIATE SAVE & UI UPDATE on any change
                         annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.ANNOTATION_EVENT_LISTENER, async (event) => {
                             console.log('ANNOTATION EVENT:', event.type);
-                            if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED", "ANNOTATION_DELETED"].includes(event.type)) {
+
+                            if (["ANNOTATION_ADDED", "ANNOTATION_UPDATED"].includes(event.type)) {
+                                const annotations = await annotationManager.getAnnotations();
+
+                                // Update the UI immediately so the panelist sees the name added
+                                if (enforceIdentity(annotations)) {
+                                    try {
+                                        await annotationManager.updateAnnotation(annotations);
+                                        console.log('UI Updated with Identity');
+                                    } catch (e) {
+                                        console.warn('UI Identity Update Failed (User editing?)', e);
+                                    }
+                                }
+
+                                saveAnnotations(annotations);
+                            } else if (event.type === "ANNOTATION_DELETED") {
                                 const annotations = await annotationManager.getAnnotations();
                                 saveAnnotations(annotations);
                             }
