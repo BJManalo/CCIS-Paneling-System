@@ -143,11 +143,27 @@ async function loadSubmissionData() {
             if (document.getElementById('projectTitle2')) document.getElementById('projectTitle2').value = projectTitles.title2 || '';
             if (document.getElementById('projectTitle3')) document.getElementById('projectTitle3').value = projectTitles.title3 || '';
 
-            // Update sub-tab button labels with actual titles
-            const titleTabBtns = document.querySelectorAll('#tab-titles .sub-tab-btn');
-            if (titleTabBtns.length >= 1 && projectTitles.title1) titleTabBtns[0].innerText = projectTitles.title1;
-            if (titleTabBtns.length >= 2 && projectTitles.title2) titleTabBtns[1].innerText = projectTitles.title2;
-            if (titleTabBtns.length >= 3 && projectTitles.title3) titleTabBtns[2].innerText = projectTitles.title3;
+            // Update sub-tab button labels, form labels, and save buttons with actual titles
+            ['1', '2', '3'].forEach(num => {
+                const title = projectTitles['title' + num];
+                if (title && title.trim() !== "") {
+                    // 1. Update Sub-tab Button
+                    const titleTabBtns = document.querySelectorAll('#tab-titles .sub-tab-btn');
+                    if (titleTabBtns.length >= num) {
+                        titleTabBtns[num - 1].innerText = title;
+                    }
+
+                    // 2. Update Form Group Label
+                    const label = document.querySelector(`label[for="projectTitle${num}"]`);
+                    if (label) label.innerText = title;
+
+                    // 3. Update Save Button Text
+                    const saveBtn = document.getElementById(`save-title${num}`);
+                    if (saveBtn) {
+                        saveBtn.innerHTML = `<span class="material-icons-round">save</span> Save ${title}`;
+                    }
+                }
+            });
 
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
@@ -648,9 +664,28 @@ window.saveSubmissions = async function (specificField) {
 
         showToast(`${specificField.toUpperCase()} saved successfully!`, 'success');
 
+        // Immediately update UI labels if it was a title update
+        if (tabId === 'titles') {
+            const num = specificField.replace('title', '');
+            const newTitle = document.getElementById(`projectTitle${num}`)?.value.trim();
+            if (newTitle) {
+                // Update Sub-tab button
+                const titleTabBtns = document.querySelectorAll('#tab-titles .sub-tab-btn');
+                if (titleTabBtns.length >= parseInt(num)) {
+                    titleTabBtns[parseInt(num) - 1].innerText = newTitle;
+                }
+                // Update Label
+                const label = document.querySelector(`label[for="projectTitle${num}"]`);
+                if (label) label.innerText = newTitle;
+                // Update Save Button Text
+                if (btn) btn.innerHTML = `<span class="material-icons-round">save</span> Save ${newTitle}`;
+            }
+        }
+
         // Update local state and lock current sub-tab only
         window.currentLinks[tabId] = activeLinks;
-        updateSaveButtonState(tabId);
+        // Delay refresh slightly for user to see success
+        setTimeout(() => { if (btn) { btn.innerHTML = originalContent; btn.disabled = false; } window.location.reload(); }, 1500);
 
     } catch (err) {
         console.error('Submission error:', err);
@@ -736,6 +771,16 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
     }
 
     let displayTitle = fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+
+    // Check for actual project titles if fileKey is title1, title2, title3
+    if (fileKey && fileKey.toLowerCase().startsWith('title')) {
+        const inputId = 'project' + fileKey.charAt(0).toUpperCase() + fileKey.slice(1); // e.g., projectTitle1
+        const actualTitleInput = document.getElementById(inputId);
+        if (actualTitleInput && actualTitleInput.value.trim()) {
+            displayTitle = actualTitleInput.value.trim();
+        }
+    }
+
     titleEl.innerText = displayTitle;
 
     let absoluteUrl = url.trim();
