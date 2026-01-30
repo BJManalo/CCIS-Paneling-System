@@ -1027,15 +1027,18 @@ window.changePage = (offset) => {
     }
 };
 
-// --- HIGHLIGHT DETECTION (Real-time Sync Version) ---
+// --- HIGHLIGHT DETECTION (Real-time Sync & Clean Version) ---
 document.addEventListener('mouseup', () => {
     // Small timeout to ensure selection is finalized
     setTimeout(() => {
         const selection = window.getSelection();
-        const text = selection.toString().trim();
+        let text = selection.toString().trim();
         const target = document.getElementById('pdfRenderTarget');
 
         if (!text || !target || !target.contains(selection.anchorNode)) return;
+
+        // Clean up text: replace multiple spaces/newlines with a single space
+        text = text.replace(/\s+/g, ' ').trim();
 
         currentHighlightedText = text;
         currentHighlightedPage = currentPageNum;

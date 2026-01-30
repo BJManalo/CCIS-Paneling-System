@@ -28,8 +28,11 @@
             right: 0;
             bottom: 0;
             overflow: hidden;
-            opacity: 0.2;
+            opacity: 1;
+            /* Changed from 0.2 to 1 for better selection precision */
             line-height: 1.0;
+            mix-blend-mode: multiply;
+            /* Natural highlight blend */
         }
 
         .textLayer span {
@@ -38,6 +41,11 @@
             white-space: pre;
             cursor: text;
             transform-origin: 0% 0%;
+        }
+
+        .textLayer ::selection {
+            background: rgba(0, 84, 255, 0.25);
+            /* Standard blue highlight */
         }
 
         .role-tab {
