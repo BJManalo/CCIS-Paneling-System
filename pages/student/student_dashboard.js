@@ -728,12 +728,13 @@ window.openFileViewer = async (url, fileKey) => {
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey }
                 }, {
-                    embedMode: "SIZED_CONTAINER",
+                    embedMode: "FULL_WINDOW",
                     showAnnotationTools: true,
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
                     showPageControls: true,
-                    showBookmarks: true
+                    showBookmarks: true,
+                    defaultViewMode: "FIT_PAGE"
                 });
 
                 adobeFilePromise.then(adobeViewer => {

@@ -956,12 +956,13 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey || 'unique-id' }
                 }, {
-                    embedMode: "SIZED_CONTAINER", // More stable within modals
+                    embedMode: "FULL_WINDOW", // Matches the rich UI in the 1st image
                     showAnnotationTools: true,
                     enableAnnotationAPIs: true,
                     showLeftHandPanel: true,
                     showPageControls: true,
-                    showBookmarks: true
+                    showBookmarks: true,
+                    defaultViewMode: "FIT_PAGE"
                 });
 
                 adobeFilePromise.then(adobeViewer => {
