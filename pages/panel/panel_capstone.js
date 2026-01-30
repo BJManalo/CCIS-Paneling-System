@@ -946,8 +946,8 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && fileId) {
-                    // Try the 'uc?id=' format without export=download, sometimes more reliable for SDKs
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}`;
+                    // This is the most 'raw' link variant that often bypasses the browser's intermediate pages
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=media&confirm=t`;
                 }
 
                 console.log('ADOBE LOADING:', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });

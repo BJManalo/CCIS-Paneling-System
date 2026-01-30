@@ -697,7 +697,7 @@ window.openFileViewer = async (url, fileKey) => {
 
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && fileId) {
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}`;
+                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=media&confirm=t`;
                 }
 
                 console.log('ADOBE LOADING (Student):', { finalUrl, fileName, clientId: ADOBE_CLIENT_ID });
