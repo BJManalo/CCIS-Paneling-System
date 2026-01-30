@@ -88,14 +88,6 @@
             box-shadow: 0 6px 15px rgba(26, 86, 219, 0.3);
         }
 
-        /* PDF.js Text Selection Color */
-        .textLayer ::selection {
-            background-color: #002d72 !important;
-            /* Rich Navy Blue */
-            color: white !important;
-            fill: white !important;
-        }
-
         @keyframes spin {
             0% {
                 transform: rotate(0deg);
@@ -382,10 +374,16 @@
                     <h3 id="modalFileTitle" style="margin: 0; color: var(--primary-dark); font-size: 1.1rem;">Document
                         Preview</h3>
                 </div>
-                <button onclick="closeFileModal()"
-                    style="background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                    <span class="material-icons-round">close</span>
-                </button>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <a id="externalLinkBtn" href="#" target="_blank"
+                        style="text-decoration: none; color: var(--primary-color); font-weight: 600; font-size: 0.85rem; padding: 6px 12px; border-radius: 6px; background: var(--primary-light); display: none;">
+                        Open in New Tab
+                    </a>
+                    <button onclick="closeFileModal()"
+                        style="background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Modal Body -->

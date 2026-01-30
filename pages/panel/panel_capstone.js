@@ -979,14 +979,16 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         placeholder.innerHTML = `<p style="color:#ef4444;">Error loading PDF. Please use "Open Original".</p>`;
     }
 
-    if (document.getElementById('externalLinkBtn')) document.getElementById('externalLinkBtn').href = absoluteUrl;
+    if (document.getElementById('externalLinkBtn')) {
+        const groupName = document.getElementById('modalGroupName').innerText;
+        document.getElementById('externalLinkBtn').href = `viewer.html?url=${encodeURIComponent(absoluteUrl)}&groupId=${groupId}&fileKey=${fileKey}&groupName=${encodeURIComponent(groupName)}`;
+    }
 };
 
 async function renderPage(num) {
     const container = document.getElementById('pdfViewerContainer');
     const page = await pdfDoc.getPage(num);
-    const scale = 2.0; // Increased for smoother/sharper display
-    const viewport = page.getViewport({ scale: scale });
+    const viewport = page.getViewport({ scale: 1.5 });
 
     const wrapper = document.createElement('div');
     wrapper.className = 'pdf-page-wrapper';
@@ -1055,16 +1057,7 @@ window.captureHighlight = () => {
     const tooltip = document.getElementById('highlightTooltip');
 
     quoted.innerText = `[Page ${currentSelection.page}] "${currentSelection.text.substring(0, 50)}${currentSelection.text.length > 50 ? '...' : ''}"`;
-
-    // Smooth transition for showing hint
-    hint.style.opacity = '0';
     hint.style.display = 'block';
-    setTimeout(() => {
-        hint.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-        hint.style.opacity = '1';
-        hint.style.transform = 'translateY(0)';
-    }, 10);
-    hint.style.transform = 'translateY(-10px)';
 
     input.placeholder = "Now type your correction/feedback here...";
     input.focus();
@@ -1178,12 +1171,7 @@ function renderComments(comments) {
             </div>
         `;
     }).join('');
-    setTimeout(() => {
-        list.scrollTo({
-            top: list.scrollHeight,
-            behavior: 'smooth'
-        });
-    }, 150);
+    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
 }
 
 window.filterTable = (program) => {

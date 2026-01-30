@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced PDF Feedback Viewer</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1a56db;
+            --primary-dark: #1e40af;
+            --primary-light: #eff6ff;
+            --accent-color: #fbbf24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: #f8fafc;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: white;
+            padding: 12px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        /* Main Workspace */
+        .workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Viewer Area */
+        #viewerArea {
+            flex: 1;
+            overflow-y: auto;
+            position: relative;
+            background: #525659;
+            scroll-behavior: smooth;
+            padding: 20px;
+        }
+
+        #pdfViewerContainer {
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .pdf-page-wrapper {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            background: white;
+            position: relative;
+        }
+
+        .textLayer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            opacity: 0.2;
+            line-height: 1.0;
+            cursor: text;
+        }
+
+        .textLayer>span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
+
+        /* Tooltip */
+        #highlightTooltip {
+            position: fixed;
+            display: none;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            z-index: 2000;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+            animation: fadeIn 0.2s ease;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 400px;
+            background: white;
+            border-left: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+
+        #commentsList {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #fdfdfd;
+        }
+
+        /* Comment Input */
+        .comment-input-area {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+        }
+
+        #selectionHint {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 0.8rem;
+            color: #1e40af;
+            border-left: 4px solid var(--primary-color);
+            display: none;
+        }
+
+        #commentInput {
+            width: 100%;
+            height: 100px;
+            padding: 12px;
+            border: 2px solid #f1f5f9;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            resize: none;
+            outline: none;
+            background: #f8fafc;
+            transition: all 0.3s;
+        }
+
+        #postCommentBtn {
+            width: 100%;
+            margin-top: 10px;
+            background: #94a3b8;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: not-allowed;
+            transition: all 0.3s;
+        }
+
+        /* Utils */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <img src="../../assets/images/logo.png" style="height: 32px;">
+            <div>
+                <h4 id="fileName" style="font-size: 1rem; color: #1e293b;">Loading Document...</h4>
+                <p id="groupName" style="font-size: 0.75rem; color: #64748b;">Feedback Session</p>
+            </div>
+        </div>
+        <button onclick="window.close()" style="background:none; border:none; cursor:pointer; color:#64748b;">
+            <span class="material-icons-round">close</span>
+        </button>
+    </header>
+
+    <div class="workspace">
+        <!-- PDF Viewer -->
+        <div id="viewerArea">
+            <div id="viewerPlaceholder"
+                style="height: 100%; display: flex; align-items: center; justify-content: center; color: white; flex-direction: column; gap: 15px;">
+                <div
+                    style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite;">
+                </div>
+                <p>Initializing Viewer...</p>
+            </div>
+            <div id="pdfViewerContainer"></div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div
+                style="padding: 15px 20px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons-round" style="color: var(--primary-color);">chat_bubble</span>
+                <h4 style="font-size: 0.9rem; font-weight: 700;">Discussion Thread</h4>
+            </div>
+
+            <div id="commentsList"></div>
+
+            <div class="comment-input-area">
+                <div id="selectionHint">
+                    <strong>Ref Page <span id="hintPage">0</span>:</strong>
+                    <p id="quotedText" style="font-style: italic; margin-top: 4px;"></p>
+                </div>
+                <textarea id="commentInput" placeholder="Highlight text in the PDF to start..."></textarea>
+                <button id="postCommentBtn" onclick="postComment()" disabled>Post Feedback</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="highlightTooltip" onclick="captureHighlight()">
+        <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">edit_note</span>
+        <span style="font-size: 13px; font-weight: 600; color: #334155;">Comment on selection</span>
+    </div>
+
+    <script type="module">
+        const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
+        const PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
+        const supabaseClient = supabase.createClient(PROJECT_URL, PUBLIC_KEY);
+
+        let pdfDoc = null;
+        let currentSelection = { text: '', page: 0 };
+        let currentViewerGroupId = null;
+        let currentViewerFileKey = null;
+
+        // 1. Get Params
+        const params = new URLSearchParams(window.location.search);
+        const url = params.get('url');
+        const groupId = params.get('groupId');
+        const fileKey = params.get('fileKey');
+        const groupNameStr = params.get('groupName') || 'Project Group';
+
+        if (!url || !groupId || !fileKey) {
+            document.body.innerHTML = '<div style="padding:40px; text-align:center;"><h3>Invalid Session</h3><p>Missing required parameters.</p></div>';
+            throw new Error('Missing parameters');
+        }
+
+        currentViewerGroupId = groupId;
+        currentViewerFileKey = fileKey;
+        document.getElementById('fileName').innerText = fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        document.getElementById('groupName').innerText = groupNameStr;
+
+        // 2. Initialize
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        async function init() {
+            try {
+                const loadingTask = pdfjsLib.getDocument(url);
+                pdfDoc = await loadingTask.promise;
+                document.getElementById('viewerPlaceholder').style.display = 'none';
+
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    await renderPage(i);
+                }
+
+                document.getElementById('viewerArea').addEventListener('mouseup', handleSelection);
+                loadComments();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('viewerPlaceholder').innerHTML = `<p style="color:#ef4444;">Failed to load PDF. Check URL or CORS settings.</p>`;
+            }
+        }
+
+        async function renderPage(num) {
+            const container = document.getElementById('pdfViewerContainer');
+            const page = await pdfDoc.getPage(num);
+            const viewport = page.getViewport({ scale: 1.5 });
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pdf-page-wrapper';
+            wrapper.dataset.pageNumber = num;
+            wrapper.style.width = viewport.width + 'px';
+            wrapper.style.height = viewport.height + 'px';
+            wrapper.style.margin = '20px 0';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width; canvas.height = viewport.height;
+            wrapper.appendChild(canvas);
+
+            const textLayer = document.createElement('div');
+            textLayer.className = 'textLayer';
+            wrapper.appendChild(textLayer);
+            container.appendChild(wrapper);
+
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            const textContent = await page.getTextContent();
+            pdfjsLib.renderTextLayer({ textContent, container: textLayer, viewport, textDivs: [] });
+        }
+
+        function handleSelection(e) {
+            const selection = window.getSelection();
+            const text = selection.toString().trim();
+            const tooltip = document.getElementById('highlightTooltip');
+
+            if (text && text.length > 3) {
+                const range = selection.getRangeAt(0);
+                let node = range.startContainer;
+                while (node && node !== document.body) {
+                    if (node.classList?.contains('pdf-page-wrapper')) {
+                        currentSelection = { text, page: node.dataset.pageNumber };
+                        break;
+                    }
+                    node = node.parentNode;
+                }
+                tooltip.style.left = `${e.clientX}px`;
+                tooltip.style.top = `${e.clientY}px`;
+                tooltip.style.display = 'flex';
+            } else {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        window.captureHighlight = () => {
+            const hint = document.getElementById('selectionHint');
+            const quoted = document.getElementById('quotedText');
+            const input = document.getElementById('commentInput');
+            const btn = document.getElementById('postCommentBtn');
+
+            quoted.innerText = `"${currentSelection.text.substring(0, 80)}..."`;
+            document.getElementById('hintPage').innerText = currentSelection.page;
+            hint.style.display = 'block';
+            input.placeholder = "Enter your feedback...";
+            input.focus();
+            btn.disabled = false;
+            btn.style.background = 'var(--primary-color)';
+            btn.style.cursor = 'pointer';
+            document.getElementById('highlightTooltip').style.display = 'none';
+            window.getSelection().removeAllRanges();
+        };
+
+        async function loadComments() {
+            const { data, error } = await supabaseClient
+                .from('file_comments')
+                .select('*')
+                .eq('group_id', currentViewerGroupId)
+                .eq('file_key', currentViewerFileKey)
+                .order('created_at', { ascending: true });
+
+            if (error) return console.error(error);
+            renderComments(data);
+        }
+
+        function renderComments(comments) {
+            const list = document.getElementById('commentsList');
+            const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+            const myName = user.name || user.full_name || 'Me';
+
+            list.innerHTML = comments.map(c => {
+                const isMe = c.user_name === myName;
+                return `
+                    <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'};">
+                        <span style="font-size: 0.7rem; font-weight: 700; color: #64748b; margin-bottom: 2px;">${c.user_name}</span>
+                        <div style="background: ${isMe ? 'var(--primary-color)' : '#f1f5f9'}; color: ${isMe ? 'white' : '#1e293b'}; padding: 10px 14px; border-radius: 12px; font-size: 0.85rem; max-width: 90%; border: ${isMe ? 'none' : '1px solid #e2e8f0'};">
+                            ${c.comment_text.replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            list.scrollTop = list.scrollHeight;
+        }
+
+        window.postComment = async () => {
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+            const userName = user.group_name || user.name || user.full_name || 'User';
+            const userRole = user.role || (user.group_name ? 'Student' : 'Panelist');
+            const fullComment = `**Ref Page ${currentSelection.page}:** _"${currentSelection.text}"_\n\n**FEEDBACK:** ${text}`;
+
+            const { error } = await supabaseClient.from('file_comments').insert({
+                group_id: currentViewerGroupId,
+                file_key: currentViewerFileKey,
+                user_name: userName,
+                user_role: userRole,
+                comment_text: fullComment
+            });
+
+            if (error) return alert("Error saving comment");
+            input.value = '';
+            document.getElementById('selectionHint').style.display = 'none';
+            loadComments();
+        };
+
+        init();
+    </script>
+</body>
+
+</html>

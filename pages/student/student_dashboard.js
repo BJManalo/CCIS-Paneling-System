@@ -680,6 +680,13 @@ window.openFileViewer = async (url, fileKey) => {
         iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
     }
 
+    if (document.getElementById('externalLinkBtn')) {
+        const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+        const gn = user.group_name || 'Student Group';
+        document.getElementById('externalLinkBtn').style.display = 'block';
+        document.getElementById('externalLinkBtn').href = `../panel/viewer.html?url=${encodeURIComponent(absoluteUrl)}&groupId=${currentGroupId}&fileKey=${fileKey}&groupName=${encodeURIComponent(gn)}`;
+    }
+
     // Load Sidebar Discussion
     loadComments(currentGroupId, fileKey);
 };
