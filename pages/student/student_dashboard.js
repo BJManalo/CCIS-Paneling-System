@@ -2,6 +2,7 @@
 // Note: PROJECT_URL, PUBLIC_KEY, and supabaseClient are already defined in ../../assets/js/shared.js
 const ADOBE_CLIENT_ID = '5edc19dfde9349e3acb7ecc73bfa4848';
 let currentGroupId = null;
+let currentBlobUrl = null;
 let adobeDCView = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -658,6 +659,13 @@ window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
     const viewer = document.getElementById('fileViewer');
     if (viewer) viewer.src = '';
+
+    // Revoke blob if exists
+    if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+    }
+
     currentViewerFileKey = null;
 };
 
@@ -675,6 +683,12 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
     if (placeholder) placeholder.style.display = 'flex';
     if (iframe) iframe.style.display = 'block';
 
+    // Revoke previous blob if exists
+    if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+    }
+
     let displayTitle = fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
     if (panelName) {
         titleEl.innerText = `Feedback from ${panelName}: ${displayTitle}`;
@@ -685,130 +699,32 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
     let absoluteUrl = url.trim();
     if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
 
-    // Stable Viewer Logic
-    let finalViewerUrl = absoluteUrl;
     const lowerUrl = absoluteUrl.toLowerCase();
 
-    // Use specialized viewer for Supabase/PDF files to show annotations
-    if (lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf')) {
-        const viewerPath = "../../assets/library/web/viewer.html";
-        finalViewerUrl = `${viewerPath}?file=${encodeURIComponent(absoluteUrl)}`;
-    } else if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-        finalViewerUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
-    } else {
-        finalViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
-    }
-
-    if (iframe) {
-        iframe.src = finalViewerUrl;
-        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
-    }
-
-    // Load Sidebar Discussion
-    loadComments(currentGroupId, fileKey);
-};
-
-async function loadComments(groupId, fileKey) {
-    const list = document.getElementById('commentsList');
-    if (!list) return;
-
-    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;"><div class="viewer-loader" style="width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 1s linear infinite; display:inline-block;"></div></div>`;
-
     try {
-        const { data: comments, error } = await supabaseClient
-            .from('file_comments')
-            .select('*')
-            .eq('group_id', groupId)
-            .eq('file_key', fileKey)
-            .order('created_at', { ascending: true });
+        // For PDF/Supabase files, use Blob loading to bypass CORS and ensure annotations show
+        if (lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf')) {
+            console.log("Fetching PDF as blob for student viewer...");
+            const response = await fetch(absoluteUrl);
+            if (!response.ok) throw new Error("Network response was not ok");
+            const blob = await response.blob();
+            currentBlobUrl = URL.createObjectURL(blob);
 
-        if (error) throw error;
-        renderComments(comments || []);
-    } catch (e) {
-        console.error('Comments Load Error:', e);
-        list.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px; font-size:0.8rem;">Error loading comments.</div>`;
-    }
-}
-
-function renderComments(comments) {
-    const list = document.getElementById('commentsList');
-    if (comments.length === 0) {
-        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;">
-            <span class="material-icons-round" style="font-size: 40px; opacity: 0.3;">forum</span>
-            <p style="font-size: 0.85rem; margin-top: 10px;">No feedback found yet.</p>
-        </div>`;
-        return;
-    }
-
-    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-    const myName = user.group_name || user.name || 'Student';
-
-    list.innerHTML = comments.map(c => {
-        const isMe = c.user_name === myName;
-        const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        // Highlight correction references (Matching Panelist UI)
-        let formattedText = c.comment_text;
-        if (formattedText.startsWith('RE Page')) {
-            const parts = formattedText.split('\n— ');
-            if (parts.length > 1) {
-                formattedText = `<div style="background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${isMe ? '#fff' : 'var(--primary-color)'}; font-size: 0.8rem; margin-bottom: 8px; font-style: italic; opacity: 0.9;">${parts[0]}</div>` + parts.slice(1).join('\n— ');
-            }
+            const viewerPath = "../../assets/library/web/viewer.html";
+            iframe.src = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+        } else if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
+            iframe.src = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
+        } else {
+            iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
         }
 
-        return `
-            <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'}; margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: ${c.user_role === 'Panelist' ? 'var(--primary-color)' : '#475569'};">
-                        ${isMe ? 'You' : c.user_name}
-                    </span>
-                    <span style="font-size: 0.65rem; color: #94a3b8;">${time}</span>
-                </div>
-                <div style="background: ${isMe ? 'var(--primary-color)' : '#f1f5f9'}; 
-                            color: ${isMe ? 'white' : '#1e293b'}; 
-                            padding: 12px 16px; 
-                            border-radius: ${isMe ? '18px 18px 2px 18px' : '2px 18px 18px 18px'}; 
-                            font-size: 0.9rem; 
-                            line-height: 1.5; 
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-                            max-width: 95%;
-                            border: ${isMe ? 'none' : '1px solid #eef2f6'};">
-                    ${formattedText}
-                </div>
-            </div>
-        `;
-    }).join('');
+        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
 
-    setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
-}
-
-window.postComment = async () => {
-    const input = document.getElementById('commentInput');
-    const text = input.value.trim();
-    if (!text || !currentGroupId || !currentViewerFileKey) return;
-
-    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-    const userName = user.group_name || user.name || 'Student';
-
-    input.disabled = true;
-
-    try {
-        const { error } = await supabaseClient.from('file_comments').insert({
-            group_id: currentGroupId,
-            file_key: currentViewerFileKey,
-            user_name: userName,
-            user_role: 'Student',
-            comment_text: text
-        });
-
-        if (error) throw error;
-        input.value = '';
-        loadComments(currentGroupId, currentViewerFileKey);
     } catch (e) {
-        alert('Could not send reply: ' + e.message);
-    } finally {
-        input.disabled = false;
-        input.focus();
+        console.warn("Blob loading failed for student, falling back to direct URL:", e);
+        const viewerPath = "../../assets/library/web/viewer.html";
+        iframe.src = `${viewerPath}?file=${encodeURIComponent(absoluteUrl)}`;
+        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
     }
 };
 
