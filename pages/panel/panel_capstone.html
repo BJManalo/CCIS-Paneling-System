@@ -279,12 +279,8 @@
                 <div class="viewer-area"
                     style="flex: 1; background: #565b5f; position: relative; display: flex; flex-direction: column; min-width: 0; box-shadow: inset 0 0 30px rgba(0,0,0,0.1);">
 
-                    <div id="pdfViewerContainer"
-                        style="flex: 1; overflow: auto; display: none; position: relative; padding: 25px 0;">
-                        <div id="pdfRenderTarget"
-                            style="margin: 0 auto; background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.2); position: relative;">
-                            <!-- PDF Canvas -->
-                        </div>
+                    <div id="pdfViewerContainer" style="flex: 1; overflow: hidden; display: none; position: relative;">
+                        <iframe id="pdfFrame" src="" style="width: 100%; height: 100%; border: none;"></iframe>
                     </div>
 
                     <!-- Placeholder -->
@@ -295,30 +291,16 @@
                         <p style="font-weight: 500;">Select a file to review</p>
                     </div>
 
-                    <!-- Floating Toolbar -->
-                    <div id="viewerToolbar"
-                        style="display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 8px 15px; border-radius: 99px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); align-items: center; gap: 15px; border: 1px solid rgba(255,255,255,0.3); z-index: 10;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <button onclick="changePage(-1)"
-                                style="background:none; border:none; cursor:pointer; color:#475569; padding:5px; border-radius:50%; display:flex; transition:0.2s;"
-                                onmouseover="this.style.background='#f1f5f9'"
-                                onmouseout="this.style.background='none'"><span
-                                    class="material-icons-round">chevron_left</span></button>
-                            <span id="pageCountDisplay"
-                                style="font-size: 13px; font-weight: 700; color: #1e293b; min-width: 80px; text-align: center;">PAGE
-                                1 / 1</span>
-                            <button onclick="changePage(1)"
-                                style="background:none; border:none; cursor:pointer; color:#475569; padding:5px; border-radius:50%; display:flex; transition:0.2s;"
-                                onmouseover="this.style.background='#f1f5f9'"
-                                onmouseout="this.style.background='none'"><span
-                                    class="material-icons-round">chevron_right</span></button>
-                        </div>
-                        <div style="width: 1px; height: 18px; background: #cbd5e1;"></div>
-                        <a id="externalLinkBtn" href="#" target="_blank"
-                            style="color:var(--primary-color); display:flex; align-items:center;"
-                            title="Open in new tab">
-                            <span class="material-icons-round" style="font-size: 20px;">open_in_new</span>
-                        </a>
+                    <!-- Floating Action Button for Saving Annotations -->
+                    <div id="saveAnnotationBtnContainer"
+                        style="display: none; position: absolute; bottom: 30px; right: 30px; z-index: 100;">
+                        <button onclick="saveAnnotatedPDF()"
+                            style="background: #22c55e; color: white; border: none; padding: 12px 20px; border-radius: 99px; font-weight: 700; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 25px rgba(34, 197, 94, 0.4); cursor: pointer; transition: 0.2s;"
+                            onmouseover="this.style.transform='translateY(-2px)'"
+                            onmouseout="this.style.transform='translateY(0)'">
+                            <span class="material-icons-round">save</span>
+                            Save Annotations to DB
+                        </button>
                     </div>
                 </div>
 

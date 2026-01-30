@@ -134,6 +134,7 @@ async function loadCapstoneData() {
             const norm = type.toLowerCase().replace(/[^a-z0-9]/g, '');
             const statuses = {};
             const remarks = {};
+            const annotations = {};
 
             // 1. From Legacy (Always try to read old data)
             const legacy = defStatuses.find(ds => ds.group_id == groupId && ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
@@ -146,12 +147,14 @@ async function loadCapstoneData() {
             capstoneFeedback.filter(cf => cf.group_id == groupId && cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
                 if (!statuses[cf.file_key] || typeof statuses[cf.file_key] !== 'object') statuses[cf.file_key] = {};
                 if (!remarks[cf.file_key] || typeof remarks[cf.file_key] !== 'object') remarks[cf.file_key] = {};
+                if (!annotations[cf.file_key] || typeof annotations[cf.file_key] !== 'object') annotations[cf.file_key] = {};
 
                 if (cf.status) statuses[cf.file_key][cf.user_name] = cf.status;
                 if (cf.remarks) remarks[cf.file_key][cf.user_name] = cf.remarks;
+                if (cf.annotated_file_url) annotations[cf.file_key][cf.user_name] = cf.annotated_file_url;
             });
 
-            return { statuses, remarks, id: legacy ? legacy.id : null };
+            return { statuses, remarks, annotations, id: legacy ? legacy.id : null };
         };
 
         // 5. Process Data
@@ -224,6 +227,7 @@ async function loadCapstoneData() {
                 const feedbackRes = getMergedFeedback(group.id, normType);
                 const currentStatuses = feedbackRes.statuses;
                 const currentRemarks = feedbackRes.remarks;
+                const currentAnnotations = feedbackRes.annotations;
 
                 let titleStatus = {}, preOralStatus = {}, finalStatus = {};
                 if (normType.includes('title')) titleStatus = currentStatuses;
@@ -234,6 +238,11 @@ async function loadCapstoneData() {
                 if (normType.includes('title')) titleRemarks = currentRemarks;
                 else if (normType.includes('preoral')) preOralRemarks = currentRemarks;
                 else if (normType.includes('final')) finalRemarks = currentRemarks;
+
+                let titleAnnotations = {}, preOralAnnotations = {}, finalAnnotations = {};
+                if (normType.includes('title')) titleAnnotations = currentAnnotations;
+                else if (normType.includes('preoral')) preOralAnnotations = currentAnnotations;
+                else if (normType.includes('final')) finalAnnotations = currentAnnotations;
 
                 allData.push({
                     id: group.id,
@@ -250,11 +259,13 @@ async function loadCapstoneData() {
                     // Unified accessors
                     titleStatus, preOralStatus, finalStatus,
                     titleRemarks, preOralRemarks, finalRemarks,
+                    titleAnnotations, preOralAnnotations, finalAnnotations,
 
                     // Store raw status info for updates
                     defenseStatusId: feedbackRes.id,
                     currentStatusJson: currentStatuses,
                     currentRemarksJson: currentRemarks,
+                    currentAnnotationsJson: currentAnnotations,
 
                     status: sched ? (sched.status || 'Active') : 'Pending Schedule',
                     isAdviser: isAdviser,
@@ -922,6 +933,12 @@ window.closeFileModal = () => {
     if (container) container.style.display = 'none';
     const sidebar = document.getElementById('commentsSidebar');
     if (sidebar) sidebar.style.display = 'none';
+    const saveBtn = document.getElementById('saveAnnotationBtnContainer');
+    if (saveBtn) saveBtn.style.display = 'none';
+
+    // Clear iframe
+    const pdfFrame = document.getElementById('pdfFrame');
+    if (pdfFrame) pdfFrame.src = "";
 
     currentPdf = null;
     currentViewerFileKey = null;
@@ -934,144 +951,168 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) return;
     currentViewerGroupId = groupId;
     currentViewerFileKey = fileKey;
-    currentHighlightedText = ""; // Reset highlight
+    currentHighlightedText = "";
 
     const placeholder = document.getElementById('viewerPlaceholder');
     const container = document.getElementById('pdfViewerContainer');
-    const toolbar = document.getElementById('viewerToolbar');
+    const pdfFrame = document.getElementById('pdfFrame');
     const sidebar = document.getElementById('commentsSidebar');
-    const nameDisplay = document.getElementById('currentFileNameDisplay');
-    const linkBtn = document.getElementById('externalLinkBtn');
+    const saveBtn = document.getElementById('saveAnnotationBtnContainer');
 
     if (placeholder) placeholder.style.display = 'none';
     if (container) container.style.display = 'block';
-    if (toolbar) toolbar.style.display = 'flex';
     if (sidebar) sidebar.style.display = 'flex';
-    if (nameDisplay) nameDisplay.innerText = (fileKey || 'File').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-    if (linkBtn) linkBtn.href = url;
+    if (saveBtn) saveBtn.style.display = 'block';
 
-    // Load PDF
-    try {
-        const loadingTask = pdfjsLib.getDocument(url);
-        currentPdf = await loadingTask.promise;
-        currentPageNum = 1;
-        renderPage(currentPageNum);
-        loadComments(groupId, fileKey);
+    // Set up highlight sync after iframe loads
+    pdfFrame.onload = () => {
+        try {
+            const frameDoc = pdfFrame.contentDocument || pdfFrame.contentWindow.document;
+            frameDoc.addEventListener('mouseup', () => {
+                setTimeout(() => {
+                    const selection = pdfFrame.contentWindow.getSelection();
+                    let text = selection.toString().trim();
+                    if (!text) return;
 
-        // --- ENFORCE HIGHLIGHT FIRST: Reset UI ---
-        const input = document.getElementById('commentInput');
-        const postBtn = input ? input.nextElementSibling : null;
-        if (input) {
-            input.disabled = true;
-            input.placeholder = "⚠️ Highlight text in the PDF first to comment...";
-            input.value = "";
+                    text = text.replace(/\s+/g, ' ').trim();
+                    currentHighlightedText = text;
+
+                    const viewerApp = pdfFrame.contentWindow.PDFViewerApplication;
+                    const pageNum = viewerApp ? viewerApp.page : 1;
+
+                    const input = document.getElementById('commentInput');
+                    const postBtn = input ? input.parentElement.querySelector('button') : null;
+
+                    if (input) {
+                        input.disabled = false;
+                        input.placeholder = "Type your feedback after the '—' symbol...";
+                        if (postBtn) postBtn.disabled = false;
+
+                        const newReference = `RE Page ${pageNum}: "${text}"`;
+                        const currentVal = input.value;
+
+                        if (currentVal.includes('—')) {
+                            const parts = currentVal.split('—');
+                            const existingFeedback = parts.length > 1 ? parts.slice(1).join('—') : "";
+                            input.value = `${newReference}\n— ${existingFeedback.trim()}`;
+                        } else {
+                            input.value = `${newReference}\n— `;
+                        }
+
+                        input.focus();
+                        input.setSelectionRange(input.value.length, input.value.length);
+                    }
+                }, 50);
+            });
+        } catch (e) {
+            console.warn("Could not attach selection listener to PDF (likely cross-origin). Students can still use annotation tools inside the viewer.");
         }
-    } catch (e) {
-        console.error('PDF Load Error:', e);
-        container.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444;">Failed to load PDF. It might be restricted or not a PDF file.</div>`;
+    };
+
+    // Point iframe to local PDF.js viewer
+    let finalUrl = url;
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+
+    if (groupId && fileKey) {
+        // Find the group in allData to check for existing annotations
+        const normTab = normalizeType(currentTab);
+        const group = allData.find(g => String(g.id) === String(groupId) && g.normalizedType === normTab);
+
+        if (group) {
+            let annotationsMap = {};
+            if (normTab.includes('title')) annotationsMap = group.titleAnnotations || {};
+            else if (normTab.includes('preoral')) annotationsMap = group.preOralAnnotations || {};
+            else if (normTab.includes('final')) annotationsMap = group.finalAnnotations || {};
+
+            if (annotationsMap[fileKey] && annotationsMap[fileKey][userName]) {
+                console.log("Loading existing annotation for:", userName);
+                finalUrl = annotationsMap[fileKey][userName];
+            }
+        }
     }
+
+    const viewerUrl = `../../assets/library/web/viewer.html?file=${encodeURIComponent(finalUrl)}`;
+    pdfFrame.src = viewerUrl;
+
+    loadComments(groupId, fileKey);
 };
 
-async function renderPage(num) {
-    if (!currentPdf) return;
-    const target = document.getElementById('pdfRenderTarget');
-    const container = document.getElementById('pdfViewerContainer');
-    target.innerHTML = '<div style="padding:40px; text-align:center; color:white;">Rendering page...</div>';
+async function saveAnnotatedPDF() {
+    const frame = document.getElementById('pdfFrame');
+    const viewerApp = frame.contentWindow.PDFViewerApplication;
 
-    const page = await currentPdf.getPage(num);
+    if (!viewerApp || !viewerApp.pdfDocument) {
+        alert("Viewer not ready or PDF not loaded.");
+        return;
+    }
 
-    // Auto-calculate scale to fit width
-    const containerWidth = container.clientWidth - 80; // Margin
-    const unscaledViewport = page.getViewport({ scale: 1 });
-    const dynamicScale = containerWidth / unscaledViewport.width;
-    pdfScale = dynamicScale;
+    const btn = document.querySelector('#saveAnnotationBtnContainer button');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round">sync</span> Saving...';
 
-    const viewport = page.getViewport({ scale: pdfScale });
+    try {
+        // 1. Get the annotated PDF bytes from PDF.js
+        const data = await viewerApp.pdfDocument.saveDocument();
 
-    target.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    target.style.width = viewport.width + 'px';
-    target.style.height = viewport.height + 'px';
-    target.appendChild(canvas);
+        // 2. Prepare file metadata
+        const userJson = localStorage.getItem('loginUser');
+        const user = JSON.parse(userJson || '{}');
+        const userName = user.name || user.full_name || 'Panel';
+        const fileName = `annotated_${currentViewerGroupId}_${currentViewerFileKey}_${Date.now()}.pdf`;
 
-    const renderContext = { canvasContext: context, viewport: viewport };
-    await page.render(renderContext).promise;
+        // 3. Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+            .from('project-submissions')
+            .upload(`submissions/annotations/${fileName}`, data, {
+                contentType: 'application/pdf',
+                upsert: true
+            });
 
-    // Render Text Layer for Selection
-    const textContent = await page.getTextContent();
-    const textLayerDiv = document.createElement('div');
-    textLayerDiv.className = 'textLayer';
-    textLayerDiv.style.width = viewport.width + 'px';
-    textLayerDiv.style.height = viewport.height + 'px';
-    target.appendChild(textLayerDiv);
+        if (uploadError) throw uploadError;
 
-    pdfjsLib.renderTextLayer({
-        textContent: textContent,
-        container: textLayerDiv,
-        viewport: viewport,
-        textDivs: []
-    });
+        // 4. Get the Public URL
+        const { data: { publicUrl } } = supabaseClient.storage
+            .from('project-submissions')
+            .getPublicUrl(`submissions/annotations/${fileName}`);
 
-    document.getElementById('pageCountDisplay').innerText = `PAGE ${num} / ${currentPdf.numPages}`;
+        // 5. Save the link to the 'capstone_feedback' table
+        const { error: dbError } = await supabaseClient
+            .from('capstone_feedback')
+            .upsert({
+                group_id: currentViewerGroupId,
+                defense_type: normalizeType(currentTab),
+                file_key: currentViewerFileKey,
+                user_name: userName,
+                annotated_file_url: publicUrl,
+                updated_at: new Date()
+            }, { onConflict: 'group_id, defense_type, file_key, user_name' });
+
+        if (dbError) throw dbError;
+
+        // Refresh allData locally to ensure the new annotation URL is captured
+        await loadCapstoneData();
+
+        alert("Successfully saved annotated PDF to database!");
+        btn.innerHTML = '<span class="material-icons-round">check_circle</span> Saved!';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 3000);
+    } catch (err) {
+        console.error('Save Annotation Error:', err);
+        alert('Error saving annotations: ' + err.message);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 }
 
-window.changePage = (offset) => {
-    const newPage = currentPageNum + offset;
-    if (newPage >= 1 && newPage <= currentPdf.numPages) {
-        currentPageNum = newPage;
-        renderPage(currentPageNum);
-        document.getElementById('pdfViewerContainer').scrollTop = 0;
-    }
-};
+// --- (Obsolete manual rendering functions removed) ---
 
 // --- HIGHLIGHT DETECTION (Real-time Sync & Clean Version) ---
-document.addEventListener('mouseup', () => {
-    // Small timeout to ensure selection is finalized
-    setTimeout(() => {
-        const selection = window.getSelection();
-        let text = selection.toString().trim();
-        const target = document.getElementById('pdfRenderTarget');
-
-        if (!text || !target || !target.contains(selection.anchorNode)) return;
-
-        // Clean up text: replace multiple spaces/newlines with a single space
-        text = text.replace(/\s+/g, ' ').trim();
-
-        currentHighlightedText = text;
-        currentHighlightedPage = currentPageNum;
-
-        const input = document.getElementById('commentInput');
-        const postBtn = input ? input.parentElement.querySelector('button') : null;
-
-        if (input) {
-            // UNLOCK UI
-            input.disabled = false;
-            input.placeholder = "Type your feedback after the '—' symbol...";
-            if (postBtn) postBtn.disabled = false;
-
-            const newReference = `RE Page ${currentPageNum}: "${text}"`;
-            const currentVal = input.value;
-
-            // REAL-TIME UPDATE LOGIC:
-            // If the user already typed something, we want to replace the reference part but keep their typed feedback.
-            if (currentVal.includes('—')) {
-                const parts = currentVal.split('—');
-                const existingFeedback = parts.length > 1 ? parts.slice(1).join('—') : "";
-                input.value = `${newReference}\n— ${existingFeedback.trim()}`;
-            } else {
-                // Fresh start or format lost
-                input.value = `${newReference}\n— `;
-            }
-
-            // Move cursor to the very end so they can continue typing feedback
-            input.focus();
-            input.setSelectionRange(input.value.length, input.value.length);
-        }
-    }, 50);
-});
+// --- (Global mouseup listener removed, handled by iframe) ---
 
 // --- SIDEBAR COMMENT SYSTEM ---
 async function loadComments(groupId, fileKey) {
