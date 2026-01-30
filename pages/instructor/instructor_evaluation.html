@@ -311,6 +311,17 @@
         <!-- Main Content -->
         <div class="evaluation-wrapper" style="padding: 0; max-width: 1000px; margin: 0 auto;">
 
+            <!-- Main Tabs (Advisory vs Evaluation) -->
+            <div class="switcher-tabs"
+                style="margin-bottom: 20px; background: #e2e8f0; padding: 4px; max-width: 400px;">
+                <button class="switcher-btn active" id="tab-advisory" onclick="switchMainTab('Advisory')">
+                    <span class="material-icons-round">reduce_capacity</span> Advisory
+                </button>
+                <button class="switcher-btn" id="tab-evaluation" onclick="switchMainTab('Evaluation')">
+                    <span class="material-icons-round">fact_check</span> Evaluation
+                </button>
+            </div>
+
             <!-- Filters -->
             <div class="filter-container">
                 <button class="filter-chip active" onclick="setFilter('ALL', this)">All Evaluations</button>

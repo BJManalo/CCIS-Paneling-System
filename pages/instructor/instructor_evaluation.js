@@ -224,6 +224,9 @@ async function loadEvaluations() {
                         panelistName: panelistName, // The specific evaluator
                         roles: { panel: true }, // Force true for display
                         isSubmitted: true,
+                        // NEW INFO FOR TABS
+                        adviser: group.adviser,
+                        createdBy: group.created_by || group.user_id, // Helper for ownership
                         savedScores: {
                             individual: (indScores || []).filter(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase()),
                             system: (sysScores || []).find(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase())
@@ -239,12 +242,26 @@ async function loadEvaluations() {
         }
 
         loadedEvaluations = processedEvaluations;
+
+        // Auto-switch to Evaluation if strictly Instructor (not adviser)? 
+        // Or default Advisory.
         applyFilters();
 
     } catch (err) {
         console.error('Error loading data:', err);
         accordionContainer.innerHTML = '<p style="text-align: center; color: red;">Error loading evaluations.</p>';
     }
+}
+
+// --- Main Tab Logic ---
+let currentMainTab = 'Advisory';
+
+window.switchMainTab = (tab) => {
+    currentMainTab = tab;
+    // Update UI
+    document.getElementById('tab-advisory').classList.toggle('active', tab === 'Advisory');
+    document.getElementById('tab-evaluation').classList.toggle('active', tab === 'Evaluation');
+    applyFilters();
 }
 
 // Search Filter
@@ -266,13 +283,38 @@ window.setFilter = (type, btn) => {
 function applyFilters() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
+    // Get User Info for Tab Filtering
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userName = user ? (user.full_name || '').toLowerCase() : '';
+    const userId = user ? user.id : '';
+
     const filtered = loadedEvaluations.filter(ev => {
-        // Text Match
+        // 1. Main Tab Filter (Advisory vs Evaluation)
+        let matchesMain = true;
+        if (currentMainTab === 'Advisory') {
+            // Must be the Adviser
+            const adviser = (ev.adviser || '').toLowerCase();
+            matchesMain = adviser.includes(userName) || userName.includes(adviser);
+        } else {
+            // Evaluation Tab: Groups I Created (Instructor)
+            // If createdBy exists, use it. Else fall back to "Not Adviser" logic?
+            if (ev.createdBy) {
+                matchesMain = ev.createdBy === userId;
+            } else {
+                // Approximate: I am logged in, so I see it. If I'm not the adviser, assume I'm the instructor?
+                const adviser = (ev.adviser || '').toLowerCase();
+                matchesMain = !(adviser.includes(userName) || userName.includes(adviser));
+            }
+        }
+        if (!matchesMain) return false;
+
+        // 2. Text Match
         const matchesText = ev.groupName.toLowerCase().includes(searchTerm) ||
             ev.panelistName.toLowerCase().includes(searchTerm) ||
             ev.defenseType.toLowerCase().includes(searchTerm);
 
-        // Type Match
+        // 3. Type Match
         let matchesType = true;
         const dType = ev.defenseType.toLowerCase();
 
