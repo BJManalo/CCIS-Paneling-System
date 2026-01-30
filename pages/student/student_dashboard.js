@@ -731,6 +731,7 @@ window.openFileViewer = async (url, fileKey) => {
                     return Promise.resolve({
                         userProfile: {
                             name: displayName,
+                            displayName: displayName,
                             firstName: displayName.split(' ')[0],
                             lastName: displayName.split(' ').slice(1).join(' ') || '',
                             email: loginUser.email || ''
@@ -754,6 +755,16 @@ window.openFileViewer = async (url, fileKey) => {
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
                     adobeViewer.getAnnotationManager().then(async annotationManager => {
+                        // Optional: Identify user again directly to the annotation manager
+                        try {
+                            if (annotationManager.setUserProfile) {
+                                annotationManager.setUserProfile({
+                                    name: displayName,
+                                    firstName: displayName.split(' ')[0]
+                                });
+                            }
+                        } catch (e) { }
+
                         try {
                             const { data } = await supabaseClient.from('pdf_annotations').select('annotation_data')
                                 .eq('group_id', currentGroupId).eq('file_key', fileKey).single();
