@@ -943,8 +943,8 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
                     const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    // Using a more reliable direct URL for Adobe SDK
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`;
+                    // Using docs.google.com subdomain which is often more reliable for CORS requests in Adobe SDK
+                    finalUrl = `https://docs.google.com/uc?export=download&id=${fileId}`;
                 }
 
                 const adobeFilePromise = adobeDCView.previewFile({
@@ -980,9 +980,11 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                         }, { autoSaveFrequency: 2 });
                     });
                 }).catch(err => {
-                    console.error('Adobe error:', err);
+                    console.error('CRITICAL ADOBE ERROR:', err);
+                    // If you see "NOT_FOUND" or "FORBIDDEN" here, it's the URL/Sharing.
+                    // If you see "INVALID_CLIENT_ID" or "UNAUTHORIZED_DOMAIN", it's the Adobe Key.
                     delete adobeContainer.dataset.activeUrl;
-                    showCompatibilityMode('Adobe Failed to Render');
+                    showCompatibilityMode('Adobe Failed to Render: ' + (err.type || 'Check Console'));
                 });
             } catch (e) {
                 console.error('Adobe init error:', e);

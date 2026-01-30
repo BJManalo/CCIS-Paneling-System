@@ -666,7 +666,8 @@ window.openFileViewer = async (url, fileKey) => {
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
                     const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`;
+                    // Using docs.google.com subdomain which is often more reliable for CORS requests in Adobe SDK
+                    finalUrl = `https://docs.google.com/uc?export=download&id=${fileId}`;
                 }
 
                 const adobeFilePromise = adobeDCView.previewFile({
@@ -691,6 +692,7 @@ window.openFileViewer = async (url, fileKey) => {
                         } catch (e) { }
                     });
                 }).catch(err => {
+                    console.error('CRITICAL ADOBE ERROR (Student):', err);
                     delete adobeContainer.dataset.activeUrl;
                     showCompatibilityMode();
                 });
