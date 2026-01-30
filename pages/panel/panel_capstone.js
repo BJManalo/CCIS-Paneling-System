@@ -886,7 +886,8 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             <div style="text-align: center; color: #64748b; padding: 20px;">
                 <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; display: inline-block;"></div>
                 <p style="font-weight: 600;">Loading Compatibility Preview...</p>
-                <p style="font-size: 0.8rem; margin-top: 6px; max-width: 300px;">Direct link restricted. Switching to the document's original viewer...</p>
+                <p style="font-size: 0.8rem; margin-top: 6px; max-width: 300px; color: #ef4444; font-weight: 700;">Error: ${reason || 'Direct Link Restricted'}</p>
+                <p style="font-size: 0.75rem; margin-top: 4px; color: #94a3b8;">Switching to the document's original viewer...</p>
             </div>
         `;
 
