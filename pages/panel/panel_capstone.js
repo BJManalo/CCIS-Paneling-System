@@ -892,54 +892,190 @@ window.closeFileModal = () => {
     currentViewerGroupId = null;
 };
 
-// --- SIDEBAR COMMENT SYSTEM (Option A) ---
+// --- ADVANCED PDF.JS VIEWER WITH SELECTION CAPTURE ---
+let pdfDoc = null;
+let currentSelection = { text: '', page: 0 };
+
 window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) return;
     currentViewerGroupId = groupId;
     currentViewerFileKey = fileKey;
 
-    const iframe = document.getElementById('fileViewer');
+    const container = document.getElementById('pdfViewerContainer');
     const placeholder = document.getElementById('viewerPlaceholder');
     const toolbar = document.getElementById('viewerToolbar');
-    const linkBtn = document.getElementById('externalLinkBtn');
-    const sidebar = document.getElementById('commentsSidebar');
     const nameDisplay = document.getElementById('currentFileNameDisplay');
+    const tooltip = document.getElementById('highlightTooltip');
 
-    // UI Reset
-    if (placeholder) placeholder.style.display = 'none';
-    if (iframe) iframe.style.display = 'block';
-    if (toolbar) toolbar.style.display = 'flex';
-    if (sidebar) sidebar.style.display = 'flex';
-    if (nameDisplay) nameDisplay.innerText = (fileKey || 'File').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    // Clear previous
+    container.innerHTML = '';
+    placeholder.style.display = 'flex';
+    tooltip.style.display = 'none';
+    resetCommentInput();
 
     let absoluteUrl = url.trim();
     if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
 
-    // Standard Viewer Link Logic (Stable)
-    let finalViewerUrl = absoluteUrl;
-    const lowerUrl = absoluteUrl.toLowerCase();
-    if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-        finalViewerUrl = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
-    } else if (lowerUrl.endsWith('.pdf') || lowerUrl.includes('supabase.co')) {
-        // Use browser's native PDF viewer for PDFs
-        finalViewerUrl = absoluteUrl;
-    } else {
-        // Fallback to Google Docs Viewer for other types
-        finalViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
+    try {
+        const loadingTask = pdfjsLib.getDocument(absoluteUrl);
+        pdfDoc = await loadingTask.promise;
+
+        placeholder.style.display = 'none';
+        toolbar.style.display = 'flex';
+        nameDisplay.innerText = (fileKey || 'File').replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+
+        // Render all pages
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            await renderPage(i);
+        }
+
+        // Setup Selection Listener
+        container.addEventListener('mouseup', handleSelection);
+
+        loadComments(groupId, fileKey);
+    } catch (e) {
+        console.error('PDF.js Load Error:', e);
+        placeholder.innerHTML = `<p style="color:#ef4444;">Error loading PDF. Please use "Open Original".</p>`;
     }
 
-    iframe.src = finalViewerUrl;
-    if (linkBtn) linkBtn.href = absoluteUrl;
+    if (document.getElementById('externalLinkBtn')) document.getElementById('externalLinkBtn').href = absoluteUrl;
+};
 
-    // Load Sidebar Comments
-    loadComments(groupId, fileKey);
+async function renderPage(num) {
+    const container = document.getElementById('pdfViewerContainer');
+    const page = await pdfDoc.getPage(num);
+    const viewport = page.getViewport({ scale: 1.5 });
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pdf-page-wrapper';
+    wrapper.dataset.pageNumber = num;
+    wrapper.style.width = viewport.width + 'px';
+    wrapper.style.height = viewport.height + 'px';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    wrapper.appendChild(canvas);
+
+    const textLayer = document.createElement('div');
+    textLayer.className = 'textLayer';
+    wrapper.appendChild(textLayer);
+
+    container.appendChild(wrapper);
+
+    const renderContext = { canvasContext: canvas.getContext('2d'), viewport: viewport };
+    await page.render(renderContext).promise;
+
+    const textContent = await page.getTextContent();
+    pdfjsLib.renderTextLayer({
+        textContent: textContent,
+        container: textLayer,
+        viewport: viewport,
+        textDivs: []
+    });
+}
+
+function handleSelection(e) {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+    const tooltip = document.getElementById('highlightTooltip');
+
+    if (text && text.length > 3) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        // Find which page this selection belongs to
+        let pageNum = 0;
+        let node = range.startContainer;
+        while (node && node !== document.body) {
+            if (node.classList?.contains('pdf-page-wrapper')) {
+                pageNum = node.dataset.pageNumber;
+                break;
+            }
+            node = node.parentNode;
+        }
+
+        currentSelection = { text: text, page: pageNum };
+
+        tooltip.style.left = `${e.clientX}px`;
+        tooltip.style.top = `${e.clientY}px`;
+        tooltip.style.display = 'flex';
+    } else {
+        tooltip.style.display = 'none';
+    }
+}
+
+window.captureHighlight = () => {
+    const hint = document.getElementById('selectionHint');
+    const quoted = document.getElementById('quotedText');
+    const input = document.getElementById('commentInput');
+    const btn = document.getElementById('postCommentBtn');
+    const tooltip = document.getElementById('highlightTooltip');
+
+    quoted.innerText = `[Page ${currentSelection.page}] "${currentSelection.text.substring(0, 50)}${currentSelection.text.length > 50 ? '...' : ''}"`;
+    hint.style.display = 'block';
+
+    input.placeholder = "Now type your correction/feedback here...";
+    input.focus();
+
+    btn.disabled = false;
+    btn.style.background = 'var(--primary-color)';
+    btn.style.cursor = 'pointer';
+
+    tooltip.style.display = 'none';
+    window.getSelection().removeAllRanges();
+};
+
+function resetCommentInput() {
+    const hint = document.getElementById('selectionHint');
+    const input = document.getElementById('commentInput');
+    const btn = document.getElementById('postCommentBtn');
+
+    hint.style.display = 'none';
+    input.value = '';
+    input.placeholder = "First, highlight text in the document...";
+    btn.disabled = true;
+    btn.style.background = '#cbd5e1';
+    btn.style.cursor = 'not-allowed';
+}
+
+window.postComment = async () => {
+    const input = document.getElementById('commentInput');
+    const text = input.value.trim();
+    if (!text || !currentViewerGroupId || !currentViewerFileKey) return;
+
+    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
+    const userName = user.name || user.full_name || 'Panelist';
+
+    // Combine selection context with comment
+    const fullComment = `**Ref Page ${currentSelection.page}:** _"${currentSelection.text}"_\n\n**FEEDBACK:** ${text}`;
+
+    input.disabled = true;
+
+    try {
+        const { error } = await supabaseClient.from('file_comments').insert({
+            group_id: currentViewerGroupId,
+            file_key: currentViewerFileKey,
+            user_name: userName,
+            user_role: 'Panelist',
+            comment_text: fullComment
+        });
+
+        if (error) throw error;
+        resetCommentInput();
+        loadComments(currentViewerGroupId, currentViewerFileKey);
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        input.disabled = false;
+    }
 };
 
 async function loadComments(groupId, fileKey) {
     const list = document.getElementById('commentsList');
     if (!list) return;
 
-    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;"><div class="viewer-loader" style="width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:var(--primary-color); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; margin-bottom:10px;"></div><br>Loading discussion...</div>`;
+    list.innerHTML = `<div style="text-align:center; padding: 20px; color:#94a3b8;">Loading...</div>`;
 
     try {
         const { data: comments, error } = await supabaseClient
@@ -952,18 +1088,14 @@ async function loadComments(groupId, fileKey) {
         if (error) throw error;
         renderComments(comments || []);
     } catch (e) {
-        console.error('Comments Load Error:', e);
-        list.innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px; font-size:0.8rem;">Error loading comments.</div>`;
+        list.innerHTML = `<div style="text-align:center; color:#ef4444;">Sync Error</div>`;
     }
 }
 
 function renderComments(comments) {
     const list = document.getElementById('commentsList');
     if (comments.length === 0) {
-        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;">
-            <span class="material-icons-round" style="font-size: 40px; opacity: 0.3;">forum</span>
-            <p style="font-size: 0.85rem; margin-top: 10px;">No feedback yet.<br>Start the discussion below.</p>
-        </div>`;
+        list.innerHTML = `<div style="text-align: center; color: #94a3b8; margin-top: 50px;"><p>No feedback yet.</p></div>`;
         return;
     }
 
@@ -972,66 +1104,31 @@ function renderComments(comments) {
 
     list.innerHTML = comments.map(c => {
         const isMe = c.user_name === myName;
-        const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const date = new Date(c.created_at).toLocaleDateString();
-        const roleBubble = c.user_role === 'Student' ? '#f0fdf4' : '#eff6ff';
-        const roleColor = c.user_role === 'Student' ? '#166534' : '#1e40af';
+        // Parse the markdown-like content for better student display
+        const displayBody = c.comment_text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/_(.*?)_/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
 
         return `
             <div style="display: flex; flex-direction: column; align-items: ${isMe ? 'flex-end' : 'flex-start'};">
                 <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
                     <span style="font-size: 0.7rem; font-weight: 700; color: #64748b;">${c.user_name}</span>
-                    <span style="font-size: 0.65rem; color: #94a3b8;">${date} ${time}</span>
                 </div>
                 <div style="background: ${isMe ? 'var(--primary-color)' : 'white'}; 
                             color: ${isMe ? 'white' : '#1e293b'}; 
-                            padding: 10px 14px; 
-                            border-radius: ${isMe ? '12px 12px 2px 12px' : '2px 12px 12px 12px'}; 
-                            font-size: 0.88rem; 
-                            line-height: 1.4; 
-                            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-                            max-width: 90%;
-                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};">
-                    ${c.comment_text}
+                            padding: 12px; 
+                            border-radius: 12px; 
+                            font-size: 0.85rem; 
+                            border: ${isMe ? 'none' : '1px solid #e2e8f0'};
+                            max-width: 95%;">
+                    ${displayBody}
                 </div>
             </div>
         `;
     }).join('');
-
-    // Scroll to bottom
     setTimeout(() => { list.scrollTop = list.scrollHeight; }, 100);
 }
-
-window.postComment = async () => {
-    const input = document.getElementById('commentInput');
-    const text = input.value.trim();
-    if (!text || !currentViewerGroupId || !currentViewerFileKey) return;
-
-    const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
-    const userName = user.name || user.full_name || 'Panelist';
-
-    // Disable input while saving
-    input.disabled = true;
-
-    try {
-        const { error } = await supabaseClient.from('file_comments').insert({
-            group_id: currentViewerGroupId,
-            file_key: currentViewerFileKey,
-            user_name: userName,
-            user_role: 'Panelist', // This is the Panel page
-            comment_text: text
-        });
-
-        if (error) throw error;
-        input.value = '';
-        loadComments(currentViewerGroupId, currentViewerFileKey);
-    } catch (e) {
-        alert('Could not post comment: ' + e.message);
-    } finally {
-        input.disabled = false;
-        input.focus();
-    }
-};
 
 window.filterTable = (program) => {
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
