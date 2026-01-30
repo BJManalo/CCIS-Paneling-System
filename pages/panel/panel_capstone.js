@@ -495,26 +495,42 @@ window.openFileModal = (groupId) => {
     try {
         console.log('DEBUG: openFileModal triggered with ID:', groupId);
         const normTab = normalizeType(currentTab);
+        console.log('DEBUG: normTab:', normTab);
         const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
+        console.log('DEBUG: group found:', group ? group.groupName : 'NOT FOUND');
 
         if (!group) {
             console.error('DEBUG ERROR: Could not find group in allData Matching Tab:', normTab, 'Target ID:', groupId);
-            console.table(allData.slice(0, 5)); // Log first 5 entries for inspection
             alert('Cannot open: Group data not found for the ' + currentTab + ' phase.');
             return;
         }
 
-        document.getElementById('modalGroupName').innerText = group.groupName;
+        const modalGroupName = document.getElementById('modalGroupName');
         const fileList = document.getElementById('fileList');
-        fileList.innerHTML = '';
+        const viewerPlaceholder = document.getElementById('viewerPlaceholder');
+        const viewerToolbar = document.getElementById('viewerToolbar');
+        const viewerContainer = document.getElementById('pdfViewerContainer');
 
-        // reset viewer
-        document.getElementById('fileViewer').style.display = 'none';
-        document.getElementById('viewerPlaceholder').style.display = 'flex';
-        document.getElementById('viewerToolbar').style.display = 'none';
+        if (!modalGroupName || !fileList || !viewerPlaceholder || !viewerToolbar || !viewerContainer) {
+            console.error('DEBUG ERROR: Missing UI element(s):', {
+                modalGroupName: !!modalGroupName,
+                fileList: !!fileList,
+                viewerPlaceholder: !!viewerPlaceholder,
+                viewerToolbar: !!viewerToolbar,
+                viewerContainer: !!viewerContainer
+            });
+            throw new Error('One or more modal elements are missing from the page.');
+        }
+
+        modalGroupName.innerText = group.groupName;
+        fileList.innerHTML = '';
+        viewerContainer.innerHTML = '';
+        viewerPlaceholder.style.display = 'flex';
+        viewerToolbar.style.display = 'none';
 
         // Helper to create sections
         const createSection = (sectionTitle, fileObj, icon, categoryKey) => {
+            console.log('DEBUG: Creating section:', sectionTitle, 'FileCount:', Object.keys(fileObj || {}).length);
             if (!fileObj || Object.keys(fileObj).length === 0) return;
 
             const section = document.createElement('div');
@@ -750,7 +766,7 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
 
     try {
         const normTab = normalizeType(currentTab);
-        const group = allData.find(g => g.id === groupId && normalizeType(g.type) === normTab);
+        const group = allData.find(g => g.id == groupId && normalizeType(g.type) === normTab);
         if (!group) throw new Error('Could not find group data in current view.');
 
         // 1. Save to individual feedback table
@@ -901,7 +917,9 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
 
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
-    document.getElementById('fileViewer').src = '';
+    const container = document.getElementById('pdfViewerContainer');
+    if (container) container.innerHTML = '';
+
     const sidebar = document.getElementById('commentsSidebar');
     if (sidebar) sidebar.style.display = 'none';
     currentViewerFileKey = null;
