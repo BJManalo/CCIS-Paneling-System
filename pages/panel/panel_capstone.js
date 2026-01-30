@@ -987,12 +987,12 @@ async function renderPage(num) {
     const page = await pdfDoc.getPage(num);
 
     // Auto-calculate scale to fit container width (minus padding)
-    const containerWidth = container.clientWidth || (window.innerWidth * 0.5);
+    const containerWidth = container.clientWidth || (window.innerWidth * 0.7);
     const unscaledViewport = page.getViewport({ scale: 1.0 });
-    const scale = (containerWidth - 60) / unscaledViewport.width;
+    const scale = (containerWidth - 40) / unscaledViewport.width;
 
-    // Safety cap: don't scale lower than 1 or higher than 2.0 for initial view
-    const finalScale = Math.min(Math.max(scale, 1.0), 2.0);
+    // Safety cap: allow much larger zoom for desktop clarity
+    const finalScale = Math.min(Math.max(scale, 1.0), 3.0);
     const viewport = page.getViewport({ scale: finalScale });
 
     const wrapper = document.createElement('div');
@@ -1000,8 +1000,8 @@ async function renderPage(num) {
     wrapper.dataset.pageNumber = num;
     wrapper.style.width = viewport.width + 'px';
     wrapper.style.height = viewport.height + 'px';
-    wrapper.style.margin = '0 auto 20px auto'; // Center the page horizontally
-    wrapper.style.boxShadow = '0 10px 30px rgba(0,0,0,0.15)';
+    wrapper.style.margin = '0 auto 30px auto'; // Better vertical spacing
+    wrapper.style.boxShadow = '0 15px 40px rgba(0,0,0,0.2)';
     wrapper.style.background = 'white';
 
     const canvas = document.createElement('canvas');
