@@ -342,16 +342,19 @@ async function loadSubmissionData() {
                     el.insertAdjacentHTML('afterend', remarksHtml);
                 }
 
-                // --- ACTION BUTTON INJECTION ---
-                if (!el.parentElement.classList.contains('input-with-action')) {
+                // --- ACTION BUTTON INJECTION HELPER ---
+                const injectActionButtons = (targetEl, currentValue) => {
+                    if (!targetEl || targetEl.parentElement.classList.contains('input-with-action')) return;
+
                     const wrapper = document.createElement('div');
                     wrapper.className = 'input-with-action';
                     wrapper.style.cssText = 'position: relative; display: flex; align-items: center; gap: 8px; width: 100%;';
 
-                    el.parentNode.insertBefore(wrapper, el);
-                    wrapper.appendChild(el);
-                    el.style.marginBottom = '0'; // Let the wrapper handle the margin
+                    targetEl.parentNode.insertBefore(wrapper, targetEl);
+                    wrapper.appendChild(targetEl);
+                    targetEl.style.marginBottom = '0';
 
+                    // 1. Spellcheck / Verify Button
                     const checkBtn = document.createElement('button');
                     checkBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">spellcheck</span>';
                     checkBtn.title = "Check if link is Public";
@@ -369,19 +372,24 @@ async function loadSubmissionData() {
                     `;
                     checkBtn.onclick = (e) => {
                         e.preventDefault();
-                        window.verifyDriveLink(elementId);
+                        window.verifyDriveLink(targetEl.id);
                     };
                     wrapper.appendChild(checkBtn);
 
+                    // 2. Upload Button
                     const uploadBtn = document.createElement('button');
                     uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
                     uploadBtn.title = "Upload PDF directly";
 
-                    const isUploaded = linkMap[key] && (linkMap[key].includes('supabase.co') || linkMap[key].includes('project-submissions'));
+                    const isUploaded = currentValue && (currentValue.includes('supabase.co') || currentValue.includes('project-submissions'));
+
+                    // Check if we are in revised mode (amber style)
+                    const isRevised = targetEl.id.includes('_revised');
+                    const uploadColor = isRevised ? '#d97706' : 'var(--primary-color)'; // Amber-600 vs Primary
 
                     uploadBtn.style.cssText = `
-                        background: ${isUploaded ? '#f1f5f9' : 'var(--primary-color)'};
-                        border: 1.5px solid ${isUploaded ? '#e2e8f0' : 'var(--primary-color)'};
+                        background: ${isUploaded ? '#f1f5f9' : uploadColor};
+                        border: 1.5px solid ${isUploaded ? '#e2e8f0' : uploadColor};
                         border-radius: 8px;
                         color: ${isUploaded ? '#94a3b8' : 'white'};
                         padding: 10px;
@@ -390,21 +398,34 @@ async function loadSubmissionData() {
                         align-items: center;
                         justify-content: center;
                         transition: all 0.2s;
-                        box-shadow: ${isUploaded ? 'none' : '0 2px 6px rgba(26, 86, 219, 0.2)'};
+                        box-shadow: ${isUploaded ? 'none' : '0 2px 6px rgba(0,0,0, 0.1)'};
                     `;
                     if (isUploaded) uploadBtn.disabled = true;
 
                     uploadBtn.onclick = (e) => {
                         e.preventDefault();
+                        // Find sibling file input (works for both original and revised structure)
+                        // HTML Structure: .form-group > input[text], input[file], button
+                        // Wrapper Structure: .form-group > .input-with-action > input[text], buttons...
+                        // So file input is in .form-group (grandparent of text input now?)
+                        // Wait, wrapper is child of .form-group. File input is sibling of wrapper.
                         const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
                         if (fileInput) {
                             fileInput.click();
                         } else {
-                            console.error('File input not found in form-group for:', elementId);
-                            showToast('Upload feature initialization error', 'error');
+                            console.error('File input not found for:', targetEl.id);
                         }
                     };
                     wrapper.appendChild(uploadBtn);
+                };
+
+                // Inject for Main Input
+                injectActionButtons(el, linkMap[key]);
+
+                // Inject for Revised Input
+                const revEl = document.getElementById(elementId + '_revised');
+                if (revEl) {
+                    injectActionButtons(revEl, linkMap[key + '_revised']);
                 }
             };
 
