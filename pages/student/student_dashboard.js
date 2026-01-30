@@ -569,10 +569,10 @@ window.openFileViewer = async (url, fileKey) => {
     }
 
     const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = lowerUrl.includes('.pdf') ||
+    const isPDF = (lowerUrl.includes('.pdf') ||
         lowerUrl.includes('supabase.co/storage/v1/object/public') ||
-        lowerUrl.includes('drive.google.com') ||
-        lowerUrl.includes('docs.google.com/viewer');
+        lowerUrl.includes('drive.google.com')) &&
+        !lowerUrl.includes('docs.google.com/viewer');
 
     // Prevent redundant reloads
     if (adobeContainer.dataset.activeUrl === absoluteUrl && adobeContainer.innerHTML !== '') {
@@ -633,6 +633,13 @@ window.openFileViewer = async (url, fileKey) => {
                         }
                     } catch (e) { console.log('No annotations found'); }
                 });
+            }).catch(err => {
+                console.error('Adobe student preview error:', err);
+                if (adobeContainer) adobeContainer.style.display = 'none';
+                if (placeholder) {
+                    placeholder.style.display = 'flex';
+                    placeholder.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;"><p>Failed to load PDF preview.</p></div>`;
+                }
             });
         };
 

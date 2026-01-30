@@ -864,10 +864,10 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     }
 
     const lowerUrl = absoluteUrl.toLowerCase();
-    const isPDF = lowerUrl.includes('.pdf') ||
+    const isPDF = (lowerUrl.includes('.pdf') ||
         lowerUrl.includes('supabase.co/storage/v1/object/public') ||
-        lowerUrl.includes('drive.google.com') ||
-        lowerUrl.includes('docs.google.com/viewer');
+        lowerUrl.includes('drive.google.com')) &&
+        !lowerUrl.includes('docs.google.com/viewer');
 
     const iframe = document.getElementById('fileViewer');
     const adobeContainer = document.getElementById('adobe-dc-view');
@@ -899,85 +899,88 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         if (iframe) iframe.style.display = 'none';
 
         const initAdobe = async () => {
-            if (!adobeDCView) {
-                adobeDCView = new AdobeDC.View({
-                    clientId: ADOBE_CLIENT_ID,
-                    divId: "adobe-dc-view"
-                });
-            }
-
-            const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
-
-            const previewConfig = {
-                embedMode: "FULL_WINDOW",
-                showAnnotationTools: true,
-                showDownloadPDF: true,
-                showPrintPDF: true,
-                enableAnnotationAPIs: true,
-                showLeftHandPanel: true,
-                showPageControls: true,
-                showBookmarks: true
-            };
-
-            let finalUrl = absoluteUrl;
-            if (lowerUrl.includes('drive.google.com')) {
-                if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
-                    const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
-                    finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
-                }
-            }
-
-            const adobeFilePromise = adobeDCView.previewFile({
-                content: { location: { url: finalUrl } },
-                metaData: { fileName: fileName, id: fileKey || 'unique-id' }
-            }, previewConfig);
-
-            adobeFilePromise.then(adobeViewer => {
-                placeholder.style.display = 'none';
-                adobeViewer.getAnnotationManager().then(async annotationManager => {
-                    try {
-                        const { data } = await supabaseClient
-                            .from('pdf_annotations')
-                            .select('annotation_data')
-                            .eq('group_id', groupId)
-                            .eq('file_key', fileKey)
-                            .single();
-
-                        if (data && data.annotation_data) {
-                            annotationManager.addAnnotations(data.annotation_data);
-                        }
-                    } catch (e) { console.log('No existing annotations found'); }
-
-                    annotationManager.setConfig({
-                        showAuthorName: true,
-                        authorName: userName
+            try {
+                if (!adobeDCView || !adobeContainer.innerHTML) {
+                    adobeDCView = new AdobeDC.View({
+                        clientId: ADOBE_CLIENT_ID,
+                        divId: "adobe-dc-view"
                     });
+                }
 
-                    annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
+                const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
+
+                const previewConfig = {
+                    embedMode: "FULL_WINDOW",
+                    showAnnotationTools: true,
+                    showDownloadPDF: true,
+                    showPrintPDF: true,
+                    enableAnnotationAPIs: true,
+                    showLeftHandPanel: true,
+                    showPageControls: true,
+                    showBookmarks: true
+                };
+
+                let finalUrl = absoluteUrl;
+                if (lowerUrl.includes('drive.google.com')) {
+                    if (absoluteUrl.match(/\/d\/([^\/]+)/)) {
+                        const fileId = absoluteUrl.match(/\/d\/([^\/]+)/)[1];
+                        finalUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+                    }
+                }
+
+                const adobeFilePromise = adobeDCView.previewFile({
+                    content: { location: { url: finalUrl } },
+                    metaData: { fileName: fileName, id: fileKey || 'unique-id' }
+                }, previewConfig);
+
+                adobeFilePromise.then(adobeViewer => {
+                    if (placeholder) placeholder.style.display = 'none';
+                    adobeViewer.getAnnotationManager().then(async annotationManager => {
                         try {
-                            const { error } = await supabaseClient
+                            const { data } = await supabaseClient
                                 .from('pdf_annotations')
-                                .upsert({
-                                    group_id: groupId,
-                                    file_key: fileKey,
-                                    annotation_data: annotations,
-                                    user_name: userName,
-                                    updated_at: new Date()
-                                }, { onConflict: 'group_id, file_key' });
+                                .select('annotation_data')
+                                .eq('group_id', groupId)
+                                .eq('file_key', fileKey)
+                                .single();
 
-                            if (error) throw error;
-                            return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
-                        } catch (err) {
-                            console.error('Error saving annotations:', err);
-                            return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
-                        }
-                    }, { autoSaveFrequency: 2 });
+                            if (data && data.annotation_data) {
+                                annotationManager.addAnnotations(data.annotation_data);
+                            }
+                        } catch (e) { console.log('No existing annotations found'); }
+
+                        annotationManager.setConfig({ showAuthorName: true, authorName: userName });
+
+                        annotationManager.registerCallback(AdobeDC.View.Enum.CallbackType.SAVE_API, async (annotations) => {
+                            try {
+                                const { error } = await supabaseClient
+                                    .from('pdf_annotations')
+                                    .upsert({
+                                        group_id: groupId,
+                                        file_key: fileKey,
+                                        annotation_data: annotations,
+                                        user_name: userName,
+                                        updated_at: new Date()
+                                    }, { onConflict: 'group_id, file_key' });
+
+                                if (error) throw error;
+                                return { code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS };
+                            } catch (err) {
+                                console.error('Error saving annotations:', err);
+                                return { code: AdobeDC.View.Enum.ApiResponseCode.FAIL };
+                            }
+                        }, { autoSaveFrequency: 2 });
+                    });
+                }).catch(err => {
+                    console.error('Adobe Preview Error:', err);
+                    // Use standard fallback if Adobe fails
+                    adobeContainer.style.display = 'none';
+                    if (placeholder) {
+                        placeholder.style.display = 'flex';
+                        placeholder.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;"><p>Adobe was unable to preview this document.</p><p style="font-size: 11px; color: #64748b; margin-top: 5px;">Please use the "Open in New Tab" link below.</p></div>`;
+                    }
                 });
-            }).catch(err => {
-                console.error('Adobe SDK Error:', err);
-                placeholder.style.display = 'flex';
-                placeholder.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;"><p>Failed to load PDF preview.</p></div>`;
-            });
+            } catch (e) { console.error('Init Error:', e); }
         };
 
         if (window.AdobeDC) {
