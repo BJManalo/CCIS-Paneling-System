@@ -1056,6 +1056,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                             });
 
                             try {
+                                console.log('Attempting to save to Supabase...');
                                 const { error } = await supabaseClient.from('pdf_annotations').upsert({
                                     group_id: groupId,
                                     file_key: fileKey,
@@ -1063,10 +1064,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                                     user_name: userName,
                                     updated_at: new Date().toISOString()
                                 }, { onConflict: ['group_id', 'file_key'] });
-                                if (error) throw error;
+
+                                if (error) {
+                                    console.error('SUPABASE ERROR:', error);
+                                    alert(`Failed to save comments: ${error.message} \n\nPlease run the SUPABASE_SETUP.sql script.`);
+                                    throw error;
+                                }
                                 console.log('SAVE SUCCESSful:', dbAnnotations.length);
                             } catch (err) {
-                                console.error('SAVE FAILED:', err);
+                                console.error('SAVE FAILED (Exception):', err);
                             }
                         };
 
