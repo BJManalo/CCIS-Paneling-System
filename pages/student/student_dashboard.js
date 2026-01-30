@@ -583,7 +583,7 @@ window.openFileViewer = async (url, fileKey) => {
                 <div style="text-align: center; color: #64748b; padding: 20px;">
                     <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; display: inline-block;"></div>
                     <p style="font-weight: 600;">Opening Standard Preview...</p>
-                    <p style="font-size: 0.8rem; margin-top: 4px;">Direct annotation link restricted by Drive security.</p>
+                    <p style="font-size: 0.8rem; margin-top: 4px;">Direct annotation link restricted. Using secondary viewer.</p>
                 </div>
             `;
         }
@@ -610,14 +610,13 @@ window.openFileViewer = async (url, fileKey) => {
     };
 
     if (isPDF) {
+        adobeContainer.innerHTML = '';
         adobeContainer.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
 
         const initAdobe = async () => {
             try {
-                if (!adobeDCView) {
-                    adobeDCView = new AdobeDC.View({ clientId: ADOBE_CLIENT_ID, divId: "adobe-dc-view" });
-                }
+                adobeDCView = new AdobeDC.View({ clientId: ADOBE_CLIENT_ID, divId: "adobe-dc-view" });
 
                 let finalUrl = absoluteUrl;
                 if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
@@ -627,7 +626,14 @@ window.openFileViewer = async (url, fileKey) => {
                 const adobeFilePromise = adobeDCView.previewFile({
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileKey + ".pdf", id: fileKey }
-                }, { embedMode: "FULL_WINDOW", showAnnotationTools: false, enableAnnotationAPIs: true });
+                }, {
+                    embedMode: "SIZED_CONTAINER",
+                    showAnnotationTools: false,
+                    enableAnnotationAPIs: true,
+                    showLeftHandPanel: true,
+                    showPageControls: true,
+                    showBookmarks: true
+                });
 
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';

@@ -878,15 +878,15 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     adobeContainer.dataset.activeUrl = absoluteUrl;
 
     const showCompatibilityMode = (reason) => {
-        console.warn('Adobe View Restricted:', reason);
+        console.warn('Switching to compatibility mode:', reason);
         adobeContainer.style.display = 'none';
         if (iframe) iframe.style.display = 'none';
         placeholder.style.display = 'flex';
         placeholder.innerHTML = `
             <div style="text-align: center; color: #64748b; padding: 20px;">
-                <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; display: inline-block;"></div>
-                <p style="font-weight: 600;">Switching to Compatibility Mode...</p>
-                <p style="font-size: 0.8rem; margin-top: 4px;">Google Drive security has restricted direct Adobe access.</p>
+                <div class="viewer-loader" style="width: 30px; height: 30px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; display: inline-block;"></div>
+                <p style="font-weight: 600;">Loading Compatibility Preview...</p>
+                <p style="font-size: 0.8rem; margin-top: 6px; max-width: 300px;">Direct link restricted. Switching to the document's original viewer...</p>
             </div>
         `;
 
@@ -908,26 +908,29 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 iframe.onload = () => {
                     placeholder.style.display = 'none';
                     iframe.style.display = 'block';
+                    if (toolbar) toolbar.style.display = 'flex';
                 };
             }
-            if (toolbar) toolbar.style.display = 'flex';
             if (linkBtn) linkBtn.href = absoluteUrl;
-        }, 600);
+        }, 500);
     };
 
     if (isPDF) {
         const user = JSON.parse(localStorage.getItem('loginUser') || '{}');
         const userName = user.name || user.full_name || 'Panelist';
 
+        adobeContainer.innerHTML = ''; // Start fresh
         adobeContainer.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
         if (iframe) iframe.style.display = 'none';
 
         const initAdobe = async () => {
             try {
-                if (!adobeDCView || !adobeContainer.innerHTML) {
-                    adobeDCView = new AdobeDC.View({ clientId: ADOBE_CLIENT_ID, divId: "adobe-dc-view" });
-                }
+                // Always recreate view instance if container was cleared
+                adobeDCView = new AdobeDC.View({
+                    clientId: ADOBE_CLIENT_ID,
+                    divId: "adobe-dc-view"
+                });
 
                 const fileName = fileKey ? fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) + '.pdf' : 'document.pdf';
                 let finalUrl = absoluteUrl;
@@ -938,7 +941,14 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                 const adobeFilePromise = adobeDCView.previewFile({
                     content: { location: { url: finalUrl } },
                     metaData: { fileName: fileName, id: fileKey || 'unique-id' }
-                }, { embedMode: "FULL_WINDOW", showAnnotationTools: true, enableAnnotationAPIs: true });
+                }, {
+                    embedMode: "SIZED_CONTAINER", // More stable within modals
+                    showAnnotationTools: true,
+                    enableAnnotationAPIs: true,
+                    showLeftHandPanel: true,
+                    showPageControls: true,
+                    showBookmarks: true
+                });
 
                 adobeFilePromise.then(adobeViewer => {
                     if (placeholder) placeholder.style.display = 'none';
@@ -961,10 +971,14 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
                         }, { autoSaveFrequency: 2 });
                     });
                 }).catch(err => {
+                    console.error('Adobe error:', err);
                     delete adobeContainer.dataset.activeUrl;
-                    showCompatibilityMode('Adobe Preview Rejected');
+                    showCompatibilityMode('Adobe Failed to Render');
                 });
-            } catch (e) { showCompatibilityMode('Init Loop Failed'); }
+            } catch (e) {
+                console.error('Adobe init error:', e);
+                showCompatibilityMode('SDK Init Failed');
+            }
         };
 
         if (window.AdobeDC) initAdobe();
@@ -975,7 +989,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         return;
     }
 
-    showCompatibilityMode('Non-PDF file detected');
+    showCompatibilityMode('Non-PDF detected');
 };
 
 window.filterTable = (program) => {
