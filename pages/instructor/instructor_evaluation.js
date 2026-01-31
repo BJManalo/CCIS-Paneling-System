@@ -271,10 +271,14 @@ window.switchMainTab = (tab) => {
 
     // Always show filters
     if (filterContainer) filterContainer.style.display = 'flex';
+    const allBtn = document.querySelector('.filter-chip');
 
     if (tab === 'Advisory') {
         if (accordion) accordion.style.display = 'none';
         if (advisoryTable) advisoryTable.style.display = 'block';
+
+        // Update Text
+        if (allBtn) allBtn.textContent = 'All Advisory';
 
         // Update Filter UI visually to ALL if reseting
         currentTypeFilter = 'ALL';
@@ -287,6 +291,10 @@ window.switchMainTab = (tab) => {
     } else {
         if (accordion) accordion.style.display = 'block';
         if (advisoryTable) advisoryTable.style.display = 'none';
+
+        // Update Text
+        if (allBtn) allBtn.textContent = 'All Evaluations';
+
         applyFilters(); // Re-render evaluations
     }
 }
