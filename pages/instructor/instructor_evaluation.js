@@ -7,6 +7,8 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 let allData = [];
 let loadedEvaluations = [];
 let currentTypeFilter = 'ALL';
+let rawGroups = [];
+let allDefenseStatuses = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadEvaluations();
@@ -158,7 +160,8 @@ const systemCriteria = [
 
 async function loadEvaluations() {
     const accordionContainer = document.getElementById('accordionContainer');
-    accordionContainer.innerHTML = '<p style="text-align: center; color: #888;">Loading evaluation history...</p>';
+    // We don't overwrite innerHTML immediately because we might be in Advisory mode
+    // But initially, loading...
 
     try {
         // 1. Fetch Groups + their Schedules + Students
@@ -176,8 +179,15 @@ async function loadEvaluations() {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
+        rawGroups = groups || []; // Store for Advisory View
 
-        // 2. Fetch ALL Submitted Evaluations
+        // 2. Fetch Defense Statuses (For Advisory View)
+        const { data: statuses } = await supabaseClient
+            .from('defense_statuses')
+            .select('*');
+        allDefenseStatuses = statuses || [];
+
+        // 3. Fetch ALL Submitted Evaluations (For Evaluation View)
         const { data: indScores } = await supabaseClient
             .from('individual_evaluations')
             .select('*');
@@ -186,24 +196,19 @@ async function loadEvaluations() {
             .from('system_evaluations')
             .select('*');
 
-        // 3. Process Data: We need to create an "Evaluation Item" for each (Schedule + Panelist) pair that exists in the scores
+        // 4. Process Data for Evaluations View
         let processedEvaluations = [];
 
         (groups || []).forEach(group => {
             const schedules = group.schedules || [];
 
             schedules.forEach(sched => {
-                // Find all panelists who have rated this schedule
-                // We check individual_evaluations for this schedule_id
                 const relevantIndScores = (indScores || []).filter(s => s.schedule_id === sched.id);
-                // Get unique panelists
                 const panelistsWhoRated = [...new Set(relevantIndScores.map(s => s.panelist_name))];
 
-                // Also check system scores just in case
                 const relevantSysScores = (sysScores || []).filter(s => s.schedule_id === sched.id);
                 const panelistsSys = relevantSysScores.map(s => s.panelist_name);
 
-                // Merge lists
                 const allRaters = [...new Set([...panelistsWhoRated, ...panelistsSys])];
 
                 let dType = sched.schedule_type || 'Defense';
@@ -213,7 +218,7 @@ async function loadEvaluations() {
 
                 allRaters.forEach(panelistName => {
                     processedEvaluations.push({
-                        id: sched.id + '-' + panelistName.replace(/\s+/g, ''), // Unique DOM ID
+                        id: sched.id + '-' + panelistName.replace(/\s+/g, ''),
                         schedId: sched.id,
                         groupId: group.id,
                         groupName: group.group_name,
@@ -221,12 +226,11 @@ async function loadEvaluations() {
                         members: group.students || [],
                         title: group.title,
                         defenseType: dType,
-                        panelistName: panelistName, // The specific evaluator
-                        roles: { panel: true }, // Force true for display
+                        panelistName: panelistName,
+                        roles: { panel: true },
                         isSubmitted: true,
-                        // NEW INFO FOR TABS
                         adviser: group.adviser,
-                        createdBy: group.created_by || group.user_id, // Helper for ownership
+                        createdBy: group.created_by || group.user_id,
                         savedScores: {
                             individual: (indScores || []).filter(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase()),
                             system: (sysScores || []).find(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase())
@@ -236,20 +240,18 @@ async function loadEvaluations() {
             });
         });
 
-        if (processedEvaluations.length === 0) {
-            accordionContainer.innerHTML = '<div class="empty-state"><span class="material-icons-round">history</span><p>No submitted evaluations found yet.</p></div>';
-            return;
-        }
-
         loadedEvaluations = processedEvaluations;
 
-        // Auto-switch to Evaluation if strictly Instructor (not adviser)? 
-        // Or default Advisory.
-        applyFilters();
+        // Initial Render based on Tab
+        if (window.switchMainTab) {
+            window.switchMainTab(currentMainTab);
+        } else {
+            applyFilters();
+        }
 
     } catch (err) {
         console.error('Error loading data:', err);
-        accordionContainer.innerHTML = '<p style="text-align: center; color: red;">Error loading evaluations.</p>';
+        if (accordionContainer) accordionContainer.innerHTML = '<p style="text-align: center; color: red;">Error loading data.</p>';
     }
 }
 
@@ -258,20 +260,107 @@ let currentMainTab = 'Advisory';
 
 window.switchMainTab = (tab) => {
     currentMainTab = tab;
-    // Update UI
+
+    // UI Toggles
     document.getElementById('tab-advisory').classList.toggle('active', tab === 'Advisory');
     document.getElementById('tab-evaluation').classList.toggle('active', tab === 'Evaluation');
 
-    // Hide/Show Defense Type Filters
     const filterContainer = document.querySelector('.filter-container');
+    const accordion = document.getElementById('accordionContainer');
+    const advisoryTable = document.getElementById('advisoryTableContainer');
+
     if (tab === 'Advisory') {
         if (filterContainer) filterContainer.style.display = 'none';
-        currentTypeFilter = 'ALL'; // Reset
+        if (accordion) accordion.style.display = 'none';
+        if (advisoryTable) advisoryTable.style.display = 'block';
+        currentTypeFilter = 'ALL';
+        renderAdvisoryTable();
     } else {
         if (filterContainer) filterContainer.style.display = 'flex';
+        if (accordion) accordion.style.display = 'block';
+        if (advisoryTable) advisoryTable.style.display = 'none';
+        applyFilters(); // Re-render evaluations
+    }
+}
+
+function renderAdvisoryTable() {
+    const tbody = document.getElementById('advisoryTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    // Get User
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userName = (user ? (user.full_name || '') : '').toLowerCase();
+
+    // Filter Groups where I am Adviser
+    const myAdviseeGroups = rawGroups.filter(g => {
+        const adv = (g.adviser || '').toLowerCase();
+        return adv.includes(userName) || (userName && userName.includes(adv));
+    });
+
+    if (myAdviseeGroups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No groups assigned to you as Adviser.</td></tr>';
+        return;
     }
 
-    applyFilters();
+    myAdviseeGroups.forEach(group => {
+        const schedules = group.schedules || [];
+
+        let displayType = 'Title Defense'; // Default
+        let displayStatus = 'Not Scheduled';
+
+        // Find latest schedule
+        const titleSched = schedules.find(s => s.schedule_type.includes('Title'));
+        const preSched = schedules.find(s => s.schedule_type.includes('Pre'));
+        const finalSched = schedules.find(s => s.schedule_type.includes('Final'));
+
+        let currentSched = null;
+        if (finalSched) { currentSched = finalSched; displayType = 'Final Defense'; }
+        else if (preSched) { currentSched = preSched; displayType = 'Pre-Oral Defense'; }
+        else if (titleSched) { currentSched = titleSched; displayType = 'Title Defense'; }
+
+        if (currentSched) {
+            const statusRecord = allDefenseStatuses.find(ds => ds.schedule_id === currentSched.id);
+            if (statusRecord) {
+                displayStatus = 'Under Evaluation';
+                // Simple check if approved? 
+                // We will just show "Under Evaluation" or "Pending" for now as requested layout is the priority.
+            } else {
+                displayStatus = 'Scheduled';
+            }
+        }
+
+        // Get Title safely
+        let title = group.title;
+        if (typeof title === 'object' && title !== null) {
+            title = title.title1 || title.title2 || Object.values(title)[0] || '';
+        } else if (typeof title === 'string' && title.startsWith('{')) {
+            try { const t = JSON.parse(title); title = t.title1 || Object.values(t)[0] || title; } catch (e) { }
+        }
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><span style="font-weight:600; color:var(--primary-color);">${title || 'Untitled'}</span></td>
+            <td>${group.group_name}</td>
+            <td>
+                <div class="chips-container">
+                    ${(group.students || []).map(m => `<span class="chip">${m.full_name}</span>`).join('')}
+                </div>
+            </td>
+            <td><span class="type-badge ${getTypeClass(displayType)}">${displayType}</span></td>
+            <td><span class="status-badge ${displayStatus === 'Not Scheduled' ? 'rejected' : 'pending'}">${displayStatus}</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function getTypeClass(type) {
+    type = type.toLowerCase();
+    if (type.includes('title')) return 'type-title';
+    if (type.includes('pre')) return 'type-pre-oral';
+    if (type.includes('final')) return 'type-final';
+    return 'type-unknown';
 }
 
 // Search Filter
