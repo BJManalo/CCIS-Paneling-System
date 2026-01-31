@@ -269,14 +269,22 @@ window.switchMainTab = (tab) => {
     const accordion = document.getElementById('accordionContainer');
     const advisoryTable = document.getElementById('advisoryTableContainer');
 
+    // Always show filters
+    if (filterContainer) filterContainer.style.display = 'flex';
+
     if (tab === 'Advisory') {
-        if (filterContainer) filterContainer.style.display = 'none';
         if (accordion) accordion.style.display = 'none';
         if (advisoryTable) advisoryTable.style.display = 'block';
+
+        // Update Filter UI visually to ALL if reseting
         currentTypeFilter = 'ALL';
+        document.querySelectorAll('.filter-chip').forEach(b => {
+            b.classList.remove('active');
+            if (b.textContent.includes('All')) b.classList.add('active');
+        });
+
         renderAdvisoryTable();
     } else {
-        if (filterContainer) filterContainer.style.display = 'flex';
         if (accordion) accordion.style.display = 'block';
         if (advisoryTable) advisoryTable.style.display = 'none';
         applyFilters(); // Re-render evaluations
@@ -304,31 +312,56 @@ function renderAdvisoryTable() {
         return;
     }
 
+    let hasGlobalData = false;
+
     myAdviseeGroups.forEach(group => {
         const schedules = group.schedules || [];
 
-        let displayType = 'Title Defense'; // Default
-        let displayStatus = 'Not Scheduled';
+        let targetSched = null;
+        let displayType = '';
 
-        // Find latest schedule
-        const titleSched = schedules.find(s => s.schedule_type.includes('Title'));
-        const preSched = schedules.find(s => s.schedule_type.includes('Pre'));
-        const finalSched = schedules.find(s => s.schedule_type.includes('Final'));
+        // Determine which schedule to show based on filter
+        if (currentTypeFilter !== 'ALL') {
+            if (currentTypeFilter === 'title') targetSched = schedules.find(s => s.schedule_type && s.schedule_type.includes('Title'));
+            if (currentTypeFilter === 'pre') targetSched = schedules.find(s => s.schedule_type && s.schedule_type.includes('Pre'));
+            // The filter uses 'final' but schedule_type matches 'Final'
+            if (currentTypeFilter === 'final') targetSched = schedules.find(s => s.schedule_type && s.schedule_type.includes('Final'));
 
-        let currentSched = null;
-        if (finalSched) { currentSched = finalSched; displayType = 'Final Defense'; }
-        else if (preSched) { currentSched = preSched; displayType = 'Pre-Oral Defense'; }
-        else if (titleSched) { currentSched = titleSched; displayType = 'Title Defense'; }
+            if (!targetSched) return; // Skip group if no match
+            displayType = targetSched.schedule_type;
+        } else {
+            // Default Priority: Final > Pre > Title
+            const titleSched = schedules.find(s => s.schedule_type && s.schedule_type.includes('Title'));
+            const preSched = schedules.find(s => s.schedule_type && s.schedule_type.includes('Pre'));
+            const finalSched = schedules.find(s => s.schedule_type && s.schedule_type.includes('Final'));
 
-        if (currentSched) {
-            const statusRecord = allDefenseStatuses.find(ds => ds.schedule_id === currentSched.id);
-            if (statusRecord) {
-                displayStatus = 'Under Evaluation';
-                // Simple check if approved? 
-                // We will just show "Under Evaluation" or "Pending" for now as requested layout is the priority.
-            } else {
-                displayStatus = 'Scheduled';
+            if (finalSched) { targetSched = finalSched; displayType = 'Final Defense'; }
+            else if (preSched) { targetSched = preSched; displayType = 'Pre-Oral Defense'; }
+            else if (titleSched) { targetSched = titleSched; displayType = 'Title Defense'; }
+            else {
+                // No schedule found implies "Not Scheduled"
+                displayType = 'Title Defense';
             }
+        }
+
+        hasGlobalData = true; // Found at least one item
+
+        let displayStatus = 'Not Scheduled';
+        if (targetSched) {
+            const statusRecord = allDefenseStatuses.find(ds => ds.schedule_id === targetSched.id);
+            if (statusRecord) {
+                // Check if actually finished or ongoing?
+                // For now, if record exists, it's "Scheduled" or "Under Evaluation" ??
+                // Panel says "Scheduled" in image.
+                displayStatus = 'Scheduled';
+
+                // Refine if needed: if (statusRecord.verdict) ...
+            } else {
+                displayStatus = 'Scheduled'; // If explicit schedule exists in 'schedules' table, it is scheduled.
+            }
+        } else {
+            // No schedule object found
+            if (displayType) displayStatus = 'Not Scheduled';
         }
 
         // Get Title safely
@@ -339,6 +372,9 @@ function renderAdvisoryTable() {
             try { const t = JSON.parse(title); title = t.title1 || Object.values(t)[0] || title; } catch (e) { }
         }
 
+        // Truncate title if clean
+        if (title && title.length > 50) title = title.substring(0, 50) + '...';
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><span style="font-weight:600; color:var(--primary-color);">${title || 'Untitled'}</span></td>
@@ -348,11 +384,15 @@ function renderAdvisoryTable() {
                     ${(group.students || []).map(m => `<span class="chip">${m.full_name}</span>`).join('')}
                 </div>
             </td>
-            <td><span class="type-badge ${getTypeClass(displayType)}">${displayType}</span></td>
+            <td><span class="type-badge ${getTypeClass(displayType || 'Defense')}">${displayType || 'N/A'}</span></td>
             <td><span class="status-badge ${displayStatus === 'Not Scheduled' ? 'rejected' : 'pending'}">${displayStatus}</span></td>
         `;
         tbody.appendChild(row);
     });
+
+    if (!hasGlobalData) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No records found for this filter.</td></tr>';
+    }
 }
 
 function getTypeClass(type) {
@@ -376,7 +416,11 @@ window.setFilter = (type, btn) => {
     document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
 
-    applyFilters();
+    if (currentMainTab === 'Advisory') {
+        renderAdvisoryTable();
+    } else {
+        applyFilters();
+    }
 };
 
 function applyFilters() {
