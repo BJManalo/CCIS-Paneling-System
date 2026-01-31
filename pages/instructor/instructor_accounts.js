@@ -11,6 +11,7 @@ let allGroups = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadGroups();
+    loadAdviserOptions();
 });
 
 // --- Fetch Groups from Supabase ---
@@ -42,6 +43,35 @@ async function getGroups() {
         return [];
     }
 }
+
+// --- Fetch Advisers for Dropdown ---
+async function loadAdviserOptions() {
+    try {
+        const { data: accounts, error } = await supabaseClient
+            .from('accounts')
+            .select('name, role');
+
+        if (error) throw error;
+
+        // Filter for specific roles: Panel/Adviser, Instructor/Adviser (and strictly those, or legacy 'Instructor'?)
+        // User requested: "only panel/adviser and instructor/adviser account"
+        const allowedRoles = ['Panel/Adviser', 'Instructor/Adviser', 'Instructor']; // Added Instructor for safety/legacy
+        const advisers = (accounts || []).filter(acc => allowedRoles.includes(acc.role));
+
+        const datalist = document.getElementById('adviserSuggestions');
+        if (datalist) {
+            datalist.innerHTML = '';
+            advisers.forEach(adv => {
+                const opt = document.createElement('option');
+                opt.value = adv.name;
+                datalist.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.error('Error loading advisers:', err);
+    }
+}
+
 
 // --- Load Groups into UI ---
 async function loadGroups() {
