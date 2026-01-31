@@ -48,6 +48,21 @@
             </div>
         </div>
 
+        <!-- Role Switcher -->
+        <div class="role-switcher" style="margin-bottom: 20px;">
+            <div class="switcher-container"
+                style="display: inline-flex; background: white; border-radius: 30px; padding: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <button class="switcher-btn active" id="role-Panel" onclick="switchRole('Panel')"
+                    style="padding: 8px 24px; border-radius: 24px; border: none; background: var(--primary-color); color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px;">
+                    <span class="material-icons-round" style="font-size: 18px;">people</span> Panel
+                </button>
+                <button class="switcher-btn" id="role-Adviser" onclick="switchRole('Adviser')"
+                    style="padding: 8px 24px; border-radius: 24px; border: none; background: transparent; color: #64748b; font-weight: 500; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px;">
+                    <span class="material-icons-round" style="font-size: 18px;">school</span> Adviser
+                </button>
+            </div>
+        </div>
+
         <!-- Defense Stage Tabs -->
         <div class="role-tabs"
             style="display: flex; gap: 20px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 0;">
@@ -71,10 +86,17 @@
         </div>
 
         <!-- Filters -->
-        <div class="filter-section centered-filters">
+        <div class="filter-section centered-filters" style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button class="filter-btn bsis" onclick="filterTable('BSIS')">BSIS</button>
             <button class="filter-btn bsit" onclick="filterTable('BSIT')">BSIT</button>
             <button class="filter-btn bscs" onclick="filterTable('BSCS')">BSCS</button>
+            <div style="width: 1px; background: #ddd; margin: 0 5px;"></div>
+            <button class="filter-btn active" onclick="filterStatus('ALL')" id="filter-ALL"
+                style="background:#5b6b79; color: white;">All</button>
+            <button class="filter-btn" onclick="filterStatus('FINISHED')" id="filter-FINISHED"
+                style="background:white; color: #10b981; border: 1px solid #10b981;">Finished</button>
+            <button class="filter-btn" onclick="filterStatus('UNFINISHED')" id="filter-UNFINISHED"
+                style="background:white; color: #ef4444; border: 1px solid #ef4444;">Unfinished</button>
         </div>
 
         <!-- Data Table -->
