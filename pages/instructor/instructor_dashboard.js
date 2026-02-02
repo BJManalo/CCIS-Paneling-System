@@ -205,13 +205,16 @@ window.applyDashboardFilters = () => {
             displayRows.push({ ...baseObj, title: projectTitleDisplay, statusHtml: statusBadge });
 
         } else if (currentCategory === 'APPROVED') {
-            if (approvedKey) {
-                displayRows.push({
-                    ...baseObj,
-                    title: `<strong>${projectTitleDisplay}</strong>`,
-                    statusHtml: '<span class="status-badge approved">Title Approved</span>'
-                });
-            }
+            Object.keys(tMap).forEach(k => {
+                const val = tMap[k] || '';
+                if (val.includes('Approved') || val.includes('Completed')) {
+                    displayRows.push({
+                        ...baseObj,
+                        title: `<strong>${getTitleText(g.project_title, k)}</strong>`,
+                        statusHtml: '<span class="status-badge approved">Title Approved</span>'
+                    });
+                }
+            });
         } else if (currentCategory === 'REJECTED') {
             Object.keys(tMap).forEach(k => {
                 if (tMap[k] === 'Rejected' || tMap[k] === 'Redefend') {
