@@ -291,38 +291,47 @@ async function loadSubmissionData() {
             };
 
             const injectActionButtons = (targetEl, currentValue) => {
-                if (!targetEl || targetEl.parentElement.classList.contains('input-with-action')) return;
-                const wrapper = document.createElement('div');
-                wrapper.className = 'input-with-action';
-                wrapper.style.cssText = 'position: relative; display: flex; align-items: center; gap: 8px; width: 100%;';
-                targetEl.parentNode.insertBefore(wrapper, targetEl);
-                wrapper.appendChild(targetEl);
-                targetEl.style.marginBottom = '0';
+                if (!targetEl) return;
 
-                const uploadBtn = document.createElement('button');
-                uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
-                uploadBtn.title = "Upload PDF directly";
+                let wrapper = targetEl.parentElement;
+                let uploadBtn;
                 const isUploaded = currentValue && (currentValue.includes('supabase.co') || currentValue.includes('project-submissions'));
                 const isRevised = targetEl.id.includes('_revised');
 
-                // For Revised fields, we ALWAYS allow the upload button to be clickable to "Update" the revision.
-                // For Original fields, we disable it once uploaded.
-                const canUpload = (isRevised) || !isUploaded;
+                if (wrapper && wrapper.classList.contains('input-with-action')) {
+                    uploadBtn = wrapper.querySelector('button');
+                } else {
+                    wrapper = document.createElement('div');
+                    wrapper.className = 'input-with-action';
+                    wrapper.style.cssText = 'position: relative; display: flex; align-items: center; gap: 8px; width: 100%;';
+                    targetEl.parentNode.insertBefore(wrapper, targetEl);
+                    wrapper.appendChild(targetEl);
+                    targetEl.style.marginBottom = '0';
 
+                    uploadBtn = document.createElement('button');
+                    uploadBtn.title = "Upload PDF directly";
+                    uploadBtn.onclick = (e) => {
+                        e.preventDefault();
+                        const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
+                        if (fileInput) fileInput.click();
+                    };
+                    wrapper.appendChild(uploadBtn);
+                }
+
+                // Update Button State
+                const canUpload = isRevised || !isUploaded;
                 const uploadColor = isRevised ? '#d97706' : 'var(--primary-color)';
+
+                uploadBtn.disabled = !canUpload;
                 uploadBtn.style.cssText = `background: ${!canUpload ? '#f1f5f9' : uploadColor}; border: 1.5px solid ${!canUpload ? '#e2e8f0' : uploadColor}; border-radius: 8px; color: ${!canUpload ? '#94a3b8' : 'white'}; padding: 10px; cursor: ${!canUpload ? 'default' : 'pointer'}; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: ${!canUpload ? 'none' : '0 2px 6px rgba(0,0,0, 0.1)'};`;
 
-                if (!canUpload) uploadBtn.disabled = true;
-                if (isRevised && isUploaded) {
-                    uploadBtn.title = "Update your Revision";
-                    uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">sync</span>';
+                if (isRevised) {
+                    uploadBtn.title = isUploaded ? "Update your Revision" : "Upload Revision";
+                    uploadBtn.innerHTML = isUploaded ? '<span class="material-icons-round" style="font-size:18px;">sync</span>' : '<span class="material-icons-round" style="font-size:18px;">history_edu</span>';
+                } else {
+                    uploadBtn.title = isUploaded ? "File uploaded" : "Upload PDF directly";
+                    uploadBtn.innerHTML = isUploaded ? '<span class="material-icons-round" style="font-size:18px;">task_alt</span>' : '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
                 }
-                uploadBtn.onclick = (e) => {
-                    e.preventDefault();
-                    const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
-                    if (fileInput) fileInput.click();
-                };
-                wrapper.appendChild(uploadBtn);
             };
 
             renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title1', 'titleLink1');
@@ -1038,8 +1047,17 @@ window.handleFileUpload = async (input, targetId) => {
     }
 
     const targetInput = document.getElementById(targetId);
-    const btn = input.nextElementSibling || input.parentElement.querySelector('button[title="Upload PDF directly"]');
+    // Be very specific: find the button within the same form-group
+    const formGroup = input.parentElement;
+    const btn = formGroup.querySelector('.input-with-action button');
+
+    if (!btn) {
+        console.error('Upload button not found for', targetId);
+        return;
+    }
+
     const originalContent = btn.innerHTML;
+    const isRevised = targetId.includes('_revised');
 
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-round" style="font-size:18px; animation: spin 1s linear infinite;">sync</span>';
@@ -1086,7 +1104,20 @@ window.handleFileUpload = async (input, targetId) => {
             btn.disabled = false;
             btn.innerHTML = originalContent;
         } else {
-            btn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">task_alt</span>';
+            // Success State
+            if (isRevised) {
+                btn.disabled = false; // Never lock revisions
+                btn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">sync</span>';
+                btn.title = "Update your Revision";
+                // Reset style to orange for revision
+                btn.style.background = '#d97706';
+                btn.style.borderColor = '#d97706';
+                btn.style.color = 'white';
+                btn.style.cursor = 'pointer';
+            } else {
+                btn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">task_alt</span>';
+                btn.title = "File uploaded";
+            }
         }
     }
 }
