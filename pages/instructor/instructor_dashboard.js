@@ -301,17 +301,17 @@ function updateCounts(groups) {
             const tMap = getStatusMap(titleRow);
             const values = Object.values(tMap);
 
+            // Count specific titles, not just the group aggregate
             // "if the status set by the panels=approved that counts as 1"
-            if (values.some(v => v.includes('Approved') || v.includes('Completed'))) {
-                approvedTotal++;
-            }
-
             // "1 title is rejected that count as 1"
-            // Note: If Approved takes precedence, we only count as rejected if NOT approved?
-            // Usually Approval > Rejection in summary stats.
-            else if (values.some(v => v === 'Rejected' || v === 'Redefend')) {
-                rejectedTotal++;
-            }
+            // So we iterate over all values (files) in the map
+            values.forEach(v => {
+                if (v.includes('Approved') || v.includes('Completed')) {
+                    approvedTotal++;
+                } else if (v === 'Rejected' || v === 'Redefend') {
+                    rejectedTotal++;
+                }
+            });
         }
     });
 
