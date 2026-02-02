@@ -221,9 +221,9 @@ async function loadSubmissionData() {
                 const badgesHtml = feedbackData.map(f => {
                     let color = '#64748b'; let icon = 'hourglass_empty'; let bg = '#f1f5f9'; let border = '#e2e8f0';
                     const s = (f.status || 'Pending').toLowerCase();
-                    if (s.includes('approved')) { color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0'; }
+                    if (s.includes('approved') || s.includes('completed')) { color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0'; }
                     else if (s.includes('revision')) { color = '#d97706'; icon = 'warning'; bg = '#fffbeb'; border = '#fde68a'; }
-                    else if (s.includes('reject') || s.includes('redefense')) { color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca'; }
+                    else if (s.includes('reject') || s.includes('redefend')) { color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca'; }
                     return `
                         <div class="status-badge" style="font-size: 0.65rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase;">
                             <span class="material-icons-round" style="font-size: 10px;">${icon}</span>

@@ -686,11 +686,11 @@ window.openFileModal = (groupId) => {
             let statusBg = '#f1f5f9';
             let iconText = 'hourglass_empty';
 
-            if (myStatus.includes('Approved')) {
+            if (myStatus === 'Approved' || myStatus === 'Completed') {
                 statusColor = '#059669'; statusBg = '#dcfce7'; iconText = 'check_circle';
-            } else if (myStatus.includes('Approve with Revisions')) {
+            } else if (myStatus === 'Approved with Revisions') {
                 statusColor = '#d97706'; statusBg = '#fef3c7'; iconText = 'warning';
-            } else if (myStatus.includes('Rejected') || myStatus.includes('Redefense')) {
+            } else if (myStatus === 'Rejected' || myStatus === 'Redefend') {
                 statusColor = '#dc2626'; statusBg = '#fee2e2'; iconText = 'cancel';
             }
 
@@ -699,15 +699,22 @@ window.openFileModal = (groupId) => {
 
             if (categoryKey === 'titles') {
                 optionsHtml = `
-                    <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
-                    <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
-                    <option value="Rejected" ${myStatus === 'Rejected' ? 'selected' : ''}>Reject</option>
+                    <option value="Rejected" ${myStatus === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                    <option value="Redefend" ${myStatus === 'Redefend' ? 'selected' : ''}>Redefend</option>
+                    <option value="Approved with Revisions" ${myStatus === 'Approved with Revisions' ? 'selected' : ''}>Approved with Revisions</option>
+                    <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approved</option>
                 `;
-            } else {
+            } else if (categoryKey === 'pre_oral') {
                 optionsHtml = `
-                    <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approve</option>
-                    <option value="Approve with Revisions" ${myStatus === 'Approve with Revisions' ? 'selected' : ''}>Approve w/ Revisions</option>
-                    <option value="Redefense" ${myStatus === 'Redefense' ? 'selected' : ''}>Redefense</option>
+                    <option value="Redefend" ${myStatus === 'Redefend' ? 'selected' : ''}>Redefend</option>
+                    <option value="Approved with Revisions" ${myStatus === 'Approved with Revisions' ? 'selected' : ''}>Approved with Revisions</option>
+                    <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approved</option>
+                `;
+            } else if (categoryKey === 'final') {
+                optionsHtml = `
+                    <option value="Redefend" ${myStatus === 'Redefend' ? 'selected' : ''}>Redefend</option>
+                    <option value="Approved with Revisions" ${myStatus === 'Approved with Revisions' ? 'selected' : ''}>Approved with Revisions</option>
+                    <option value="Completed" ${myStatus === 'Completed' ? 'selected' : ''}>Completed</option>
                 `;
             }
 
