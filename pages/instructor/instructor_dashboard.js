@@ -80,12 +80,10 @@ async function fetchDashboardData() {
 function populateSectionFilter() {
     const sectionFilter = document.getElementById('sectionFilter');
 
-    // Filter groups where I am the adviser
-    const myGroups = allGroups.filter(g =>
-        g.adviser && g.adviser.toLowerCase().trim() === instructorName.toLowerCase().trim()
-    );
+    // Filter groups where I am the adviser (REMOVED - Global View)
+    // const myGroups = allGroups.filter(g => ...);
 
-    const sections = [...new Set(myGroups.map(g => g.section).filter(Boolean))].sort();
+    const sections = [...new Set(allGroups.map(g => g.section).filter(Boolean))].sort();
 
     sections.forEach(sec => {
         const option = document.createElement('option');
@@ -130,10 +128,11 @@ window.applyDashboardFilters = () => {
 
     // 1. Filter by Adviser, Program, Section, Search (Used for COUNTS)
     const baseGroups = allGroups.filter(g => {
-        const dbAdviser = (g.adviser || '').toLowerCase().trim();
-        const me = instructorName.toLowerCase().trim();
-        const isMyGroup = dbAdviser.includes(me) || me.includes(dbAdviser);
-        if (!isMyGroup) return false;
+        // REMOVED: Adviser check (Global dashboard view requested)
+        // const dbAdviser = (g.adviser || '').toLowerCase().trim();
+        // const me = instructorName.toLowerCase().trim();
+        // const isMyGroup = dbAdviser.includes(me) || me.includes(dbAdviser);
+        // if (!isMyGroup) return false;
 
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
@@ -343,15 +342,44 @@ function updateCounts(groups) {
         rejectedTotal = displayRows.length;
     }
 
-    // Display Counts
-    const titleEl = document.getElementById('countTitle');
-    const rejectedEl = document.getElementById('countPreOral');
-    const finalEl = document.getElementById('countFinal');
-
-    if (titleEl) titleEl.innerText = approvedTotal;
-    if (rejectedEl) rejectedEl.innerText = rejectedTotal;
-    if (finalEl) finalEl.innerText = '-';
+    // Display Counts (Update Chart)
+    if (window.statusChart) {
+        window.statusChart.data.datasets[0].data = [approvedTotal, rejectedTotal];
+        window.statusChart.update();
+    }
 }
+
+// Global variable for chart
+window.statusChart = null;
+
+function initChart() {
+    const ctx = document.getElementById('statusChart').getContext('2d');
+    window.statusChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Approved', 'Rejected'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: [
+                    '#3b82f6',
+                    '#dc2626'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initChart);
 
 function countDefenseStatus(allStatuses, defenseType, passValues) { return 0; }
 
