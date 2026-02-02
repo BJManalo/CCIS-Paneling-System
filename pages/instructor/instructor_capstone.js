@@ -182,8 +182,9 @@ async function loadCapstoneData() {
 
                 const parseFileField = (val, defaultLabel) => {
                     if (!val) return {};
+                    if (typeof val === 'object') return val;
                     try {
-                        if (val.trim().startsWith('{')) return JSON.parse(val);
+                        if (typeof val === 'string' && val.trim().startsWith('{')) return JSON.parse(val);
                         return { [defaultLabel]: val };
                     } catch (e) {
                         return { [defaultLabel]: val };
@@ -547,12 +548,16 @@ window.openFileModal = (groupId) => {
             const isRevised = label.endsWith('_revised');
             let projectTitles = {};
             if (categoryKey === 'titles' && group.projectTitle) {
-                try {
-                    projectTitles = typeof group.projectTitle === 'string' && group.projectTitle.startsWith('{')
-                        ? JSON.parse(group.projectTitle)
-                        : { title1: group.projectTitle };
-                } catch (e) {
-                    projectTitles = { title1: group.projectTitle };
+                if (typeof group.projectTitle === 'object') {
+                    projectTitles = group.projectTitle;
+                } else {
+                    try {
+                        projectTitles = typeof group.projectTitle === 'string' && group.projectTitle.trim().startsWith('{')
+                            ? JSON.parse(group.projectTitle)
+                            : { title1: group.projectTitle };
+                    } catch (e) {
+                        projectTitles = { title1: group.projectTitle };
+                    }
                 }
             }
 
@@ -734,7 +739,8 @@ window.openFileModal = (groupId) => {
             // Other Panel Feedback
             let panelsToDisplay = [];
             if (currentRole === 'Adviser') {
-                panelsToDisplay = Object.keys(fileStatuses);
+                // Show ALL assigned panels, not just those who graded
+                panelsToDisplay = group.panels || [];
             } else {
                 panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
             }
