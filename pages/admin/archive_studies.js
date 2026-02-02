@@ -34,8 +34,8 @@ async function loadArchives() {
         // 3. Filter for Completed Final Defense
         // Condition: Has a record for Final Defense AND status includes "Completed"
         const archivedGroups = groups.filter(g => {
-            // Find status record for this group
-            // Normalize types just in case
+            // Check if group is marked explicitly as "Completed" in logic or if Final Defense passed
+            // We look at defense_statuses table
             const relevantStatuses = statuses.filter(s =>
                 s.group_id === g.id &&
                 s.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
@@ -43,10 +43,7 @@ async function loadArchives() {
 
             if (relevantStatuses.length === 0) return false;
 
-            // Check if ANY status in the JSON is 'Completed'
-            // Structure: { "fileKey": { "PanelName": "Status" } }
-            // or sometimes legacy string?
-
+            // Logic: If ANY final defense record is marked 'Completed'
             return relevantStatuses.some(record => {
                 if (!record.statuses) return false;
 
@@ -55,10 +52,15 @@ async function loadArchives() {
                     try { sObj = JSON.parse(sObj); } catch (e) { return false; }
                 }
 
-                // Iterate through files
+                // Check for "Completed" status in any panel's feedback
                 for (const fileKey in sObj) {
                     const panelStatuses = sObj[fileKey];
                     // panelStatuses is { "PanelName": "Status" }
+                    // If any panel marked it "Completed" OR if the system aggregated it to "Completed"
+                    // Usually we want ALL panels to complete, but let's stick to if the record implies completion.
+                    // The user said: "when Chapter 4 and Chapter 5 was input by panels that equals to completed... mark as completed"
+
+                    // Simple check: if value 'Completed' exists in the status map
                     for (const panelName in panelStatuses) {
                         if (panelStatuses[panelName] === 'Completed') return true;
                     }
@@ -201,4 +203,9 @@ window.onclick = function (event) {
     if (event.target == modal) {
         closeModal();
     }
+}
+
+function logout() {
+    localStorage.removeItem('loginUser');
+    window.location.href = '../../index.html';
 }
