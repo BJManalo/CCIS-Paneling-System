@@ -439,8 +439,8 @@ function applyFilters() {
             // Must be the Adviser of the group being evaluated
             matchesMain = isAdviser;
         } else {
-            // "My Evaluations" tab: Evaluations I performed as a panelist
-            matchesMain = isPanelist;
+            // "All Evaluations" tab: show everything in the system
+            matchesMain = true;
         }
         if (!matchesMain) return false;
 

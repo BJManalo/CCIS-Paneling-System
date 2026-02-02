@@ -310,20 +310,20 @@
         <!-- Main Content -->
         <div class="evaluation-wrapper" style="padding: 0; max-width: 1000px; margin: 0 auto;">
 
-            <!-- Main Tabs (Advisory vs My Evaluations) -->
+            <!-- Main Tabs (Advisory vs All Evaluations) -->
             <div class="switcher-tabs"
                 style="margin-bottom: 20px; background: #e2e8f0; padding: 4px; max-width: 500px;">
                 <button class="switcher-btn active" id="tab-advisory" onclick="switchMainTab('Advisory')">
-                    <span class="material-icons-round">groups</span> My Advisory Groups
+                    <span class="material-icons-round">groups</span> My Advisory Evaluations
                 </button>
                 <button class="switcher-btn" id="tab-evaluation" onclick="switchMainTab('Evaluation')">
-                    <span class="material-icons-round">rate_review</span> My Evaluations
+                    <span class="material-icons-round">rate_review</span> All Evaluations
                 </button>
             </div>
 
             <!-- Filters -->
             <div class="filter-container">
-                <button class="filter-chip active" onclick="setFilter('ALL', this)">All Advisory</button>
+                <button class="filter-chip active" onclick="setFilter('ALL', this)">All Records</button>
                 <button class="filter-chip" onclick="setFilter('title', this)">Title Defense</button>
                 <button class="filter-chip" onclick="setFilter('pre', this)">Pre-Oral Defense</button>
                 <button class="filter-chip" onclick="setFilter('final', this)">Final Defense</button>
@@ -360,10 +360,6 @@
         <a href="instructor_dashboard" class="nav-item">
             <span class="material-icons-round">dashboard</span>
             <span class="nav-label">Dashboard</span>
-        </a>
-        <a href="instructor_capstone" class="nav-item">
-            <span class="material-icons-round">folder_special</span>
-            <span class="nav-label">Capstone</span>
         </a>
         <a href="instructor_evaluation" class="nav-item active">
             <span class="material-icons-round">rate_review</span>
