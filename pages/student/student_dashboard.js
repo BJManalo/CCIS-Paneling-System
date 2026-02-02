@@ -301,14 +301,6 @@ async function loadSubmissionData() {
                 wrapper.appendChild(targetEl);
                 targetEl.style.marginBottom = '0';
 
-                const checkBtn = document.createElement('button');
-                checkBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">spellcheck</span>';
-                checkBtn.title = "Check if link is Public";
-                checkBtn.className = "action-btn-small";
-                checkBtn.style.cssText = "background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; color: #64748b; padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;";
-                checkBtn.onclick = (e) => { e.preventDefault(); window.verifyDriveLink(targetEl.id); };
-                wrapper.appendChild(checkBtn);
-
                 const uploadBtn = document.createElement('button');
                 uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
                 uploadBtn.title = "Upload PDF directly";
@@ -488,16 +480,21 @@ function updateSaveButtonState(tabId) {
                 }
 
                 inputs.forEach(input => {
+                    const isLinkField = input.id.toLowerCase().includes('link') || input.id.toLowerCase().includes('ch');
                     if (input.id.includes('_revised')) {
-                        // Allow Revision Input
-                        input.readOnly = false;
-                        input.style.backgroundColor = '#fffbeb'; // Ensure amber bg
-                        input.title = "Upload your revised version here";
-                    } else {
+                        // Keep submission field readonly, but visually indicate it's the target
+                        input.readOnly = true;
+                        input.style.backgroundColor = '#fffbeb'; // Still show amber to indicate focus
+                        input.title = "Use the Upload icon to submit your revision";
+                    } else if (isLinkField) {
                         // Lock Original
                         input.readOnly = true;
                         input.style.backgroundColor = '#f1f5f9';
                         input.title = "Original submission is locked";
+                    } else {
+                        // Project Title or other non-link fields
+                        input.readOnly = false;
+                        input.style.backgroundColor = '#f8fafc';
                     }
                 });
             } else {
@@ -532,8 +529,15 @@ function updateSaveButtonState(tabId) {
                 saveBtn.style.cursor = 'pointer';
             }
             inputs.forEach(input => {
-                input.readOnly = false;
-                input.style.backgroundColor = '#f8fafc';
+                // IMPORTANT: Link/submission fields should remain readonly to force using the Upload button
+                const isLinkField = input.id.toLowerCase().includes('link') || input.id.toLowerCase().includes('ch');
+                if (isLinkField) {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f1f5f9';
+                } else {
+                    input.readOnly = false;
+                    input.style.backgroundColor = '#f8fafc';
+                }
                 input.title = "";
             });
         }
@@ -657,8 +661,15 @@ window.saveSubmissions = async function (specificField) {
         }
 
         // Validation
-        if (!activeLinks[specificField] || activeLinks[specificField].trim() === '') {
-            showToast('Please provide a link before saving.', 'warning');
+        const link = activeLinks[specificField] || "";
+        if (link.trim() === '') {
+            showToast('Please upload a PDF file before saving.', 'warning');
+            if (btn) { btn.innerHTML = originalContent; btn.disabled = false; }
+            return;
+        }
+
+        if (!link.includes('supabase.co') && !link.includes('project-submissions')) {
+            showToast('Invalid file source. Please use the Upload button to submit your PDF.', 'error');
             if (btn) { btn.innerHTML = originalContent; btn.disabled = false; }
             return;
         }
@@ -1061,58 +1072,4 @@ window.handleFileUpload = async (input, targetId) => {
     }
 }
 
-window.verifyDriveLink = async (inputId) => {
-    const input = document.getElementById(inputId);
-    const url = input.value.trim();
-    const btn = input.nextElementSibling;
-
-    if (!url) {
-        showToast('Enter a link first', 'info');
-        return;
-    }
-
-    if (!url.includes('drive.google.com')) {
-        showToast('Only for GDrive links', 'info');
-        return;
-    }
-
-    const fileIdMatch = url.match(/\/d\/([^\/]+)/) || url.match(/id=([^\&]+)/);
-    if (!fileIdMatch) {
-        showToast('Invalid Drive link', 'info');
-        return;
-    }
-
-    const fileId = fileIdMatch[1];
-    const originalContent = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons-round" style="font-size:18px; animation: spin 1s linear infinite;">sync</span>';
-
-    try {
-        const checkUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`;
-        const isPublic = await new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
-            img.src = checkUrl;
-        });
-
-        if (isPublic) {
-            showToast('Link is PUBLIC (Correct)', 'success');
-            btn.style.borderColor = '#10b981';
-            btn.style.color = '#10b981';
-            btn.style.background = '#f0fdf4';
-        } else {
-            showToast('RESTRICTED: Change to "Anyone with link"', 'info');
-            btn.style.borderColor = '#ef4444';
-            btn.style.color = '#ef4444';
-            btn.style.background = '#fef2f2';
-        }
-    } catch (e) {
-        showToast('Verification failed', 'info');
-    } finally {
-        btn.disabled = false;
-        setTimeout(() => {
-            btn.innerHTML = originalContent;
-        }, 2000);
-    }
-}
+// verifyDriveLink removed to restrict submissions to file uploads only.
