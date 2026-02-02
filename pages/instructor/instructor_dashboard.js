@@ -166,16 +166,16 @@ window.applyDashboardFilters = () => {
         let s = row.statuses;
         if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
 
-        // Flatten for easy checking: if a key's value is an object (multi-panel), 
-        // we consider the "overall" status based on panel consensus.
         const flat = {};
         Object.keys(s).forEach(fileKey => {
             const val = s[fileKey];
             if (typeof val === 'object' && val !== null) {
                 const values = Object.values(val);
-                if (values.some(v => v.includes('Approved'))) flat[fileKey] = 'Approved';
-                else if (values.some(v => v.includes('Approve with Revisions'))) flat[fileKey] = 'Approve with Revisions';
-                else if (values.some(v => v.includes('Rejected') || v.includes('Redefense'))) flat[fileKey] = 'Rejected';
+                // Priority: Approved > Approved with Revisions > Redefend > Rejected > Pending
+                if (values.some(v => v.includes('Approved') || v.includes('Completed'))) flat[fileKey] = values.find(v => v.includes('Approved') || v.includes('Completed'));
+                else if (values.some(v => v.includes('Approved with Revisions'))) flat[fileKey] = 'Approved with Revisions';
+                else if (values.some(v => v.includes('Redefend'))) flat[fileKey] = 'Redefend';
+                else if (values.some(v => v.includes('Rejected'))) flat[fileKey] = 'Rejected';
                 else flat[fileKey] = 'Pending';
             } else {
                 flat[fileKey] = val || 'Pending';
@@ -188,8 +188,11 @@ window.applyDashboardFilters = () => {
 
     baseGroups.forEach(g => {
         const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
+        const preOralRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Pre-Oral Defense');
         const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
+
         const tMap = getStatusMap(titleRow);
+        const pMap = getStatusMap(preOralRow);
         const fMap = getStatusMap(finalRow);
 
         const members = allStudents
@@ -206,60 +209,63 @@ window.applyDashboardFilters = () => {
             original: g
         };
 
+        // Determine which title is approved
+        const approvedKey = Object.keys(tMap).find(k => (tMap[k] || '').includes('Approved'));
+        let projectTitleDisplay = g.group_name;
+        if (approvedKey) {
+            projectTitleDisplay = getTitleText(g.project_title, approvedKey);
+        }
+
         if (currentCategory === 'ALL') {
-            let titleLabel = g.group_name;
             let statusBadge = '<span class="status-badge pending">Pending</span>';
 
-            const approvedKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved'));
+            // Check progression from Final -> Pre-Oral -> Title
+            const fStatus = Object.values(fMap).find(v => v === 'Completed' || v.includes('Approved') || v.includes('Revisions')) ||
+                Object.values(fMap).find(v => v === 'Redefend') || 'Pending';
 
-            // Final Approved requires BOTH Chapter 4 and Chapter 5 to be "Approved"
-            const ch4Status = (fMap.ch4 || '').toLowerCase();
-            const ch5Status = (fMap.ch5 || '').toLowerCase();
-            const finalApproved = ch4Status.includes('approved') && ch5Status.includes('approved');
+            const pStatus = Object.values(pMap).find(v => v.includes('Approved') || v.includes('Revisions')) ||
+                Object.values(pMap).find(v => v === 'Redefend') || 'Pending';
 
-            if (finalApproved) {
+            const tStatus = Object.values(tMap).find(v => v.includes('Approved') || v.includes('Revisions')) ||
+                Object.values(tMap).find(v => v === 'Redefend' || v === 'Rejected') || 'Pending';
+
+            if (Object.values(fMap).some(v => v === 'Completed')) {
                 statusBadge = '<span class="status-badge approved">Completed</span>';
-                titleLabel = `<strong>${getTitleText(g.project_title, approvedKey) || approvedKey || g.group_name}</strong>`;
-            } else if (approvedKey) {
+            } else if (Object.values(fMap).some(v => v.includes('Approved') || v.includes('Revisions'))) {
+                statusBadge = '<span class="status-badge approved" style="background:#dcfce7; color:#166534;">Final Ongoing</span>';
+            } else if (pStatus.includes('Approved') || pStatus.includes('Revisions')) {
+                statusBadge = '<span class="status-badge approved" style="background:#e0f2fe; color:#0369a1;">Pre-Oral Passed</span>';
+            } else if (tStatus.includes('Approved') || tStatus.includes('Revisions')) {
                 statusBadge = '<span class="status-badge approved" style="background:#dbeafe; color:#2563eb;">Title Approved</span>';
-                titleLabel = `<strong>${getTitleText(g.project_title, approvedKey)}</strong>`;
-            } else if (Object.values(tMap).some(v => v.toLowerCase().includes('rejected'))) {
-                const rejCount = Object.values(tMap).filter(v => v.toLowerCase().includes('rejected')).length;
-                statusBadge = `<span class="status-badge rejected">${rejCount} Rejected</span>`;
-                const firstRejKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('rejected'));
-                titleLabel = getTitleText(g.project_title, firstRejKey) || firstRejKey;
+            } else if (tStatus === 'Rejected' || tStatus === 'Redefend' || pStatus === 'Redefend' || fStatus === 'Redefend') {
+                statusBadge = `<span class="status-badge rejected">${fStatus === 'Redefend' ? 'Redefend Final' : pStatus === 'Redefend' ? 'Redefend Pre-Oral' : tStatus}</span>`;
             }
-            displayRows.push({ ...baseObj, title: titleLabel, statusHtml: statusBadge });
+
+            displayRows.push({ ...baseObj, title: projectTitleDisplay, statusHtml: statusBadge });
 
         } else if (currentCategory === 'APPROVED') {
-            Object.keys(tMap).forEach(k => {
-                if (tMap[k].toLowerCase().includes('approved')) {
-                    displayRows.push({
-                        ...baseObj,
-                        title: `<strong>${getTitleText(g.project_title, k)}</strong>`,
-                        statusHtml: '<span class="status-badge approved">Title Approved</span>'
-                    });
-                }
-            });
+            if (approvedKey) {
+                displayRows.push({
+                    ...baseObj,
+                    title: `<strong>${projectTitleDisplay}</strong>`,
+                    statusHtml: '<span class="status-badge approved">Title Approved</span>'
+                });
+            }
         } else if (currentCategory === 'REJECTED') {
             Object.keys(tMap).forEach(k => {
-                if (tMap[k].toLowerCase().includes('rejected')) {
+                if (tMap[k] === 'Rejected' || tMap[k] === 'Redefend') {
                     displayRows.push({
                         ...baseObj,
                         title: `<span style="color: #dc2626;">${getTitleText(g.project_title, k)}</span>`,
-                        statusHtml: '<span class="status-badge rejected">Rejected</span>'
+                        statusHtml: `<span class="status-badge rejected">${tMap[k]}</span>`
                     });
                 }
             });
         } else if (currentCategory === 'COMPLETED') {
-            // Strict check: Ch4 & Ch5 done
-            const ch4 = (fMap.ch4 || '').toLowerCase();
-            const ch5 = (fMap.ch5 || '').toLowerCase();
-            if (ch4.includes('approved') && ch5.includes('approved')) {
-                const approvedKey = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved'));
+            if (Object.values(fMap).some(v => v === 'Completed')) {
                 displayRows.push({
                     ...baseObj,
-                    title: `<strong>${getTitleText(g.project_title, approvedKey) || approvedKey || g.group_name}</strong>`,
+                    title: `<strong>${projectTitleDisplay}</strong>`,
                     statusHtml: '<span class="status-badge approved">Completed</span>'
                 });
             }
@@ -274,25 +280,6 @@ function updateCounts(groups) {
     const groupIds = groups.map(g => g.id);
     const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
 
-    const getVals = (row) => {
-        if (!row || !row.statuses) return [];
-        let s = row.statuses;
-        if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return []; } }
-
-        const results = [];
-        Object.values(s).forEach(val => {
-            if (typeof val === 'object' && val !== null) {
-                const inner = Object.values(val);
-                if (inner.some(v => v.includes('Approved'))) results.push('Approved');
-                else if (inner.some(v => v.includes('Rejected') || v.includes('Redefense'))) results.push('Rejected');
-                else results.push('Pending');
-            } else {
-                results.push(val);
-            }
-        });
-        return results;
-    };
-
     let approvedTotal = 0;
     let rejectedTotal = 0;
     let completedTotal = 0;
@@ -301,36 +288,31 @@ function updateCounts(groups) {
         const titleRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Title Defense');
         const finalRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Final Defense');
 
-        const tVals = getVals(titleRow);
+        // Check Titles
+        if (titleRow && titleRow.statuses) {
+            const tMap = getStatusMap(titleRow);
+            Object.values(tMap).forEach(v => {
+                if (v.includes('Approved') || v.includes('Revisions')) approvedTotal++;
+                if (v === 'Rejected' || v === 'Redefend') rejectedTotal++;
+            });
+        }
 
-        approvedTotal += tVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('approved')).length;
-        rejectedTotal += tVals.filter(v => typeof v === 'string' && v.toLowerCase().includes('rejected')).length;
-
-        // Strict logic for Completed: Parse dictionary manually
+        // Check if Overall Completed (Final Defense)
         if (finalRow && finalRow.statuses) {
-            let s = finalRow.statuses;
-            if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { s = {}; } }
-
-            const isApproved = (val) => {
-                if (!val) return false;
-                if (typeof val === 'string') return val.toLowerCase().includes('approved');
-                if (typeof val === 'object') return Object.values(val).some(v => v.toLowerCase().includes('approved'));
-                return false;
-            };
-
-            if (isApproved(s.ch4) && isApproved(s.ch5)) {
-                completedTotal += 1;
+            const fMap = getStatusMap(finalRow);
+            if (Object.values(fMap).some(v => v === 'Completed')) {
+                completedTotal++;
             }
         }
     });
 
     // Display Counts
     const titleEl = document.getElementById('countTitle');
-    const preOralEl = document.getElementById('countPreOral');
+    const rejectedEl = document.getElementById('countPreOral'); // This is the middle card (Rejected Titles)
     const finalEl = document.getElementById('countFinal');
 
     if (titleEl) titleEl.innerText = approvedTotal;
-    if (preOralEl) preOralEl.innerText = rejectedTotal;
+    if (rejectedEl) rejectedEl.innerText = rejectedTotal;
     if (finalEl) finalEl.innerText = completedTotal;
 }
 
@@ -354,8 +336,10 @@ async function renderTable() {
         else if (program.includes('BSIT')) progClass = 'prog-bsit';
         else if (program.includes('BSCS')) progClass = 'prog-bscs';
 
-        const members = (row.members || '').split(',').filter(m => m.trim());
-        const membersHtml = members.map(m => `<span class="chip">${m.trim()}</span>`).join('');
+        const members = (row.members || '').split(',').map(m => m.trim()).filter(m => m && m !== '-');
+        const membersHtml = members.length > 0
+            ? members.map(m => `<span class="chip">${m}</span>`).join('')
+            : '<span style="color:#94a3b8;">-</span>';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
