@@ -279,11 +279,11 @@ function getStatusMap(row) {
         const val = s[fileKey];
         if (typeof val === 'object' && val !== null) {
             const values = Object.values(val);
-            // Priority: Approved > Approved with Revisions > Redefend > Rejected > Pending
-            if (values.some(v => v.includes('Approved') || v.includes('Completed'))) flat[fileKey] = values.find(v => v.includes('Approved') || v.includes('Completed'));
-            else if (values.some(v => v.includes('Approved with Revisions'))) flat[fileKey] = 'Approved with Revisions';
-            else if (values.some(v => v.includes('Redefend'))) flat[fileKey] = 'Redefend';
-            else if (values.some(v => v.includes('Rejected'))) flat[fileKey] = 'Rejected';
+            // Priority: Redefend > Rejected > Approved with Revisions > Approved
+            if (values.some(v => v === 'Redefend')) flat[fileKey] = 'Redefend';
+            else if (values.some(v => v === 'Rejected')) flat[fileKey] = 'Rejected';
+            else if (values.some(v => v === 'Approved with Revisions')) flat[fileKey] = 'Approved with Revisions';
+            else if (values.some(v => v === 'Approved' || v === 'Completed')) flat[fileKey] = 'Approved';
             else flat[fileKey] = 'Pending';
         } else {
             flat[fileKey] = val || 'Pending';
@@ -297,18 +297,17 @@ function updateCounts(groups) {
     let rejectedTotal = 0;
 
     groups.forEach(g => {
-        // Direct look-up matching the table's logic (using loose equality for safety)
         const titleRow = allDefenseStatuses.find(ds => ds.group_id == g.id && ds.defense_type === 'Title Defense');
 
         if (titleRow && titleRow.statuses) {
             const tMap = getStatusMap(titleRow);
             const values = Object.values(tMap);
 
-            // Count individual titles
+            // Count based on resolved status
             values.forEach(v => {
-                if (v && (v.includes('Approved') || v.includes('Completed'))) {
+                if (v === 'Approved' || v === 'Approved with Revisions' || v === 'Completed') {
                     approvedTotal++;
-                } else if (v && (v === 'Rejected' || v === 'Redefend')) {
+                } else if (v === 'Rejected' || v === 'Redefend') {
                     rejectedTotal++;
                 }
             });
