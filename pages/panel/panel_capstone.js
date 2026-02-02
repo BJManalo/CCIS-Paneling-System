@@ -900,9 +900,9 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
         group.currentStatusJson = mergedStatuses;
 
         // Ensure stage-specific statuses are also updated for immediate modal feedback
-        if (normTab.includes('title')) group.titleStatus = localMap;
-        else if (normTab.includes('preoral')) group.preOralStatus = localMap;
-        else if (normTab.includes('final')) group.finalStatus = localMap;
+        if (normTab.includes('title')) group.titleStatus = mergedStatuses;
+        else if (normTab.includes('preoral')) group.preOralStatus = mergedStatuses;
+        else if (normTab.includes('final')) group.finalStatus = mergedStatuses;
 
         // --- Real-time Badge Update ---
         const badge = document.getElementById(`status-badge-${categoryKey}-${fileKey}`);
@@ -1011,8 +1011,17 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
         group.currentRemarksJson = mergedRemarks;
 
         // Success Feedback
-        group.currentRemarksJson = localRemarksMap;
-        group.currentStatusJson = localStatusMap;
+        // Update specific view maps as well for immediate render
+        if (normTab.includes('title')) {
+            group.titleStatus = mergedStatuses;
+            group.titleRemarks = mergedRemarks;
+        } else if (normTab.includes('preoral')) {
+            group.preOralStatus = mergedStatuses;
+            group.preOralRemarks = mergedRemarks;
+        } else if (normTab.includes('final')) {
+            group.finalStatus = mergedStatuses;
+            group.finalRemarks = mergedRemarks;
+        }
 
         if (btn) {
             btn.innerText = 'Updated';
