@@ -15,7 +15,7 @@ let instructorName = '';
 let displayRows = [];
 
 // PDF Viewer State
-let currentAdobeView = null;
+// PDF Viewer State
 let currentViewerFileKey = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -374,12 +374,12 @@ window.openFileModal = async (groupId) => {
     fileList.innerHTML = '';
 
     // Reset PDF view
-    document.getElementById('adobe-dc-view').style.display = 'none';
-    document.getElementById('pdfPlaceholder').style.display = 'flex';
-    if (currentAdobeView) {
-        document.getElementById('adobe-dc-view').innerHTML = '';
-        currentAdobeView = null;
+    const pdfFrame = document.getElementById('pdfFrame');
+    if (pdfFrame) {
+        pdfFrame.style.display = 'none';
+        pdfFrame.src = "";
     }
+    document.getElementById('pdfPlaceholder').style.display = 'flex';
 
     // Prepare File Categories
     const categories = [
@@ -536,43 +536,50 @@ window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
 };
 
-window.loadPDF = (url, title, fileKey) => {
+window.loadPDF = async (url, title, fileKey) => {
     currentViewerFileKey = fileKey;
     document.getElementById('pdfPlaceholder').style.display = 'none';
-    const viewerDiv = document.getElementById('adobe-dc-view');
-    viewerDiv.style.display = 'block';
 
-    // Clear previous
-    viewerDiv.innerHTML = '';
+    const pdfFrame = document.getElementById('pdfFrame');
+    if (pdfFrame) {
+        pdfFrame.style.display = 'block';
 
-    if (window.AdobeDC) {
-        currentAdobeView = new AdobeDC.View({
-            clientId: "8ebcb61f76d649989f2ae52da7014605",
-            divId: "adobe-dc-view"
-        });
-        currentAdobeView.previewFile({
-            content: { location: { url: url } },
-            metaData: { fileName: title }
-        }, {
-            embedMode: "FULL_WINDOW",
-            showAnnotationTools: false, // Cleaner for Adviser
-            showLeftHandPanel: true,
-            showDownloadPDF: true,
-            showPrintPDF: true
-        });
-    } else {
-        viewerDiv.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
+        let finalUrl = url.trim();
+        if (!finalUrl.startsWith('http') && !finalUrl.startsWith('//')) finalUrl = 'https://' + finalUrl;
+
+        // Use the local PDF viewer (same as Panel)
+        // If it's a PDF, we try to fetch it as a blob to avoid CORS if possible, 
+        // OR just pass it to the viewer if cross-origin is allowed.
+        // For simplicity and read-only, we can try direct PDF.js viewer link.
+
+        const lowerUrl = finalUrl.toLowerCase();
+        if (lowerUrl.endsWith('.pdf') || lowerUrl.includes('supabase.co')) {
+            try {
+                const response = await fetch(finalUrl);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const viewerPath = "../../assets/library/web/viewer.html";
+                    pdfFrame.src = `${viewerPath}?file=${encodeURIComponent(blobUrl)}`;
+                } else {
+                    // Fallback to direct link
+                    pdfFrame.src = finalUrl;
+                }
+            } catch (e) {
+                // Fallback to direct link or Google Docs viewer
+                console.warn("Fetch failed, using direct link", e);
+                pdfFrame.src = finalUrl;
+            }
+        } else if (lowerUrl.includes('drive.google.com')) {
+            const fileIdMatch = finalUrl.match(/\/d\/([^\/]+)/) || finalUrl.match(/id=([^\&]+)/);
+            const drivePreview = fileIdMatch ? `https://drive.google.com/file/d/${fileIdMatch[1]}/preview` : finalUrl;
+            pdfFrame.src = drivePreview;
+        } else {
+            // Generic fallback
+            pdfFrame.src = finalUrl;
+        }
     }
-
-    // Highlight the active file in sidebar
-    document.querySelectorAll('.file-item').forEach(it => it.style.boxShadow = 'none');
-    // ... we don't have .file-item since I used parent/child divs, let's just leave it for now.
 };
-
-// Add Adobe SDK
-const script = document.createElement('script');
-script.src = "https://documentservices.adobe.com/view-sdk/viewer.js";
-document.head.appendChild(script);
 
 function logout() {
     localStorage.removeItem('loginUser');
