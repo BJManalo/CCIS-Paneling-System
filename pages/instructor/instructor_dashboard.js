@@ -278,45 +278,41 @@ window.applyDashboardFilters = () => {
 
 function updateCounts(groups) {
     const groupIds = groups.map(g => g.id);
-
-    // Filter feedback relevant to these displayed groups
-    const relevantFeedback = allCapstoneFeedback.filter(cf => groupIds.includes(cf.group_id));
+    // Use allDefenseStatuses because that is what populates the view
+    const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
 
     let approvedTotal = 0;
     let rejectedTotal = 0;
 
     groupIds.forEach(id => {
-        // Get all feedback for this group's Title Defense
-        const titleFeedback = relevantFeedback.filter(cf =>
-            cf.group_id === id &&
-            cf.defense_type &&
-            cf.defense_type.toLowerCase().includes('title')
-        );
+        const titleRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Title Defense');
 
-        // Check for 'Approved' status
-        // User Logic: "if the status set by the panels=approved that counts as 1"
-        // We count the GROUP as 1 if at least one panel marked it Approved.
-        const headerStatusApproved = titleFeedback.some(cf => cf.status === 'Approved');
-        if (headerStatusApproved) {
-            approvedTotal++;
-        }
+        // Check Titles
+        if (titleRow && titleRow.statuses) {
+            const tMap = getStatusMap(titleRow);
+            const values = Object.values(tMap);
 
-        // Check for 'Rejected' status
-        const headerStatusRejected = titleFeedback.some(cf => cf.status === 'Rejected');
-        if (headerStatusRejected) {
-            rejectedTotal++;
+            // "if the status set by the panels=approved that counts as 1"
+            if (values.some(v => v.includes('Approved') || v.includes('Completed'))) {
+                approvedTotal++;
+            }
+
+            // "1 title is rejected that count as 1"
+            // Note: If Approved takes precedence, we only count as rejected if NOT approved?
+            // Usually Approval > Rejection in summary stats.
+            else if (values.some(v => v === 'Rejected' || v === 'Redefend')) {
+                rejectedTotal++;
+            }
         }
     });
 
     // Display Counts
     const titleEl = document.getElementById('countTitle');
-    const rejectedEl = document.getElementById('countPreOral'); // Middle card is Rejected Titles
+    const rejectedEl = document.getElementById('countPreOral'); // Middle card
+    const finalEl = document.getElementById('countFinal');
 
     if (titleEl) titleEl.innerText = approvedTotal;
     if (rejectedEl) rejectedEl.innerText = rejectedTotal;
-
-    // Legacy 'countFinal' is removed from HTML, so we ignore it or clear it if it exists
-    const finalEl = document.getElementById('countFinal');
     if (finalEl) finalEl.innerText = '-';
 }
 
@@ -356,7 +352,6 @@ async function renderTable() {
             </td>
             <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>${row.year}</td>
-            <td>${row.statusHtml}</td>
             <td>
                 <button onclick="openFileModal(${row.id})" 
                     style="background: var(--primary-color); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2); transition: all 0.2s;"
