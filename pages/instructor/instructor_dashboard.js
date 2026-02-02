@@ -143,46 +143,7 @@ window.applyDashboardFilters = () => {
         return progMatch && sectMatch && searchMatch;
     });
 
-    // Helper to robustly get title text
-    const getTitleText = (pTitle, keyHint) => {
-        if (!pTitle) return keyHint || '';
-        let parsed = pTitle;
-        if (typeof parsed === 'string') {
-            try {
-                if (parsed.trim().startsWith('{')) {
-                    parsed = JSON.parse(parsed);
-                } else {
-                    return parsed;
-                }
-            } catch (e) { return parsed; }
-        }
 
-        if (keyHint && parsed[keyHint]) return parsed[keyHint];
-        return parsed.title1 || parsed.title2 || parsed.title3 || Object.values(parsed)[0] || '';
-    };
-
-    const getStatusMap = (row) => {
-        if (!row || !row.statuses) return {};
-        let s = row.statuses;
-        if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
-
-        const flat = {};
-        Object.keys(s).forEach(fileKey => {
-            const val = s[fileKey];
-            if (typeof val === 'object' && val !== null) {
-                const values = Object.values(val);
-                // Priority: Approved > Approved with Revisions > Redefend > Rejected > Pending
-                if (values.some(v => v.includes('Approved') || v.includes('Completed'))) flat[fileKey] = values.find(v => v.includes('Approved') || v.includes('Completed'));
-                else if (values.some(v => v.includes('Approved with Revisions'))) flat[fileKey] = 'Approved with Revisions';
-                else if (values.some(v => v.includes('Redefend'))) flat[fileKey] = 'Redefend';
-                else if (values.some(v => v.includes('Rejected'))) flat[fileKey] = 'Rejected';
-                else flat[fileKey] = 'Pending';
-            } else {
-                flat[fileKey] = val || 'Pending';
-            }
-        });
-        return flat;
-    };
 
     displayRows = [];
 
@@ -196,7 +157,7 @@ window.applyDashboardFilters = () => {
         const fMap = getStatusMap(finalRow);
 
         const members = allStudents
-            .filter(s => String(s.group_id) === String(g.id))
+            .filter(s => s.group_id == g.id) // Loose comparison (string vs number)
             .map(s => s.full_name)
             .join(', ');
 
@@ -272,9 +233,54 @@ window.applyDashboardFilters = () => {
         }
     });
 
+    // 4. Update Counts
     updateCounts(baseGroups);
+
+    // 5. Render
     renderTable();
 };
+
+// --- Helper Functions (Hoisted/Global) ---
+
+function getTitleText(pTitle, keyHint) {
+    if (!pTitle) return keyHint || '';
+    let parsed = pTitle;
+    if (typeof parsed === 'string') {
+        try {
+            if (parsed.trim().startsWith('{')) {
+                parsed = JSON.parse(parsed);
+            } else {
+                return parsed;
+            }
+        } catch (e) { return parsed; }
+    }
+
+    if (keyHint && parsed[keyHint]) return parsed[keyHint];
+    return parsed.title1 || parsed.title2 || parsed.title3 || Object.values(parsed)[0] || '';
+}
+
+function getStatusMap(row) {
+    if (!row || !row.statuses) return {};
+    let s = row.statuses;
+    if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
+
+    const flat = {};
+    Object.keys(s).forEach(fileKey => {
+        const val = s[fileKey];
+        if (typeof val === 'object' && val !== null) {
+            const values = Object.values(val);
+            // Priority: Approved > Approved with Revisions > Redefend > Rejected > Pending
+            if (values.some(v => v.includes('Approved') || v.includes('Completed'))) flat[fileKey] = values.find(v => v.includes('Approved') || v.includes('Completed'));
+            else if (values.some(v => v.includes('Approved with Revisions'))) flat[fileKey] = 'Approved with Revisions';
+            else if (values.some(v => v.includes('Redefend'))) flat[fileKey] = 'Redefend';
+            else if (values.some(v => v.includes('Rejected'))) flat[fileKey] = 'Rejected';
+            else flat[fileKey] = 'Pending';
+        } else {
+            flat[fileKey] = val || 'Pending';
+        }
+    });
+    return flat;
+}
 
 function updateCounts(groups) {
     const groupIds = groups.map(g => g.id);
