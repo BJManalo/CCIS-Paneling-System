@@ -111,26 +111,26 @@ async function loadCapstoneData() {
             }
         });
 
-        // 4. Fetch Defense Statuses and Detailed Feedback
+        // 4. Fetch Defense Statuses, Feedback, AND Annotations
         let defStatuses = [];
         let capstoneFeedback = [];
+        let capstoneAnnotations = [];
 
         try {
-            const [dsRes, cfRes] = await Promise.all([
+            const [dsRes, cfRes, caRes] = await Promise.all([
                 supabaseClient.from('defense_statuses').select('*'),
-                supabaseClient.from('capstone_feedback').select('*')
+                supabaseClient.from('capstone_feedback').select('*'),
+                supabaseClient.from('capstone_annotations').select('*')
             ]);
 
             if (dsRes.error) console.error('Error fetching defense_statuses:', dsRes.error);
-            if (cfRes.error) {
-                console.error('DATABASE ERROR (capstone_feedback):', cfRes.error);
-                if (cfRes.error.message.includes('relation "capstone_feedback" does not exist')) {
-                    alert('⚠️ DATABASE SETUP MISSING: Please run the updated SQL script in Supabase SQL Editor. The table "capstone_feedback" is not found.');
-                }
-            }
+            if (cfRes.error) console.error('DATABASE ERROR (capstone_feedback):', cfRes.error);
+            if (caRes.error) console.error('DATABASE ERROR (capstone_annotations):', caRes.error);
 
             defStatuses = dsRes.data || [];
             capstoneFeedback = cfRes.data || [];
+            capstoneAnnotations = caRes.data || [];
+            console.log('LOAD SUCCESS:', { statuses: defStatuses.length, feedback: capstoneFeedback.length, annotations: capstoneAnnotations.length });
             console.log('LOAD SUCCESS:', { statuses: defStatuses.length, feedback: capstoneFeedback.length });
         } catch (e) {
             console.error('Critical Fetch Error:', e);
@@ -159,7 +159,14 @@ async function loadCapstoneData() {
 
                 if (cf.status) statuses[cf.file_key][cf.user_name] = cf.status;
                 if (cf.remarks) remarks[cf.file_key][cf.user_name] = cf.remarks;
+                // Fallback: Read annotation from feedback table if it exists there (Legacy)
                 if (cf.annotated_file_url) annotations[cf.file_key][cf.user_name] = cf.annotated_file_url;
+            });
+
+            // 3. Merge Annotations from New Table (capstone_annotations) - Primary Source
+            capstoneAnnotations.filter(ca => ca.group_id == groupId && normalizeType(ca.defense_type) === norm).forEach(ca => {
+                if (!annotations[ca.file_key]) annotations[ca.file_key] = {};
+                annotations[ca.file_key][ca.user_name] = ca.annotated_file_url;
             });
 
             return { statuses, remarks, annotations, id: legacy ? legacy.id : null };
@@ -1244,9 +1251,9 @@ async function saveAnnotatedPDF(isAuto = false) {
             .from('project-submissions')
             .getPublicUrl(`submissions/annotations/${fileName}`);
 
-        // 5. Save the link to the 'capstone_feedback' table
+        // 5. Save the link to the 'capstone_annotations' table (New Separate Table)
         const { error: dbError } = await supabaseClient
-            .from('capstone_feedback')
+            .from('capstone_annotations')
             .upsert({
                 group_id: currentViewerGroupId,
                 defense_type: normalizeType(currentTab),

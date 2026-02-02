@@ -89,8 +89,22 @@
             </select>
         </div>
 
-        <!-- Charts Row -->
-        <!-- Charts Removed -->
+        <!-- Charts Row / Status Tabs -->
+        <div class="charts-row"
+            style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
+            <div class="chart-card" onclick="setCategoryFilter('APPROVED')"
+                style="cursor: pointer; flex: 1; min-width: 250px; text-align: center; padding: 20px; transition: transform 0.2s;">
+                <div class="chart-title">Approved Titles</div>
+                <h1 style="font-size: 3rem; color: #22c55e; margin: 10px 0;" id="countTitle">0</h1>
+                <div style="font-size: 0.9rem; color: #64748b;">Click to view list</div>
+            </div>
+            <div class="chart-card" onclick="setCategoryFilter('REJECTED')"
+                style="cursor: pointer; flex: 1; min-width: 250px; text-align: center; padding: 20px; transition: transform 0.2s;">
+                <div class="chart-title">Rejected Titles</div>
+                <h1 style="font-size: 3rem; color: #ef4444; margin: 10px 0;" id="countRejected">0</h1>
+                <div style="font-size: 0.9rem; color: #64748b;">Click to view list</div>
+            </div>
+        </div>
 
         <!-- Filters -->
         <div class="filter-section">

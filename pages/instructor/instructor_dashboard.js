@@ -335,7 +335,7 @@ function resolveStatusMap(groupId, defenseType) {
     return resolved;
 }
 
-function updateCounts(groups) {
+function deprecated_updateCounts(groups) {
     let approvedTotal = 0;
     let rejectedTotal = 0;
 
@@ -673,3 +673,35 @@ window.filterTable = (program) => {
 };
 
 document.getElementById('searchInput')?.addEventListener('input', applyDashboardFilters);
+
+function updateCounts(groups) {
+    let approvedTotal = 0;
+    let rejectedTotal = 0;
+
+    groups.forEach(g => {
+        const tMap = resolveStatusMap(g.id, 'Title Defense');
+        const values = Object.values(tMap);
+
+        values.forEach(v => {
+            if (v && (v === 'Approved' || v === 'Approved with Revisions' || v === 'Completed')) {
+                approvedTotal++;
+            } else if (v === 'Rejected' || v === 'Redefend') {
+                rejectedTotal++;
+            }
+        });
+    });
+
+    // OVERRIDE: If we are actively filtering by a category, the count should reflect visible rows
+    if (currentCategory === 'APPROVED') {
+        approvedTotal = displayRows.length;
+    } else if (currentCategory === 'REJECTED') {
+        rejectedTotal = displayRows.length;
+    }
+
+    // Display Counts to Cards
+    const titleEl = document.getElementById('countTitle');
+    const rejectedEl = document.getElementById('countRejected');
+
+    if (titleEl) titleEl.innerText = approvedTotal;
+    if (rejectedEl) rejectedEl.innerText = rejectedTotal;
+}
