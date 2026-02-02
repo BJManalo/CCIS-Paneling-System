@@ -304,9 +304,19 @@ async function loadSubmissionData() {
                 uploadBtn.title = "Upload PDF directly";
                 const isUploaded = currentValue && (currentValue.includes('supabase.co') || currentValue.includes('project-submissions'));
                 const isRevised = targetEl.id.includes('_revised');
+
+                // For Revised fields, we ALWAYS allow the upload button to be clickable to "Update" the revision.
+                // For Original fields, we disable it once uploaded.
+                const canUpload = (isRevised) || !isUploaded;
+
                 const uploadColor = isRevised ? '#d97706' : 'var(--primary-color)';
-                uploadBtn.style.cssText = `background: ${isUploaded ? '#f1f5f9' : uploadColor}; border: 1.5px solid ${isUploaded ? '#e2e8f0' : uploadColor}; border-radius: 8px; color: ${isUploaded ? '#94a3b8' : 'white'}; padding: 10px; cursor: ${isUploaded ? 'default' : 'pointer'}; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: ${isUploaded ? 'none' : '0 2px 6px rgba(0,0,0, 0.1)'};`;
-                if (isUploaded) uploadBtn.disabled = true;
+                uploadBtn.style.cssText = `background: ${!canUpload ? '#f1f5f9' : uploadColor}; border: 1.5px solid ${!canUpload ? '#e2e8f0' : uploadColor}; border-radius: 8px; color: ${!canUpload ? '#94a3b8' : 'white'}; padding: 10px; cursor: ${!canUpload ? 'default' : 'pointer'}; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: ${!canUpload ? 'none' : '0 2px 6px rgba(0,0,0, 0.1)'};`;
+
+                if (!canUpload) uploadBtn.disabled = true;
+                if (isRevised && isUploaded) {
+                    uploadBtn.title = "Update your Revision";
+                    uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">sync</span>';
+                }
                 uploadBtn.onclick = (e) => {
                     e.preventDefault();
                     const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
