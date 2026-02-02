@@ -171,10 +171,20 @@ window.applyDashboardFilters = () => {
         };
 
         // Determine which title is approved
-        const approvedKey = Object.keys(tMap).find(k => (tMap[k] || '').includes('Approved'));
-        let projectTitleDisplay = g.group_name;
+        const approvedKey = Object.keys(tMap).find(k => (tMap[k] || '').includes('Approved') || (tMap[k] || '').includes('Completed'));
+        let projectTitleDisplay = g.group_name; // Default fallback
+
+        // If we have an approved key, specifically fetch THAT title text
         if (approvedKey) {
             projectTitleDisplay = getTitleText(g.project_title, approvedKey);
+        }
+        // If not, try to get ANY title text (e.g. title1) instead of just group name if possible
+        else {
+            const firstTitleKey = Object.keys(tMap)[0] || 'title1';
+            const potentialTitle = getTitleText(g.project_title, firstTitleKey);
+            if (potentialTitle && potentialTitle !== 'undefined') {
+                projectTitleDisplay = potentialTitle;
+            }
         }
 
         if (currentCategory === 'ALL') {
