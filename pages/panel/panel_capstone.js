@@ -566,9 +566,27 @@ window.openFileModal = (groupId) => {
 
         Object.entries(fileObj).forEach(([label, url]) => {
             const isRevised = label.endsWith('_revised');
+            let projectTitles = {};
+            if (categoryKey === 'titles' && group.projectTitle) {
+                try {
+                    projectTitles = typeof group.projectTitle === 'string' && group.projectTitle.startsWith('{')
+                        ? JSON.parse(group.projectTitle)
+                        : { title1: group.projectTitle };
+                } catch (e) {
+                    projectTitles = { title1: group.projectTitle };
+                }
+            }
+
+            let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            if (categoryKey === 'titles' && projectTitles[label]) {
+                displayLabel = projectTitles[label];
+            }
+
             const cleanUrl = url ? url.toString().trim() : "";
-            // SKIP: If URL is empty, literally "null", or the key is a revised version 
-            if (!cleanUrl || cleanUrl === "" || cleanUrl.toLowerCase() === "null" || isRevised) return;
+            const isNull = !cleanUrl || cleanUrl.toLowerCase() === "null" || (displayLabel && displayLabel.toLowerCase() === "null");
+
+            // SKIP: If URL is missing/null, title is "Null", or it's a revised key
+            if (isNull || isRevised) return;
 
             const itemContainer = document.createElement('div');
             itemContainer.style.background = 'white';
@@ -586,22 +604,6 @@ window.openFileModal = (groupId) => {
             item.style.alignItems = 'center';
             item.style.justifyContent = 'space-between';
             item.style.transition = 'all 0.2s';
-
-            let projectTitles = {};
-            if (categoryKey === 'titles' && group.projectTitle) {
-                try {
-                    projectTitles = typeof group.projectTitle === 'string' && group.projectTitle.startsWith('{')
-                        ? JSON.parse(group.projectTitle)
-                        : { title1: group.projectTitle };
-                } catch (e) {
-                    projectTitles = { title1: group.projectTitle };
-                }
-            }
-
-            let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-            if (categoryKey === 'titles' && projectTitles[label]) {
-                displayLabel = projectTitles[label];
-            }
 
             item.innerHTML = `
                 <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
