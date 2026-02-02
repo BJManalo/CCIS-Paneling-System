@@ -53,6 +53,7 @@ async function loadCapstoneData() {
         return;
     }
     const user = JSON.parse(userJson);
+    const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
     tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;">Loading capstone data...</td></tr>';
     if (emptyState) emptyState.style.display = 'none';
@@ -72,37 +73,41 @@ async function loadCapstoneData() {
 
         if (sError) throw sError;
 
-        // 3. Fetch Grades/Evaluations (For sequential Locking)
-        // We need to know if THIS user (Panel) has evaluated the group for a specific stage.
-        // Assuming 'grades' table links students to grades.
-        // We need to fetch students first to map group_id.
+        // 3. Fetch Evaluations (For sequential Locking)
         const { data: students, error: stdError } = await supabaseClient
             .from('students')
             .select('id, group_id');
 
         if (stdError) throw stdError;
 
-        const studentIds = students.map(s => s.id);
+        // We check if THIS user (Panel) has evaluated the group for a specific stage.
+        const [indRes, sysRes] = await Promise.all([
+            supabaseClient.from('individual_evaluations').select('student_id, schedule_id').eq('panelist_name', userName),
+            supabaseClient.from('system_evaluations').select('group_id, schedule_id').eq('panelist_name', userName)
+        ]);
 
-        // Fetch grades for these students
-        // Ideally we filter by grader, but if schema doesn't support it, we check if *any* grade exists for the group.
-        // Constraint: The prompt says "until THEY evaluated".
-        // If we can't track "THEY", we'll check global status or assume any grade counts.
-        // For MVP, we check if there is a grade for the group's students for the required type.
-        const { data: grades, error: grError } = await supabaseClient
-            .from('grades')
-            .select('student_id, grade_type')
-            .in('student_id', studentIds);
+        const indEvs = indRes.data || [];
+        const sysEvs = sysRes.data || [];
 
-        if (grError) throw grError;
-
-        // Build Group Grades Map
+        // Build Group Grades Map based on evaluations
         groupGrades = {};
-        grades.forEach(g => {
-            const student = students.find(s => s.id === g.student_id);
-            if (student) {
+
+        // Add individual evaluations
+        indEvs.forEach(ev => {
+            const student = students.find(s => s.id === ev.student_id);
+            const sched = schedules.find(s => s.id === ev.schedule_id);
+            if (student && sched) {
                 if (!groupGrades[student.group_id]) groupGrades[student.group_id] = new Set();
-                groupGrades[student.group_id].add(normalizeType(g.grade_type));
+                groupGrades[student.group_id].add(normalizeType(sched.schedule_type));
+            }
+        });
+
+        // Add system evaluations
+        sysEvs.forEach(ev => {
+            const sched = schedules.find(s => s.id === ev.schedule_id);
+            if (sched) {
+                if (!groupGrades[ev.group_id]) groupGrades[ev.group_id] = new Set();
+                groupGrades[ev.group_id].add(normalizeType(sched.schedule_type));
             }
         });
 
@@ -409,17 +414,20 @@ function renderTable() {
         let lockReason = '';
         const userEvaluations = groupGrades[g.id] || new Set();
 
-        if (normCurrentTab === normalizeType('Pre-Oral Defense')) {
-            // Must have evaluated Title Defense
-            if (!userEvaluations.has(normalizeType('Title Defense'))) {
-                isLocked = true;
-                lockReason = 'Evaluate Title Defense first';
-            }
-        } else if (normCurrentTab === normalizeType('Final Defense')) {
-            // Must have evaluated Pre-Oral Defense
-            if (!userEvaluations.has(normalizeType('Pre-Oral Defense'))) {
-                isLocked = true;
-                lockReason = 'Evaluate Pre-Oral first';
+        // Sequential Locking: Only applies if the user is a panelist for this group
+        if (g.isPanelist) {
+            if (normCurrentTab === normalizeType('Pre-Oral Defense')) {
+                // Must have evaluated Title Defense
+                if (!userEvaluations.has(normalizeType('Title Defense'))) {
+                    isLocked = true;
+                    lockReason = 'Evaluate Title Defense first';
+                }
+            } else if (normCurrentTab === normalizeType('Final Defense')) {
+                // Must have evaluated Pre-Oral Defense
+                if (!userEvaluations.has(normalizeType('Pre-Oral Defense'))) {
+                    isLocked = true;
+                    lockReason = 'Evaluate Pre-Oral first';
+                }
             }
         }
 
