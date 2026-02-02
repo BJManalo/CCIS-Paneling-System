@@ -271,32 +271,20 @@ window.switchMainTab = (tab) => {
 
     // Always show filters
     if (filterContainer) filterContainer.style.display = 'flex';
-    const allBtn = document.querySelector('.filter-chip');
+    const allBtn = document.querySelector('.filter-chips-container .filter-chip') || document.querySelector('.filter-chip'); // Support different possible structures
 
-    if (tab === 'Advisory') {
-        if (accordion) accordion.style.display = 'none';
-        if (advisoryTable) advisoryTable.style.display = 'block';
+    // We use the accordion for both now to show detailed panel ratings
+    if (accordion) accordion.style.display = 'block';
+    if (advisoryTable) advisoryTable.style.display = 'none';
 
-        // Update Text
-        if (allBtn) allBtn.textContent = 'All Advisory';
+    // Update Filter UI visually to ALL if reseting
+    currentTypeFilter = 'ALL';
+    document.querySelectorAll('.filter-chip').forEach(b => {
+        b.classList.remove('active');
+        if (b.textContent.includes('All')) b.classList.add('active');
+    });
 
-        // Update Filter UI visually to ALL if reseting
-        currentTypeFilter = 'ALL';
-        document.querySelectorAll('.filter-chip').forEach(b => {
-            b.classList.remove('active');
-            if (b.textContent.includes('All')) b.classList.add('active');
-        });
-
-        renderAdvisoryTable();
-    } else {
-        if (accordion) accordion.style.display = 'block';
-        if (advisoryTable) advisoryTable.style.display = 'none';
-
-        // Update Text
-        if (allBtn) allBtn.textContent = 'All Evaluations';
-
-        applyFilters(); // Re-render evaluations
-    }
+    applyFilters();
 }
 
 function renderAdvisoryTable() {
@@ -445,19 +433,14 @@ function applyFilters() {
         let matchesMain = true;
         const adviser = (ev.adviser || '').toLowerCase();
         const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
+        const isPanelist = (ev.panelistName || '').toLowerCase() === userName.toLowerCase();
 
         if (currentMainTab === 'Advisory') {
-            // Must be the Adviser
+            // Must be the Adviser of the group being evaluated
             matchesMain = isAdviser;
         } else {
-            // Evaluation Tab: Groups I Created (Instructor)
-            if (ev.createdBy) {
-                matchesMain = (ev.createdBy == userId); // Using loose equality for potential type mismatch (string vs number)
-            } else {
-                // If createdBy is missing, we fallback to showing it (better to show than hide)
-                // Previously we hid if (isAdviser), which caused the issue for dual roles.
-                matchesMain = true;
-            }
+            // "My Evaluations" tab: Evaluations I performed as a panelist
+            matchesMain = isPanelist;
         }
         if (!matchesMain) return false;
 

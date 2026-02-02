@@ -230,136 +230,163 @@
             </div>
         </div>
 
-        <!-- Title -->
-        <h2 class="page-title">Student Grades</h2>
-
-        <!-- Grades Table -->
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Group Name</th>
-                        <th>Defense Type</th>
-                        <th>Program</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="gradesTableBody">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Add Grade FAB -->
-        <button class="fab-btn" onclick="openGradeModal()">
-            <span class="material-icons-round">add</span>
-        </button>
-
-    </div>
-
-    <!-- Grading Modal -->
-    <div id="gradeModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 650px;">
-            <h2 class="modal-title">Grade Students</h2>
-
-            <form id="gradeForm" onsubmit="saveGrades(event)">
-                <div class="input-group">
-                    <label for="gradeGroupId">Group Name</label>
-                    <div class="custom-select-wrapper">
-                        <select id="gradeGroupId" required onchange="handleGroupChange()">
-                            <option value="">Select Group</option>
-                            <!-- Populated by JS -->
-                        </select>
-                        <span class="material-icons-round select-arrow">expand_more</span>
-                    </div>
-                </div>
-
-                <!-- Grading Area -->
-                <div id="gradingArea" style="margin-top: 20px;">
-                    <p class="text-light" style="font-size: 0.9em; margin-bottom: 10px;">Select a group to load
-                        students.</p>
-                </div>
-
-                <div class="modal-actions">
-                    <button type="button" class="btn-cancel" onclick="closeGradeModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Save Grades</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Alert Modal -->
-    <div id="alertModal" class="modal-overlay" style="z-index: 2000;">
-        <div class="modal-content"
-            style="max-width: 400px; text-align: center; padding: 30px 25px; border-radius: 20px; transition: all 0.3s ease;">
-            <div
-                style="width: 60px; height: 60px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-                <span class="material-icons-round" style="font-size: 32px; color: var(--primary-color);">info</span>
+        <!-- Main Content Wrapper -->
+        <div style="max-width: 1000px; margin: 0 auto; padding: 0 10px;">
+            <!-- Main Tabs (Advisory vs Manage Grades) -->
+            <div class="switcher-tabs"
+                style="margin-bottom: 20px; background: #e2e8f0; padding: 4px; max-width: 500px; display: flex; border-radius: 12px;">
+                <button class="switcher-btn active" id="tab-advisory" onclick="switchMainTab('Advisory')"
+                    style="flex:1; padding: 10px; border:none; border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:all 0.3s; background:white; color:var(--primary-color);">
+                    <span class="material-icons-round">groups</span> My Advisory Groups
+                </button>
+                <button class="switcher-btn" id="tab-manage" onclick="switchMainTab('Manage')"
+                    style="flex:1; padding: 10px; border:none; border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:all 0.3s; background:transparent; color:#64748b;">
+                    <span class="material-icons-round">grading</span> Manage Grades
+                </button>
             </div>
-            <h3 id="alertTitle" style="font-size: 1.25rem; margin: 0 0 10px; color: #1e293b; font-weight: 700;">Notice
-            </h3>
-            <p id="alertMessage" style="color: #64748b; margin: 0 0 25px; font-size: 0.95rem; line-height: 1.6;"></p>
-            <button onclick="closeAlertModal()"
-                style="background: var(--primary-color); color: white; border: none; padding: 12px 0; width: 100%; border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06);">
-                Okay, got it
+
+            <!-- Title -->
+            <h2 class="page-title" id="gradesPageTitle">Advisory Grades</h2>
+
+            <!-- Grades Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Group Name</th>
+                            <th>Defense Type</th>
+                            <th>Program</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gradesTableBody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add Grade FAB -->
+            <button class="fab-btn" onclick="openGradeModal()">
+                <span class="material-icons-round">add</span>
             </button>
-        </div>
-    </div>
 
-    <!-- Dedicated Printable Area (Hidden on Screen) -->
-    <div id="printableArea" style="display: none;">
-        <!-- Header -->
-        <div class="print-header">
-            <div id="printDate" style="font-size: 10px; color: #64748b; margin-bottom: 20px; text-align: left;"></div>
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                <img src="../../assets/images/logo.png" alt="University Logo"
-                    style="width: 80px; height: 80px; object-fit: contain;">
-                <div style="text-align: center; flex: 1;">
-                    <h1
-                        style="font-size: 24px; color: #1e293b; margin: 0; font-weight: 700; text-transform: uppercase;">
-                        UNIVERSITY OF ANTIQUE</h1>
-                    <h2 style="font-size: 18px; color: #334155; margin: 4px 0; font-weight: 600;">College of Computer
-                        Studies</h2>
-                    <h3 id="printReportTitle"
-                        style="font-size: 14px; color: #2563eb; margin: 8px 0 0; font-weight: 700;"></h3>
-                </div>
-                <img src="../../assets/images/ccs_logo.jpg" alt="CCS Logo"
-                    style="width: 80px; height: 80px; object-fit: contain;">
+        </div>
+
+        <!-- Grading Modal -->
+        <div id="gradeModal" class="modal-overlay">
+            <div class="modal-content" style="max-width: 650px;">
+                <h2 class="modal-title">Grade Students</h2>
+
+                <form id="gradeForm" onsubmit="saveGrades(event)">
+                    <div class="input-group">
+                        <label for="gradeGroupId">Group Name</label>
+                        <div class="custom-select-wrapper">
+                            <select id="gradeGroupId" required onchange="handleGroupChange()">
+                                <option value="">Select Group</option>
+                                <!-- Populated by JS -->
+                            </select>
+                            <span class="material-icons-round select-arrow">expand_more</span>
+                        </div>
+                    </div>
+
+                    <!-- Grading Area -->
+                    <div id="gradingArea" style="margin-top: 20px;">
+                        <p class="text-light" style="font-size: 0.9em; margin-bottom: 10px;">Select a group to load
+                            students.</p>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" onclick="closeGradeModal()">Cancel</button>
+                        <button type="submit" class="btn-save">Save Grades</button>
+                    </div>
+                </form>
             </div>
-            <div style="height: 3px; background: #000; margin: 15px 0;"></div>
         </div>
 
-        <!-- Content -->
-        <div id="printContent"></div>
-    </div>
+        <!-- Alert Modal -->
+        <div id="alertModal" class="modal-overlay" style="z-index: 2000;">
+            <div class="modal-content"
+                style="max-width: 400px; text-align: center; padding: 30px 25px; border-radius: 20px; transition: all 0.3s ease;">
+                <div
+                    style="width: 60px; height: 60px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <span class="material-icons-round" style="font-size: 32px; color: var(--primary-color);">info</span>
+                </div>
+                <h3 id="alertTitle" style="font-size: 1.25rem; margin: 0 0 10px; color: #1e293b; font-weight: 700;">
+                    Notice
+                </h3>
+                <p id="alertMessage" style="color: #64748b; margin: 0 0 25px; font-size: 0.95rem; line-height: 1.6;">
+                </p>
+                <button onclick="closeAlertModal()"
+                    style="background: var(--primary-color); color: white; border: none; padding: 12px 0; width: 100%; border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06);">
+                    Okay, got it
+                </button>
+            </div>
+        </div>
 
-    <nav class="bottom-nav">
-        <a href="instructor_dashboard" class="nav-item">
-            <span class="material-icons-round">dashboard</span>
-            <span class="nav-label">Dashboard</span>
-        </a>
-        <a href="instructor_evaluation_grades" class="nav-item active">
-            <span class="material-icons-round">fact_check</span>
-            <span class="nav-label">Evaluation & Grades</span>
-        </a>
-        <a href="instructor_payers" class="nav-item">
-            <span class="material-icons-round">payments</span>
-            <span class="nav-label">Payers</span>
-        </a>
-        <a href="instructor_schedule" class="nav-item">
-            <span class="material-icons-round">calendar_today</span>
-            <span class="nav-label">Schedule</span>
-        </a>
-        <a href="instructor_accounts" class="nav-item">
-            <span class="material-icons-round">people</span>
-            <span class="nav-label">Accounts</span>
-        </a>
-    </nav>
+        <!-- Dedicated Printable Area (Hidden on Screen) -->
+        <div id="printableArea" style="display: none;">
+            <!-- Header -->
+            <div class="print-header">
+                <div id="printDate" style="font-size: 10px; color: #64748b; margin-bottom: 20px; text-align: left;">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <img src="../../assets/images/logo.png" alt="University Logo"
+                        style="width: 80px; height: 80px; object-fit: contain;">
+                    <div style="text-align: center; flex: 1;">
+                        <h1
+                            style="font-size: 24px; color: #1e293b; margin: 0; font-weight: 700; text-transform: uppercase;">
+                            UNIVERSITY OF ANTIQUE</h1>
+                        <h2 style="font-size: 18px; color: #334155; margin: 4px 0; font-weight: 600;">College of
+                            Computer
+                            Studies</h2>
+                        <h3 id="printReportTitle"
+                            style="font-size: 14px; color: #2563eb; margin: 8px 0 0; font-weight: 700;"></h3>
+                    </div>
+                    <img src="../../assets/images/ccs_logo.jpg" alt="CCS Logo"
+                        style="width: 80px; height: 80px; object-fit: contain;">
+                </div>
+                <div style="height: 3px; background: #000; margin: 15px 0;"></div>
+            </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="admin.js"></script> <!-- Reusing admin.js for logout/basic function -->
-    <script src="instructor_grades.js"></script>
+            <!-- Content -->
+            <div id="printContent"></div>
+        </div>
+
+        <nav class="bottom-nav">
+            <a href="instructor_dashboard" class="nav-item">
+                <span class="material-icons-round">dashboard</span>
+                <span class="nav-label">Dashboard</span>
+            </a>
+            <a href="instructor_capstone" class="nav-item">
+                <span class="material-icons-round">folder_special</span>
+                <span class="nav-label">Capstone</span>
+            </a>
+            <a href="instructor_evaluation" class="nav-item">
+                <span class="material-icons-round">rate_review</span>
+                <span class="nav-label">Evaluations</span>
+            </a>
+            <a href="instructor_grades" class="nav-item active">
+                <span class="material-icons-round">grading</span>
+                <span class="nav-label">Grades</span>
+            </a>
+            <a href="instructor_payers" class="nav-item">
+                <span class="material-icons-round">payments</span>
+                <span class="nav-label">Payers</span>
+            </a>
+            <a href="instructor_schedule" class="nav-item">
+                <span class="material-icons-round">calendar_today</span>
+                <span class="nav-label">Schedule</span>
+            </a>
+            <a href="instructor_accounts" class="nav-item">
+                <span class="material-icons-round">people</span>
+                <span class="nav-label">Accounts</span>
+            </a>
+        </nav>
+
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="admin.js"></script> <!-- Reusing admin.js for logout/basic function -->
+        <script src="instructor_grades.js"></script>
 </body>
 
 </html>

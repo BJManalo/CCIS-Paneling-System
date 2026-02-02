@@ -10,6 +10,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 // State
 let allGradesData = [];
 let fetchedGroups = [];
+let currentMainTab = 'Advisory';
 
 document.addEventListener('DOMContentLoaded', () => {
     loadGrades();
@@ -20,6 +21,32 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sectionFilter').addEventListener('change', renderGrades);
     document.getElementById('programFilter').addEventListener('change', renderGrades);
 });
+
+// --- Main Tab Switching ---
+window.switchMainTab = (tab) => {
+    currentMainTab = tab;
+
+    // UI Updates
+    const advBtn = document.getElementById('tab-advisory');
+    const manageBtn = document.getElementById('tab-manage');
+    const pageTitle = document.getElementById('gradesPageTitle');
+
+    if (tab === 'Advisory') {
+        advBtn.style.background = 'white';
+        advBtn.style.color = 'var(--primary-color)';
+        manageBtn.style.background = 'transparent';
+        manageBtn.style.color = '#64748b';
+        pageTitle.textContent = 'Advisory Grades';
+    } else {
+        manageBtn.style.background = 'white';
+        manageBtn.style.color = 'var(--primary-color)';
+        advBtn.style.background = 'transparent';
+        advBtn.style.color = '#64748b';
+        pageTitle.textContent = 'Manage Grades';
+    }
+
+    renderGrades();
+}
 
 // --- Populate Section Filter ---
 function populateSectionFilter() {
@@ -49,7 +76,11 @@ async function loadGrades() {
             .from('student_groups')
             .select(`
                 *,
-                schedules (id, schedule_type),
+                schedules (
+                    id, 
+                    schedule_type,
+                    panel1, panel2, panel3, panel4, panel5
+                ),
                 students (
                     id,
                     full_name,
@@ -73,10 +104,22 @@ async function loadGrades() {
 // --- Render Grades Table with Filters ---
 function renderGrades() {
     const tableBody = document.getElementById('gradesTableBody');
+    const fab = document.querySelector('.fab-btn');
+
+    if (currentMainTab === 'Advisory') {
+        if (fab) fab.style.display = 'none';
+    } else {
+        if (fab) fab.style.display = 'flex';
+    }
+
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const typeFilter = document.getElementById('typeFilter').value;
     const sectionFilter = document.getElementById('sectionFilter').value;
     const programFilter = document.getElementById('programFilter').value;
+
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userName = (user ? (user.full_name || '') : '').toLowerCase();
 
     tableBody.innerHTML = '';
 
@@ -100,10 +143,26 @@ function renderGrades() {
 
         if (!matchesSearch || !matchesSection || !matchesProgram) return;
 
+        // Role/Tab Filter
+        const adviser = (group.adviser || '').toLowerCase();
+        const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
+
         if (!group.schedules || group.schedules.length === 0) return;
 
         group.schedules.forEach(schedule => {
             const schedType = schedule.schedule_type;
+
+            // Check if I am a panelist for this specific schedule
+            const panelList = [schedule.panel1, schedule.panel2, schedule.panel3, schedule.panel4, schedule.panel5]
+                .map(p => (p || '').toLowerCase());
+            const isPanelist = panelList.some(p => p.includes(userName) || (userName && userName.includes(p)));
+
+            if (currentMainTab === 'Advisory') {
+                if (!isAdviser) return;
+            } else {
+                // Manage tab: Must be a Panelist
+                if (!isPanelist) return;
+            }
 
             // Type Filter
             if (typeFilter !== 'All' && schedType !== typeFilter) return;
@@ -165,9 +224,10 @@ function renderGrades() {
                 </td>
                 <td>
                     <div style="display:flex; gap: 5px;">
+                        ${(currentMainTab === 'Manage') ? `
                         <button class="action-btn edit" onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" title="Edit Grades">
                             <span class="material-icons-round">edit</span>
-                        </button>
+                        </button>` : ''}
                         <button class="action-btn" onclick="event.stopPropagation(); printGroup(${group.id}, '${schedType}')" title="Print Group Grades" style="color: var(--primary-color); background: #eff6ff;">
                             <span class="material-icons-round">print</span>
                         </button>
