@@ -8,7 +8,9 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 let allGroups = [];
 let allDefenseStatuses = [];
 let allStudents = [];
-let allCapstoneFeedback = []; // Added
+let allCapstoneFeedback = [];
+let feedbackIndex = {}; // Optimization: Map<GroupId, Array>
+let legacyStatusIndex = {}; // Optimization: Map<GroupId, Array>
 let filteredGroups = [];
 let currentCategory = 'ALL'; // 'ALL', 'APPROVED', 'REJECTED', 'COMPLETED'
 let instructorName = '';
@@ -32,39 +34,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchDashboardData() {
     try {
-        const { data: groups, error: gError } = await supabaseClient
-            .from('student_groups')
-            .select('*');
+        const [gRes, sRes, stdRes, fRes] = await Promise.all([
+            supabaseClient.from('student_groups').select('*'),
+            supabaseClient.from('defense_statuses').select('*'),
+            supabaseClient.from('students').select('*'),
+            supabaseClient.from('capstone_feedback').select('*')
+        ]);
 
-        if (gError) throw gError;
-        allGroups = groups || [];
+        if (gRes.error) throw gRes.error;
+        allGroups = gRes.data || [];
 
-        // Fetch all defense statuses
-        const { data: statuses, error: sError } = await supabaseClient
-            .from('defense_statuses')
-            .select('*');
+        if (sRes.error) console.error('Error fetching statuses:', sRes.error);
+        allDefenseStatuses = sRes.data || [];
 
-        if (sError) throw sError;
-        allDefenseStatuses = statuses || [];
+        if (stdRes.error) console.error('Error fetching students:', stdRes.error);
+        allStudents = stdRes.data || [];
 
-        // Fetch students
-        const { data: students, error: stdError } = await supabaseClient
-            .from('students')
-            .select('*');
+        if (fRes.error) console.error('Error fetching feedback:', fRes.error);
+        allCapstoneFeedback = fRes.data || [];
 
-        if (stdError) throw stdError;
-        allStudents = students || [];
+        // BUILD INDICES for Fast Lookup (O(1))
+        feedbackIndex = {};
+        allCapstoneFeedback.forEach(cf => {
+            if (!feedbackIndex[cf.group_id]) feedbackIndex[cf.group_id] = [];
+            feedbackIndex[cf.group_id].push(cf);
+        });
 
-        console.log('Instructor Name:', instructorName);
-        console.log('Total Groups:', allGroups.length);
-        console.log('Adviser Names in DB:', [...new Set(allGroups.map(g => g.adviser))]);
-
-        // Fetch capstone feedback
-        const { data: feedback, error: fError } = await supabaseClient
-            .from('capstone_feedback')
-            .select('*');
-        if (fError) console.error('Error fetching feedback:', fError);
-        allCapstoneFeedback = feedback || [];
+        legacyStatusIndex = {};
+        allDefenseStatuses.forEach(ds => {
+            if (!legacyStatusIndex[ds.group_id]) legacyStatusIndex[ds.group_id] = [];
+            legacyStatusIndex[ds.group_id].push(ds);
+        });
 
         // Populate Section Filter
         populateSectionFilter();
@@ -275,15 +275,15 @@ function resolveStatusMap(groupId, defenseType) {
     else if (reqNorm.includes('final')) coreKey = 'final';
 
     // 1. Gather all individual votes from New Table (capstone_feedback)
-    const feedbacks = allCapstoneFeedback.filter(cf => {
-        if (cf.group_id != groupId) return false;
+    // Use Index for O(1) Access
+    const feedbacks = (feedbackIndex[groupId] || []).filter(cf => {
         const dbNorm = normalize(cf.defense_type);
         return dbNorm.includes(coreKey);
     });
 
     // 2. Gather Legacy Statuses
-    const legRow = allDefenseStatuses.find(ds => {
-        if (ds.group_id != groupId) return false;
+    // Use Index for O(1) Access
+    const legRow = (legacyStatusIndex[groupId] || []).find(ds => {
         const dbNorm = normalize(ds.defense_type);
         return dbNorm.includes(coreKey);
     });
@@ -359,6 +359,7 @@ function updateCounts(groups) {
         rejectedTotal = displayRows.length;
     }
 
+    /* 
     // Display Counts (Update Chart)
     if (window.statusChart) {
         window.statusChart.data.datasets[0].data = [approvedTotal, rejectedTotal];
@@ -406,35 +407,10 @@ function updateCounts(groups) {
 
 // Global variable for chart
 window.statusChart = null;
-
-function initChart() {
-    const ctx = document.getElementById('statusChart').getContext('2d');
-    window.statusChart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: ['Approved', 'Rejected'],
-            datasets: [{
-                data: [0, 0],
-                backgroundColor: [
-                    '#3b82f6',
-                    '#dc2626'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                }
-            }
-        }
-    });
+*/
 }
 
-document.addEventListener('DOMContentLoaded', initChart);
+
 
 function countDefenseStatus(allStatuses, defenseType, passValues) { return 0; }
 
