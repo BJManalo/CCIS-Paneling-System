@@ -84,7 +84,21 @@
 
         <!-- Header -->
         <header class="dashboard-header">
-            <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="menuBtn" class="menu-btn" onclick="toggleMenu()">
+                    <span class="material-icons-round">menu</span>
+                </button>
+                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+            </div>
+
+            <!-- Dropdown Menu -->
+            <div id="dropdownMenu" class="dropdown-menu">
+                <a href="archive_studies" class="dropdown-item">
+                    <span class="material-icons-round">inventory_2</span>
+                    Archive Studies
+                </a>
+            </div>
+
             <div class="search-bar">
                 <span class="material-icons-round">search</span>
                 <input type="text" placeholder="Search Reports..." id="searchInput">
@@ -184,11 +198,22 @@
             <span class="material-icons-round">people</span>
             <span class="nav-label">Accounts</span>
         </a>
-        <a href="archive_studies" class="nav-item">
-            <span class="material-icons-round">inventory_2</span>
-            <span class="nav-label">Archive</span>
-        </a>
     </nav>
+
+    <script>
+        function toggleMenu() {
+            const menu = document.getElementById('dropdownMenu');
+            menu.classList.toggle('active');
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('dropdownMenu');
+            const btn = document.getElementById('menuBtn');
+            if (menu.classList.contains('active') && !menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.classList.remove('active');
+            }
+        });
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="reports.js"></script>
