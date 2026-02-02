@@ -615,22 +615,14 @@ window.printReport = () => {
         reportTitle += ` - All Sections`;
     }
 
-    const printHeader = document.querySelector('#printableArea .print-header');
-    if (printHeader) printHeader.style.display = 'block';
-
     generatePrintTable(groupsToPrint, reportTitle);
     window.print();
-
-    if (printHeader) printHeader.style.display = 'none';
 };
 
 // --- Print Single Group ---
 window.printGroup = (groupId, scheduleType) => {
     const group = allGradesData.find(g => g.id === groupId);
     if (!group) return;
-
-    const printHeader = document.querySelector('#printableArea .print-header');
-    if (printHeader) printHeader.style.display = 'block';
 
     const data = [{
         group: group,
@@ -642,8 +634,6 @@ window.printGroup = (groupId, scheduleType) => {
 
     generatePrintTable(data, title);
     window.print();
-
-    if (printHeader) printHeader.style.display = 'none';
 };
 
 // --- Table Generator ---

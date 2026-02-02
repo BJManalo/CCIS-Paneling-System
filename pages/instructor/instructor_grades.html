@@ -50,11 +50,7 @@
 
             .dashboard-container,
             .bottom-nav,
-            .fab-btn,
-            .modal-overlay,
-            .grades-toolbar,
-            .page-title,
-            .search-bar {
+            .fab-btn {
                 display: none !important;
             }
 
@@ -63,11 +59,72 @@
                 width: 100% !important;
                 position: relative !important;
             }
+        }
 
-            .print-header {
-                display: block !important;
-                margin-bottom: 10px;
-            }
+        /* Printable Area Styles (Screen) */
+        #printableArea {
+            display: none;
+        }
+
+        .print-header {
+            margin-bottom: 20px;
+        }
+
+        #printDate {
+            font-size: 10px;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: left;
+            font-family: sans-serif;
+        }
+
+        .print-header-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .print-logo {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+        }
+
+        .print-header-text {
+            text-align: center;
+            flex: 1;
+        }
+
+        .print-header-text h1 {
+            font-size: 20px;
+            color: #1e293b;
+            margin: 0;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-family: sans-serif;
+        }
+
+        .print-header-text h2 {
+            font-size: 16px;
+            color: #334155;
+            margin: 2px 0;
+            font-weight: 600;
+            font-family: sans-serif;
+        }
+
+        .print-header-text h3 {
+            font-size: 14px;
+            color: #006d77;
+            margin: 8px 0 0;
+            font-weight: 700;
+            font-family: sans-serif;
+        }
+
+        .print-header-divider {
+            height: 2px;
+            background: #000;
+            margin: 10px 0;
         }
 
         /* Responsive Toolbar Styles */
@@ -263,65 +320,57 @@
             </div>
         </div>
 
-        <!-- Dedicated Printable Area (Hidden on Screen) -->
-        <div id="printableArea" style="display: none;">
-            <!-- Header -->
-            <div class="print-header">
-                <div id="printDate" style="font-size: 10px; color: #64748b; margin-bottom: 20px; text-align: left;">
+    </div> <!-- End Dashboard Container -->
+
+    <!-- Dedicated Printable Area (Hidden on Screen) -->
+    <div id="printableArea">
+        <div class="print-header">
+            <div id="printDate"></div>
+            <div class="print-header-main">
+                <img src="../../assets/images/logo.png" alt="University Logo" class="print-logo">
+                <div class="print-header-text">
+                    <h1>UNIVERSITY OF ANTIQUE</h1>
+                    <h2>College of Computer Studies</h2>
+                    <h3 id="printReportTitle"></h3>
                 </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <img src="../../assets/images/logo.png" alt="University Logo"
-                        style="width: 80px; height: 80px; object-fit: contain;">
-                    <div style="text-align: center; flex: 1;">
-                        <h1
-                            style="font-size: 24px; color: #1e293b; margin: 0; font-weight: 700; text-transform: uppercase;">
-                            UNIVERSITY OF ANTIQUE</h1>
-                        <h2 style="font-size: 18px; color: #334155; margin: 4px 0; font-weight: 600;">College of
-                            Computer
-                            Studies</h2>
-                        <h3 id="printReportTitle"
-                            style="font-size: 14px; color: #2563eb; margin: 8px 0 0; font-weight: 700;"></h3>
-                    </div>
-                    <img src="../../assets/images/ccs_logo.jpg" alt="CCS Logo"
-                        style="width: 80px; height: 80px; object-fit: contain;">
-                </div>
-                <div style="height: 3px; background: #000; margin: 15px 0;"></div>
+                <img src="../../assets/images/ccs_logo.jpg" alt="CCS Logo" class="print-logo">
             </div>
-
-            <!-- Content -->
-            <div id="printContent"></div>
+            <div class="print-header-divider"></div>
         </div>
+        <div id="printContent"></div>
+    </div>
 
-        <nav class="bottom-nav">
-            <a href="instructor_dashboard" class="nav-item">
-                <span class="material-icons-round">dashboard</span>
-                <span class="nav-label">Dashboard</span>
-            </a>
-            <a href="instructor_evaluation" class="nav-item">
-                <span class="material-icons-round">rate_review</span>
-                <span class="nav-label">Evaluations</span>
-            </a>
-            <a href="instructor_grades" class="nav-item active">
-                <span class="material-icons-round">grading</span>
-                <span class="nav-label">Grades</span>
-            </a>
-            <a href="instructor_payers" class="nav-item">
-                <span class="material-icons-round">payments</span>
-                <span class="nav-label">Payers</span>
-            </a>
-            <a href="instructor_schedule" class="nav-item">
-                <span class="material-icons-round">calendar_today</span>
-                <span class="nav-label">Schedule</span>
-            </a>
-            <a href="instructor_accounts" class="nav-item">
-                <span class="material-icons-round">people</span>
-                <span class="nav-label">Accounts</span>
-            </a>
-        </nav>
+    <!-- Bottom Nav (Moved Outside Container for clarity) -->
+    <nav class="bottom-nav">
+        <a href="instructor_dashboard" class="nav-item">
+            <span class="material-icons-round">dashboard</span>
+            <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="instructor_evaluation" class="nav-item">
+            <span class="material-icons-round">rate_review</span>
+            <span class="nav-label">Evaluations</span>
+        </a>
+        <a href="instructor_grades" class="nav-item active">
+            <span class="material-icons-round">grading</span>
+            <span class="nav-label">Grades</span>
+        </a>
+        <a href="instructor_payers" class="nav-item">
+            <span class="material-icons-round">payments</span>
+            <span class="nav-label">Payers</span>
+        </a>
+        <a href="instructor_schedule" class="nav-item">
+            <span class="material-icons-round">calendar_today</span>
+            <span class="nav-label">Schedule</span>
+        </a>
+        <a href="instructor_accounts" class="nav-item">
+            <span class="material-icons-round">people</span>
+            <span class="nav-label">Accounts</span>
+        </a>
+    </nav>
 
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-        <script src="admin.js"></script> <!-- Reusing admin.js for logout/basic function -->
-        <script src="instructor_grades.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js"></script>
+    <script src="instructor_grades.js"></script>
 </body>
 
 </html>
