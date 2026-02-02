@@ -10,7 +10,7 @@ let searchTerm = '';
 let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
 let currentStatusFilter = 'ALL';
 
-let currentRole = 'Adviser'; // Default to Adviser for Instructor Account
+let currentRole = 'All'; // Default to All Groups as requested
 let adobeDCView = null;
 let currentViewerFileKey = null;
 let currentViewerGroupId = null;
