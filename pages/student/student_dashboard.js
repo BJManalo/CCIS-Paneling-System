@@ -20,13 +20,12 @@ async function loadSubmissionData() {
     let groupId = loginUser.id;
     currentGroupId = groupId;
 
-    // Global variable linking
     if (!window.currentLinks) window.currentLinks = {};
 
     try {
         const { data: group, error } = await supabaseClient
             .from('student_groups')
-            .select('*, students(id, grades(grade, grade_type))') // Fetch students & grades
+            .select('*, students(id, grades(grade, grade_type))')
             .eq('id', groupId)
             .single();
 
@@ -39,7 +38,6 @@ async function loadSubmissionData() {
         }
 
         if (group) {
-            // --- Fetch Schedules to check if they are allowed to submit ---
             const { data: schedules, error: schedError } = await supabaseClient
                 .from('schedules')
                 .select('*')
@@ -54,14 +52,12 @@ async function loadSubmissionData() {
             };
 
             const isTitleScheduled = isScheduled('Title');
-            const isPreOralScheduled = isScheduled('PreOral'); // checks 'preoral'
+            const isPreOralScheduled = isScheduled('PreOral');
             const isFinalScheduled = isScheduled('Final');
 
-            // --- Check Grading Status for Tab Locking ---
             const students = group.students || [];
             const totalStudents = students.length;
 
-            // Helper to check if ALL students have a grade for a specific stage
             const checkGraded = (keyword) => {
                 if (totalStudents === 0) return false;
                 const gradedCount = students.filter(s =>
@@ -71,104 +67,64 @@ async function loadSubmissionData() {
             };
 
             const isTitleGraded = checkGraded('Title');
-            const isPreOralGraded = checkGraded('Pre'); // Matches "Pre-Oral" or "Pre Oral"
+            const isPreOralGraded = checkGraded('Pre');
 
-            // Lock/Unlock Tabs
-            const titleBtn = document.querySelector('button[onclick*="titles"]');
             const preOralBtn = document.querySelector('button[onclick*="preoral"]');
             const finalBtn = document.querySelector('button[onclick*="final"]');
 
-            // Global State for Schedule status (to use in updateSaveButtonState)
             window.scheduleStatus = {
                 title: isTitleScheduled,
                 preoral: isPreOralScheduled,
                 final: isFinalScheduled
             };
 
-            // Logic: Title requires Schedule
-            if (!isTitleScheduled) {
-                // If not scheduled, they can VIEW if they somehow have data, but effectively they shouldn't have data if they followed flow.
-                // We'll handled read-only in updateSaveButtonState, but visually we might want to indicate it.
-                // OPTIONAL: We can lock the tab entirely if we want, but sticking to "Can't submit" usually means read-only or save disabled.
-            }
-
-            // Logic: Pre-Oral requires Title to be graded AND Pre-Oral Schedule
             if (!isTitleGraded) {
-                preOralBtn.disabled = true;
-                preOralBtn.style.opacity = '0.5';
-                preOralBtn.style.cursor = 'not-allowed';
-                preOralBtn.title = "Locked: Title Defense grades pending.";
-                preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
-            } else if (!isPreOralScheduled) {
-                // Unlock tab traversal but maybe warning? 
-                // Using the requested logic "students can't submit" -> implies maybe they can enter but not save, OR they can't even enter.
-                // Usually preventing entry is safest for specific strict phases.
-                // However, user might want to see previous stuff? 
-                // Let's rely on updateSaveButtonState to disable saving/editing, but allow tab click if previous stage passed.
+                if (preOralBtn) {
+                    preOralBtn.disabled = true;
+                    preOralBtn.style.opacity = '0.5';
+                    preOralBtn.style.cursor = 'not-allowed';
+                    preOralBtn.title = "Locked: Title Defense grades pending.";
+                    if (!preOralBtn.innerHTML.includes('lock')) preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                }
             }
-
-            // Logic: Final requires Pre-Oral to be graded AND Final Schedule
             if (!isPreOralGraded) {
-                finalBtn.disabled = true;
-                finalBtn.style.opacity = '0.5';
-                preOralBtn.style.cursor = 'not-allowed'; // Typo fix in logic, but standardizing
-                finalBtn.style.cursor = 'not-allowed';
-                finalBtn.title = "Locked: Pre-Oral grades pending.";
-                finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                if (finalBtn) {
+                    finalBtn.disabled = true;
+                    finalBtn.style.opacity = '0.5';
+                    finalBtn.style.cursor = 'not-allowed';
+                    finalBtn.title = "Locked: Pre-Oral grades pending.";
+                    if (!finalBtn.innerHTML.includes('lock')) finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                }
             }
 
-            // Store data for merging later
             localStorage.setItem('lastGroupData', JSON.stringify(group));
 
-            // Function to safely parse JSON
             const safeParse = (str) => {
                 try { return JSON.parse(str || '{}'); } catch (e) { return {}; }
             };
 
-            // Parse File Links
             let tLinks = safeParse(group.title_link);
             if (group.title_link && typeof group.title_link === 'string' && !group.title_link.startsWith('{')) tLinks = { title1: group.title_link };
 
-            // Load Project Title(s)
-            let projectTitles = {};
-            try {
-                projectTitles = JSON.parse(group.project_title || '{}');
-            } catch (e) {
-                // Backward compatibility: if simple string
-                projectTitles = { title1: group.project_title || '' };
-            }
+            let projectTitles = safeParse(group.project_title);
+            if (group.project_title && typeof group.project_title === 'string' && !group.project_title.startsWith('{')) projectTitles = { title1: group.project_title };
 
-            // Populate inputs
-            if (document.getElementById('projectTitle1')) document.getElementById('projectTitle1').value = projectTitles.title1 || '';
-            if (document.getElementById('projectTitle2')) document.getElementById('projectTitle2').value = projectTitles.title2 || '';
-            if (document.getElementById('projectTitle3')) document.getElementById('projectTitle3').value = projectTitles.title3 || '';
-
-            // Update sub-tab button labels, form labels, and save buttons with actual titles
             ['1', '2', '3'].forEach(num => {
                 const title = projectTitles['title' + num];
+                if (document.getElementById('projectTitle' + num)) document.getElementById('projectTitle' + num).value = title || '';
                 if (title && title.trim() !== "") {
-                    // 1. Update Sub-tab Button
                     const titleTabBtns = document.querySelectorAll('#tab-titles .sub-tab-btn');
-                    if (titleTabBtns.length >= num) {
-                        titleTabBtns[num - 1].innerText = title;
-                    }
-
-                    // 2. Update Form Group Label
+                    if (titleTabBtns.length >= num) titleTabBtns[num - 1].innerText = title;
                     const label = document.querySelector(`label[for="projectTitle${num}"]`);
                     if (label) label.innerText = title;
-
-                    // 3. Update Save Button Text
                     const saveBtn = document.getElementById(`save-title${num}`);
-                    if (saveBtn) {
-                        saveBtn.innerHTML = `<span class="material-icons-round">save</span> Save ${title}`;
-                    }
+                    if (saveBtn) saveBtn.innerHTML = `<span class="material-icons-round">save</span> Save ${title}`;
                 }
             });
 
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
 
-            // Fetch Defense Statuses and Feedback from both new and legacy tables
             const [dsRes, cfRes] = await Promise.all([
                 supabaseClient.from('defense_statuses').select('*').eq('group_id', groupId),
                 supabaseClient.from('capstone_feedback').select('*').eq('group_id', groupId)
@@ -177,24 +133,18 @@ async function loadSubmissionData() {
             const defStatuses = dsRes.data || [];
             const capstoneFeedback = cfRes.data || [];
 
-            // Map Statuses and Remarks
-            // Priority 1: New capstone_feedback table (Normalized)
-            // Priority 2: Legacy defense_statuses (for older data)
-
             const getFeedbackMaps = (type) => {
                 const norm = type.toLowerCase().replace(/[^a-z0-9]/g, '');
                 const statuses = {};
                 const remarks = {};
                 const annotations = {};
 
-                // Load from legacy first
                 const legacy = defStatuses.find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
                 if (legacy) {
                     Object.entries(legacy.statuses || {}).forEach(([fKey, fVal]) => { statuses[fKey] = fVal; });
                     Object.entries(legacy.remarks || {}).forEach(([fKey, fVal]) => { remarks[fKey] = fVal; });
                 }
 
-                // Override/Collect from new table
                 capstoneFeedback.filter(cf => cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
                     if (!statuses[cf.file_key] || typeof statuses[cf.file_key] !== 'object') statuses[cf.file_key] = {};
                     if (!remarks[cf.file_key] || typeof remarks[cf.file_key] !== 'object') remarks[cf.file_key] = {};
@@ -212,42 +162,23 @@ async function loadSubmissionData() {
             const preOralData = getFeedbackMaps('Pre-Oral Defense');
             const finalData = getFeedbackMaps('Final Defense');
 
-            // Map variables for rendering
-            let tStatus = titleData.statuses;
-            let pStatus = preOralData.statuses;
-            let fStatus = finalData.statuses;
-
-            // EXPOSE TO WINDOW FOR BUTTON STATE LOGIC
             window.feedbackStatus = {
-                titles: tStatus,
-                preoral: pStatus,
-                final: fStatus
+                titles: titleData.statuses,
+                preoral: preOralData.statuses,
+                final: finalData.statuses
             };
 
-            let tRemarks = titleData.remarks;
-            let pRemarks = preOralData.remarks;
-            let fRemarks = finalData.remarks;
-
-            let tAnnot = titleData.annotations;
-            let pAnnot = preOralData.annotations;
-            let fAnnot = finalData.annotations;
-
-            // Helper to render status badge and remarks
             const renderField = (linkMap, statusMap, remarksMap, annotationsMap, key, elementId) => {
                 const el = document.getElementById(elementId);
                 if (!el) return;
+                const formGroup = el.closest('.form-group');
+                if (!formGroup) return;
 
-                el.value = linkMap[key] || '';
-
-                // Populate Revised Link if exists
-                const conflictEl = document.getElementById(elementId + '_revised');
-                if (conflictEl) {
-                    conflictEl.value = linkMap[key + '_revised'] || '';
-                }
+                formGroup.querySelectorAll('.status-badge-container, .remarks-list-container').forEach(node => node.remove());
 
                 const rawStatus = statusMap[key] || 'Pending';
                 const rawRemarks = remarksMap[key] || {};
-
+                const rawAnnotations = annotationsMap[key] || {};
                 let feedbackData = [];
 
                 if (typeof rawStatus === 'object') {
@@ -255,34 +186,33 @@ async function loadSubmissionData() {
                         feedbackData.push({
                             panel: panel,
                             status: rawStatus[panel],
-                            remarks: typeof rawRemarks === 'object' ? (rawRemarks[panel] || '') : ''
+                            remarks: typeof rawRemarks === 'object' ? (rawRemarks[panel] || '') : '',
+                            hasAnnotation: !!rawAnnotations[panel]
                         });
                     });
                 } else {
                     feedbackData.push({
                         panel: 'Panel',
                         status: rawStatus,
-                        remarks: typeof rawRemarks === 'string' ? rawRemarks : ''
+                        remarks: typeof rawRemarks === 'string' ? rawRemarks : '',
+                        hasAnnotation: Object.keys(rawAnnotations).length > 0
                     });
                 }
 
-                const prevEl = el.previousElementSibling;
-                if (prevEl && (prevEl.classList.contains('status-badge-container') || prevEl.innerText === 'Link')) {
-                    prevEl.remove();
-                }
+                const hasActualFeedback = feedbackData.some(f =>
+                    (f.status && f.status !== 'Pending') ||
+                    (f.remarks && f.remarks.trim() !== '') ||
+                    f.hasAnnotation
+                );
 
                 const badgesHtml = feedbackData.map(f => {
                     let color = '#64748b'; let icon = 'hourglass_empty'; let bg = '#f1f5f9'; let border = '#e2e8f0';
-                    if (f.status.includes('Approved')) {
-                        color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0';
-                    } else if (f.status.includes('Approve with Revisions')) {
-                        color = '#d97706'; icon = 'warning'; bg = '#fffbeb'; border = '#fde68a';
-                    } else if (f.status.includes('Rejected') || f.status.includes('Redefense')) {
-                        color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca';
-                    }
-
+                    const s = (f.status || 'Pending').toLowerCase();
+                    if (s.includes('approved')) { color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0'; }
+                    else if (s.includes('revision')) { color = '#d97706'; icon = 'warning'; bg = '#fffbeb'; border = '#fde68a'; }
+                    else if (s.includes('reject') || s.includes('redefense')) { color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca'; }
                     return `
-                        <div style="font-size: 0.65rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 2px 6px; border-radius: 6px; display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;" title="${f.panel}">
+                        <div class="status-badge" style="font-size: 0.65rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase;">
                             <span class="material-icons-round" style="font-size: 10px;">${icon}</span>
                             ${f.status} ${feedbackData.length > 1 ? `<span style="opacity:0.6; font-size:9px;">(${f.panel})</span>` : ''}
                         </div>
@@ -290,35 +220,35 @@ async function loadSubmissionData() {
                 }).join('');
 
                 const headerHtml = `
-                    <div class="status-badge-container" style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px;">
-                        <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Submission Link</span>
-                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                            ${badgesHtml}
-                            <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-top: 2px;">
-                                ${(linkMap[key] || (annotationsMap[key] && Object.keys(annotationsMap[key]).length > 0)) ? `
-                                    <button onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: linkMap[key], annotations: annotationsMap[key] || {} }))}', '${key}')" 
-                                            style="background: var(--primary-light); color: var(--primary-color); border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                                        <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
-                                        View Feedback
-                                    </button>
-                                ` : ''}
+                    <div class="status-badge-container" style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 10px;">
+                        <span style="font-size: 0.85rem; font-weight: 700; color: #475569;">Submission Link</span>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 4px; border-right: ${hasActualFeedback ? '1.5px solid #e2e8f0' : 'none'}; padding-right: ${hasActualFeedback ? '8px' : '0'};">
+                                ${badgesHtml}
                             </div>
+                            ${hasActualFeedback ? `
+                                <button onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: linkMap[key], annotations: annotationsMap[key] || {} }))}', '${key}')" 
+                                        style="background: #eff6ff; color: #1e40af; border: none; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; border: 1px solid #bfdbfe;">
+                                    <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
+                                    View Feedback
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
                 `;
-                el.insertAdjacentHTML('beforebegin', headerHtml);
-
-                const nextEl = el.nextElementSibling;
-                if (nextEl && nextEl.classList.contains('remarks-container')) nextEl.remove();
+                const targetNode = el.closest('.input-with-action') || el;
+                targetNode.insertAdjacentHTML('beforebegin', headerHtml);
 
                 const validRemarks = feedbackData.filter(f => f.remarks && f.remarks.trim() !== '');
                 if (validRemarks.length > 0) {
-                    const remarksHtml = validRemarks.map(f => {
+                    const remarksHtml = `
+                        <div class="remarks-list-container" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                            ${validRemarks.map(f => {
                         let color = '#64748b'; let bg = '#f1f5f9';
-                        if (f.status.includes('Approved')) { color = '#059669'; bg = '#f0fdf4'; }
-                        else if (f.status.includes('Approve with Revisions')) { color = '#d97706'; bg = '#fffbeb'; }
-                        else if (f.status.includes('Rejected') || f.status.includes('Redefense')) { color = '#dc2626'; bg = '#fef2f2'; }
-
+                        const s = f.status.toLowerCase();
+                        if (s.includes('approved')) { color = '#059669'; bg = '#f0fdf4'; }
+                        else if (s.includes('revision')) { color = '#d97706'; bg = '#fffbeb'; }
+                        else if (s.includes('reject') || s.includes('redefense')) { color = '#dc2626'; bg = '#fef2f2'; }
                         let headerText = f.panel;
                         let bodyText = f.remarks;
                         if (f.remarks.includes(':')) {
@@ -326,132 +256,88 @@ async function loadSubmissionData() {
                             headerText = parts[0].trim();
                             bodyText = parts.slice(1).join(':').trim();
                         }
-
                         return `
-                            <div class="remarks-container" style="margin-top: 8px; background: ${bg}; opacity: 0.9; border-left: 3px solid ${color}; border-radius: 0 6px 6px 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <span class="material-icons-round" style="font-size: 14px; color: ${color};">face</span>
-                                    <span style="font-size: 0.75rem; font-weight: 700; color: ${color}; text-transform: uppercase;">${headerText}</span>
-                                </div>
-                                <div style="font-size: 0.9rem; color: #334155; line-height: 1.5; margin-left: 20px;">
-                                    ${bodyText}
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                    el.insertAdjacentHTML('afterend', remarksHtml);
+                                    <div class="panel-remark" style="background: ${bg}; border-left: 4px solid ${color}; padding: 12px 15px; border-radius: 0 10px 10px 0; animation: slideDown 0.3s ease;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                            <span class="material-icons-round" style="font-size: 14px; color: ${color}; opacity: 0.8;">comment</span>
+                                            <span style="font-size: 0.7rem; font-weight: 800; color: ${color}; text-transform: uppercase;">${headerText}</span>
+                                        </div>
+                                        <div style="font-size: 0.9rem; color: #334155; line-height: 1.5; font-weight: 500;">
+                                            ${bodyText}
+                                        </div>
+                                    </div>
+                                `;
+                    }).join('')}
+                        </div>
+                    `;
+                    targetNode.insertAdjacentHTML('afterend', remarksHtml);
                 }
-
-                // --- ACTION BUTTON INJECTION HELPER ---
-                const injectActionButtons = (targetEl, currentValue) => {
-                    if (!targetEl || targetEl.parentElement.classList.contains('input-with-action')) return;
-
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'input-with-action';
-                    wrapper.style.cssText = 'position: relative; display: flex; align-items: center; gap: 8px; width: 100%;';
-
-                    targetEl.parentNode.insertBefore(wrapper, targetEl);
-                    wrapper.appendChild(targetEl);
-                    targetEl.style.marginBottom = '0';
-
-                    // 1. Spellcheck / Verify Button
-                    const checkBtn = document.createElement('button');
-                    checkBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">spellcheck</span>';
-                    checkBtn.title = "Check if link is Public";
-                    checkBtn.style.cssText = `
-                        background: #f1f5f9;
-                        border: 1.5px solid #e2e8f0;
-                        border-radius: 8px;
-                        color: #64748b;
-                        padding: 10px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        transition: all 0.2s;
-                    `;
-                    checkBtn.onclick = (e) => {
-                        e.preventDefault();
-                        window.verifyDriveLink(targetEl.id);
-                    };
-                    wrapper.appendChild(checkBtn);
-
-                    // 2. Upload Button
-                    const uploadBtn = document.createElement('button');
-                    uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
-                    uploadBtn.title = "Upload PDF directly";
-
-                    const isUploaded = currentValue && (currentValue.includes('supabase.co') || currentValue.includes('project-submissions'));
-
-                    // Check if we are in revised mode (amber style)
-                    const isRevised = targetEl.id.includes('_revised');
-                    const uploadColor = isRevised ? '#d97706' : 'var(--primary-color)'; // Amber-600 vs Primary
-
-                    uploadBtn.style.cssText = `
-                        background: ${isUploaded ? '#f1f5f9' : uploadColor};
-                        border: 1.5px solid ${isUploaded ? '#e2e8f0' : uploadColor};
-                        border-radius: 8px;
-                        color: ${isUploaded ? '#94a3b8' : 'white'};
-                        padding: 10px;
-                        cursor: ${isUploaded ? 'default' : 'pointer'};
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        transition: all 0.2s;
-                        box-shadow: ${isUploaded ? 'none' : '0 2px 6px rgba(0,0,0, 0.1)'};
-                    `;
-                    if (isUploaded) uploadBtn.disabled = true;
-
-                    uploadBtn.onclick = (e) => {
-                        e.preventDefault();
-                        // Find sibling file input (works for both original and revised structure)
-                        // HTML Structure: .form-group > input[text], input[file], button
-                        // Wrapper Structure: .form-group > .input-with-action > input[text], buttons...
-                        // So file input is in .form-group (grandparent of text input now?)
-                        // Wait, wrapper is child of .form-group. File input is sibling of wrapper.
-                        const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
-                        if (fileInput) {
-                            fileInput.click();
-                        } else {
-                            console.error('File input not found for:', targetEl.id);
-                        }
-                    };
-                    wrapper.appendChild(uploadBtn);
-                };
-
-                // Inject for Main Input
-                injectActionButtons(el, linkMap[key]);
-
-                // Inject for Revised Input
+                el.value = linkMap[key] || '';
                 const revEl = document.getElementById(elementId + '_revised');
-                if (revEl) {
-                    injectActionButtons(revEl, linkMap[key + '_revised']);
-                }
+                if (revEl) revEl.value = linkMap[key + '_revised'] || '';
             };
 
-            // Render Titles
-            renderField(tLinks, tStatus, tRemarks, tAnnot, 'title1', 'titleLink1');
-            renderField(tLinks, tStatus, tRemarks, tAnnot, 'title2', 'titleLink2');
-            renderField(tLinks, tStatus, tRemarks, tAnnot, 'title3', 'titleLink3');
+            const injectActionButtons = (targetEl, currentValue) => {
+                if (!targetEl || targetEl.parentElement.classList.contains('input-with-action')) return;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'input-with-action';
+                wrapper.style.cssText = 'position: relative; display: flex; align-items: center; gap: 8px; width: 100%;';
+                targetEl.parentNode.insertBefore(wrapper, targetEl);
+                wrapper.appendChild(targetEl);
+                targetEl.style.marginBottom = '0';
 
-            // Render Pre-Oral
-            renderField(pLinks, pStatus, pRemarks, pAnnot, 'ch1', 'preOralCh1');
-            renderField(pLinks, pStatus, pRemarks, pAnnot, 'ch2', 'preOralCh2');
-            renderField(pLinks, pStatus, pRemarks, pAnnot, 'ch3', 'preOralCh3');
+                const checkBtn = document.createElement('button');
+                checkBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">spellcheck</span>';
+                checkBtn.title = "Check if link is Public";
+                checkBtn.className = "action-btn-small";
+                checkBtn.style.cssText = "background: #f1f5f9; border: 1.5px solid #e2e8f0; border-radius: 8px; color: #64748b; padding: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;";
+                checkBtn.onclick = (e) => { e.preventDefault(); window.verifyDriveLink(targetEl.id); };
+                wrapper.appendChild(checkBtn);
 
-            // Render Final
-            renderField(fLinks, fStatus, fRemarks, fAnnot, 'ch4', 'finalCh4');
-            renderField(fLinks, fStatus, fRemarks, fAnnot, 'ch5', 'finalCh5');
-
-            // Store links in window.currentLinks
-            window.currentLinks = {
-                titles: tLinks,
-                preoral: pLinks,
-                final: fLinks
+                const uploadBtn = document.createElement('button');
+                uploadBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
+                uploadBtn.title = "Upload PDF directly";
+                const isUploaded = currentValue && (currentValue.includes('supabase.co') || currentValue.includes('project-submissions'));
+                const isRevised = targetEl.id.includes('_revised');
+                const uploadColor = isRevised ? '#d97706' : 'var(--primary-color)';
+                uploadBtn.style.cssText = `background: ${isUploaded ? '#f1f5f9' : uploadColor}; border: 1.5px solid ${isUploaded ? '#e2e8f0' : uploadColor}; border-radius: 8px; color: ${isUploaded ? '#94a3b8' : 'white'}; padding: 10px; cursor: ${isUploaded ? 'default' : 'pointer'}; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: ${isUploaded ? 'none' : '0 2px 6px rgba(0,0,0, 0.1)'};`;
+                if (isUploaded) uploadBtn.disabled = true;
+                uploadBtn.onclick = (e) => {
+                    e.preventDefault();
+                    const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
+                    if (fileInput) fileInput.click();
+                };
+                wrapper.appendChild(uploadBtn);
             };
 
-            // Initialize Button State
-            updateSaveButtonState('titles');
+            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title1', 'titleLink1');
+            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title2', 'titleLink2');
+            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title3', 'titleLink3');
+            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch1', 'preOralCh1');
+            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch2', 'preOralCh2');
+            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch3', 'preOralCh3');
+            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch4', 'finalCh4');
+            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch5', 'finalCh5');
+
+            injectActionButtons(document.getElementById('titleLink1'), tLinks.title1);
+            injectActionButtons(document.getElementById('titleLink1_revised'), tLinks.title1_revised);
+            injectActionButtons(document.getElementById('titleLink2'), tLinks.title2);
+            injectActionButtons(document.getElementById('titleLink2_revised'), tLinks.title2_revised);
+            injectActionButtons(document.getElementById('titleLink3'), tLinks.title3);
+            injectActionButtons(document.getElementById('titleLink3_revised'), tLinks.title3_revised);
+            injectActionButtons(document.getElementById('preOralCh1'), pLinks.ch1);
+            injectActionButtons(document.getElementById('preOralCh1_revised'), pLinks.ch1_revised);
+            injectActionButtons(document.getElementById('preOralCh2'), pLinks.ch2);
+            injectActionButtons(document.getElementById('preOralCh2_revised'), pLinks.ch2_revised);
+            injectActionButtons(document.getElementById('preOralCh3'), pLinks.ch3);
+            injectActionButtons(document.getElementById('preOralCh3_revised'), pLinks.ch3_revised);
+            injectActionButtons(document.getElementById('finalCh4'), fLinks.ch4);
+            injectActionButtons(document.getElementById('finalCh4_revised'), fLinks.ch4_revised);
+            injectActionButtons(document.getElementById('finalCh5'), fLinks.ch5);
+            injectActionButtons(document.getElementById('finalCh5_revised'), fLinks.ch5_revised);
+
+            window.currentLinks = { titles: tLinks, preoral: pLinks, final: fLinks };
+            updateSaveButtonState(document.querySelector('.tab-btn.active')?.innerText.toLowerCase().includes('title') ? 'titles' : document.querySelector('.tab-btn.active')?.innerText.toLowerCase().includes('pre') ? 'preoral' : 'final');
         }
     } catch (err) {
         console.error('Unexpected error:', err);
