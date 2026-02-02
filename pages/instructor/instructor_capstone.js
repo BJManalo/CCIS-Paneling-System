@@ -344,8 +344,9 @@ function renderTable() {
             g.groupName.toLowerCase().includes(searchTerm.toLowerCase());
 
         // Role Match
-        const roleMatch = (currentRole === 'Panel' && g.isPanelist) ||
-            (currentRole === 'Adviser' && g.isAdviser);
+        const roleMatch = (currentRole === 'All') ||
+            (currentRole === 'Adviser' && g.isAdviser) ||
+            (currentRole === 'Panel' && g.isPanelist); // Keep legacy just in case
 
         if (!typeMatch || !programMatch || !searchMatch || !roleMatch) return false;
 
@@ -703,7 +704,10 @@ window.openFileModal = (groupId) => {
             }
 
             let interactiveControls = '';
-            if (currentRole === 'Panel') {
+            // Allow grading if role is Panel OR (All/Panelist and NOT Adviser view)
+            const canGrade = (currentRole === 'Panel' || (currentRole === 'All' && group.isPanelist));
+
+            if (canGrade) {
                 interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
@@ -742,7 +746,12 @@ window.openFileModal = (groupId) => {
                 // Show ALL assigned panels, not just those who graded
                 panelsToDisplay = group.panels || [];
             } else {
-                panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
+                // If grading mode, filter self out. If viewing as third party (All but not panelist), show all
+                if (canGrade) {
+                    panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
+                } else {
+                    panelsToDisplay = Object.keys(fileStatuses);
+                }
             }
 
             let otherFeedbackHtml = '';
