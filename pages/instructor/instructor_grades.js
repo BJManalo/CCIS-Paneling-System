@@ -144,8 +144,10 @@ function renderGrades() {
         if (!matchesSearch || !matchesSection || !matchesProgram) return;
 
         // Role/Tab Filter
-        const adviser = (group.adviser || '').toLowerCase();
-        const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
+        const adviserField = (group.adviser || '').toLowerCase();
+        // Split by comma if multiple advisers, then check exact match against current user
+        const adviserList = adviserField.split(',').map(a => a.trim());
+        const isAdviser = adviserList.includes(userName);
 
         if (!group.schedules || group.schedules.length === 0) return;
 
