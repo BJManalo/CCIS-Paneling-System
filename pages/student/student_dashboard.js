@@ -78,22 +78,37 @@ async function loadSubmissionData() {
                 final: isFinalScheduled
             };
 
-            if (!isTitleGraded) {
-                if (preOralBtn) {
+            if (preOralBtn) {
+                if (!isTitleGraded) {
                     preOralBtn.disabled = true;
                     preOralBtn.style.opacity = '0.5';
                     preOralBtn.style.cursor = 'not-allowed';
                     preOralBtn.title = "Locked: Title Defense grades pending.";
                     if (!preOralBtn.innerHTML.includes('lock')) preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                } else {
+                    preOralBtn.disabled = false;
+                    preOralBtn.style.opacity = '1';
+                    preOralBtn.style.cursor = 'pointer';
+                    preOralBtn.title = "";
+                    const lockIcon = preOralBtn.querySelector('.material-icons-round');
+                    if (lockIcon && lockIcon.innerText === 'lock') lockIcon.remove();
                 }
             }
-            if (!isPreOralGraded) {
-                if (finalBtn) {
+
+            if (finalBtn) {
+                if (!isPreOralGraded) {
                     finalBtn.disabled = true;
                     finalBtn.style.opacity = '0.5';
                     finalBtn.style.cursor = 'not-allowed';
                     finalBtn.title = "Locked: Pre-Oral grades pending.";
                     if (!finalBtn.innerHTML.includes('lock')) finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                } else {
+                    finalBtn.disabled = false;
+                    finalBtn.style.opacity = '1';
+                    finalBtn.style.cursor = 'pointer';
+                    finalBtn.title = "";
+                    const lockIcon = finalBtn.querySelector('.material-icons-round');
+                    if (lockIcon && lockIcon.innerText === 'lock') lockIcon.remove();
                 }
             }
 
