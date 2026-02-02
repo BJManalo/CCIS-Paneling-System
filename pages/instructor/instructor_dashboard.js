@@ -266,17 +266,27 @@ function getTitleText(pTitle, keyHint) {
 
 function resolveStatusMap(groupId, defenseType) {
     const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const targetNorm = normalize(defenseType);
+
+    // Determine Core Key
+    const reqNorm = normalize(defenseType);
+    let coreKey = '';
+    if (reqNorm.includes('title')) coreKey = 'title';
+    else if (reqNorm.includes('preoral')) coreKey = 'preoral';
+    else if (reqNorm.includes('final')) coreKey = 'final';
 
     // 1. Gather all individual votes from New Table (capstone_feedback)
-    const feedbacks = allCapstoneFeedback.filter(cf =>
-        cf.group_id == groupId && normalize(cf.defense_type) === targetNorm
-    );
+    const feedbacks = allCapstoneFeedback.filter(cf => {
+        if (cf.group_id != groupId) return false;
+        const dbNorm = normalize(cf.defense_type);
+        return dbNorm.includes(coreKey);
+    });
 
     // 2. Gather Legacy Statuses
-    const legRow = allDefenseStatuses.find(ds =>
-        ds.group_id == groupId && normalize(ds.defense_type) === targetNorm
-    );
+    const legRow = allDefenseStatuses.find(ds => {
+        if (ds.group_id != groupId) return false;
+        const dbNorm = normalize(ds.defense_type);
+        return dbNorm.includes(coreKey);
+    });
     let legacyStatuses = {};
     if (legRow && legRow.statuses) {
         if (typeof legRow.statuses === 'string') {
