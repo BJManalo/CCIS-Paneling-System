@@ -196,7 +196,7 @@ window.applyDashboardFilters = () => {
         const fMap = getStatusMap(finalRow);
 
         const members = allStudents
-            .filter(s => s.group_id === g.id)
+            .filter(s => String(s.group_id) === String(g.id))
             .map(s => s.full_name)
             .join(', ');
 
@@ -279,13 +279,16 @@ window.applyDashboardFilters = () => {
 function updateCounts(groups) {
     const groupIds = groups.map(g => g.id);
     // Use allDefenseStatuses because that is what populates the view
-    const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
+    // Convert IDs to strings for safe comparison
+    const relevantStatuses = allDefenseStatuses.filter(ds =>
+        groupIds.some(gid => String(gid) === String(ds.group_id))
+    );
 
     let approvedTotal = 0;
     let rejectedTotal = 0;
 
     groupIds.forEach(id => {
-        const titleRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Title Defense');
+        const titleRow = relevantStatuses.find(ds => String(ds.group_id) === String(id) && ds.defense_type === 'Title Defense');
 
         // Check Titles
         if (titleRow && titleRow.statuses) {
