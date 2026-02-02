@@ -132,8 +132,6 @@ async function loadSubmissionData() {
                     if (titleTabBtns.length >= num) titleTabBtns[num - 1].innerText = title;
                     const label = document.querySelector(`label[for="projectTitle${num}"]`);
                     if (label) label.innerText = title;
-                    const saveBtn = document.getElementById(`save-title${num}`);
-                    if (saveBtn) saveBtn.innerHTML = `<span class="material-icons-round">save</span> Save ${title}`;
                 }
             });
 
@@ -713,8 +711,6 @@ window.saveSubmissions = async function (specificField) {
                 // Update Label
                 const label = document.querySelector(`label[for="projectTitle${num}"]`);
                 if (label) label.innerText = newTitle;
-                // Update Save Button Text
-                if (btn) btn.innerHTML = `<span class="material-icons-round">save</span> Save ${newTitle}`;
             }
         }
 
