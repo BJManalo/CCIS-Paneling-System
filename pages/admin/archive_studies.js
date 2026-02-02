@@ -24,24 +24,52 @@ async function loadArchives() {
             .select('*');
         if (gError) throw gError;
 
-        // 2. Fetch Defense Data (Legacy + Detailed Feedback)
-        const [dsRes, cfRes] = await Promise.all([
+        // 2. Fetch Defense Data (Legacy + Detailed Feedback), Students, and Schedules
+        const [dsRes, cfRes, studentsRes, schedRes] = await Promise.all([
             supabase.from('defense_statuses').select('*'),
-            supabase.from('capstone_feedback').select('*')
+            supabase.from('capstone_feedback').select('*'),
+            supabase.from('students').select('*'),
+            supabase.from('schedules').select('*')
         ]);
 
         if (dsRes.error) console.warn('Error fetching legacy statuses:', dsRes.error);
         if (cfRes.error) console.warn('Error fetching feedback:', cfRes.error);
+        if (studentsRes.error) console.warn('Error fetching students:', studentsRes.error);
+        if (schedRes.error) console.warn('Error fetching schedules:', schedRes.error);
 
         const statuses = dsRes.data || [];
         const feedbacks = cfRes.data || [];
+        const students = studentsRes.data || [];
+        const schedules = schedRes.data || [];
 
         // 3. Filter for Completed Final Defense
-        const archivedGroups = groups.filter(g => {
+        const archivedGroups = groups.map(g => {
+            // Attach Members
+            const members = students.filter(s => s.group_id === g.id).map(s => `${s.first_name} ${s.last_name}`);
+
+            // Attach Panels (Find schedule for Final Defense)
+            const finalSched = schedules.find(s =>
+                s.group_id === g.id &&
+                s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
+            );
+
+            let panels = [];
+            if (finalSched) {
+                panels = [finalSched.panel1, finalSched.panel2, finalSched.panel3, finalSched.panel4, finalSched.panel5].filter(p => p);
+            } else {
+                // Fallback: Check who gave feedback
+                const groupFeedbacks = feedbacks.filter(f => f.group_id == g.id);
+                // Get unique user_names
+                const uniquePanels = [...new Set(groupFeedbacks.map(f => f.user_name).filter(n => n))];
+                panels = uniquePanels;
+            }
+
+            return { ...g, members, panels };
+        }).filter(g => {
             // A. Check Legacy Data
             const relevantStatuses = statuses.filter(s =>
                 s.group_id === g.id &&
-                s.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
+                String(s.defense_type || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
             );
 
             const legacyCompleted = relevantStatuses.some(record => {
@@ -53,7 +81,7 @@ async function loadArchives() {
                 for (const fileKey in sObj) {
                     const panelStatuses = sObj[fileKey];
                     for (const panelName in panelStatuses) {
-                        if (String(panelStatuses[panelName]).toLowerCase() === 'completed') return true;
+                        if (String(panelStatuses[panelName]).trim().toLowerCase() === 'completed') return true;
                     }
                 }
                 return false;
@@ -64,9 +92,10 @@ async function loadArchives() {
             // B. Check New Feedback Data
             // We look for ANY Final Defense file marked as 'Completed'
             const feedbackCompleted = feedbacks.some(f =>
-                f.group_id == g.id &&
-                f.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '').includes('final') &&
-                String(f.status).toLowerCase() === 'completed'
+                f && f.group_id && f.status &&
+                String(f.group_id) === String(g.id) &&
+                String(f.defense_type || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes('final') &&
+                String(f.status).trim().toLowerCase() === 'completed'
             );
 
             return feedbackCompleted;
@@ -111,26 +140,27 @@ function renderList(groups) {
             } catch (e) { }
         }
 
-        // Format Members
-        let members = [];
-        // Ideally we would fetch members from 'students' table but for simplicity valid for MVP if we don't display names yet, 
-        // OR we can make a joined query. 'student_groups' might not have member names in it?
-        // Let's check 'students' table if needed.
-        // Actually, previous files fetched 'students' separately. 
-        // Admin View usually doesn't need detailed names immediately, but let's be nice.
-        // For now, I'll display Group Name and Program.
-
-        const date = new Date(g.created_at).getFullYear(); // Approximation of year
+        const date = new Date(g.created_at).getFullYear();
+        const membersStr = g.members && g.members.length > 0 ? g.members.join(', ') : 'No Members Listed';
+        const panelStr = g.panels && g.panels.length > 0 ? g.panels[0] + (g.panels.length > 1 ? ` +${g.panels.length - 1} more` : '') : 'No Panels';
 
         card.innerHTML = `
             <div class="archive-header">
-                <div class="archive-title">${g.group_name}</div>
-                <div class="program-badge" style="background:#f1f5f9; padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:700;">${(g.program || 'N/A').toUpperCase()}</div>
+                <div class="archive-title" style="flex:1;">${g.group_name}</div>
+                <div class="program-badge" style="background:#f1f5f9; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">${(g.program || 'N/A').toUpperCase()}</div>
             </div>
-            <div style="font-size: 1rem; font-weight:600; color:#1e293b; margin-bottom:10px;">${title}</div>
-            <div class="archive-details">
+            <div style="font-size: 1rem; font-weight:700; color:#1e293b; margin-bottom:6px; line-height:1.4;">${title}</div>
+            
+            <div style="font-size: 0.85rem; color:#475569; margin-bottom:4px;">
+                <strong>Members:</strong> ${membersStr}
+            </div>
+             <div style="font-size: 0.85rem; color:#475569; margin-bottom:10px;">
+                <strong>Adviser:</strong> ${g.adviser || 'N/A'}
+            </div>
+
+            <div class="archive-details" style="font-size:0.8rem;">
                 <span style="display:flex; align-items:center; gap:5px;"><span class="material-icons-round" style="font-size:16px;">calendar_today</span> Year: ${date}</span>
-                <span style="display:flex; align-items:center; gap:5px;"><span class="material-icons-round" style="font-size:16px;">check_circle</span> Status: Completed</span>
+                <span style="display:flex; align-items:center; gap:5px;"><span class="material-icons-round" style="font-size:16px;">verified</span> Completed</span>
             </div>
         `;
 
@@ -144,7 +174,8 @@ function filterArchives(term) {
     const filtered = allArchives.filter(g =>
         (g.group_name || '').toLowerCase().includes(lower) ||
         (g.project_title || '').toLowerCase().includes(lower) ||
-        (g.program || '').toLowerCase().includes(lower)
+        (g.program || '').toLowerCase().includes(lower) ||
+        (g.members || []).join(' ').toLowerCase().includes(lower)
     );
     renderList(filtered);
 }
@@ -166,31 +197,58 @@ function openDetails(group) {
 
     // Links decoding
     let finalLinks = group.final_link;
-    let linksHtml = '<p>No final manuscripts available.</p>';
+    let linksHtml = '<p style="font-style:italic; color:#94a3b8;">No final manuscripts available.</p>';
 
     if (finalLinks) {
         try {
             if (finalLinks.startsWith('{')) {
                 const fObj = JSON.parse(finalLinks);
-                linksHtml = '<ul style="list-style:none;">';
+                linksHtml = '<ul style="list-style:none; padding:0;">';
                 for (const [key, url] of Object.entries(fObj)) {
-                    linksHtml += `<li style="margin-bottom:8px;"><a href="${url}" target="_blank" style="color:var(--primary-color); display:flex; align-items:center; gap:8px;"><span class="material-icons-round">description</span> ${key}</a></li>`;
+                    linksHtml += `<li style="margin-bottom:8px;"><a href="${url}" target="_blank" style="color:var(--primary-color); display:flex; align-items:center; gap:8px; text-decoration:none; font-weight:500;"><span class="material-icons-round">description</span> ${key}</a></li>`;
                 }
                 linksHtml += '</ul>';
             } else {
-                linksHtml = `<a href="${finalLinks}" target="_blank" style="color:var(--primary-color); display:flex; align-items:center; gap:8px;"><span class="material-icons-round">description</span> View Manuscript</a>`;
+                linksHtml = `<a href="${finalLinks}" target="_blank" style="color:var(--primary-color); display:flex; align-items:center; gap:8px; text-decoration:none; font-weight:500;"><span class="material-icons-round">description</span> View Manuscript</a>`;
             }
         } catch (e) {
-            linksHtml = `<a href="${finalLinks}" target="_blank" style="color:var(--primary-color); display:flex; align-items:center; gap:8px;"><span class="material-icons-round">description</span> View Manuscript</a>`;
+            linksHtml = `<a href="${finalLinks}" target="_blank" style="color:var(--primary-color); display:flex; align-items:center; gap:8px; text-decoration:none; font-weight:500;"><span class="material-icons-round">description</span> View Manuscript</a>`;
         }
     }
 
+    const membersList = group.members && group.members.length > 0
+        ? group.members.map(m => `<li style="margin-bottom:2px;">${m}</li>`).join('')
+        : '<li>No members found</li>';
+
+    const panelsList = group.panels && group.panels.length > 0
+        ? group.panels.map(p => `<li style="margin-bottom:2px;">${p}</li>`).join('')
+        : '<li>No panels assigned</li>';
+
     mBody.innerHTML = `
-        <p><strong>Group:</strong> ${group.group_name}</p>
-        <p><strong>Program:</strong> ${(group.program || '').toUpperCase()}</p>
-        <p><strong>Adviser:</strong> ${group.adviser || 'N/A'}</p>
-        <hr style="margin: 15px 0; border:0; border-top:1px solid #eee;">
-        <h4 style="margin-bottom:10px;">Archived Documents</h4>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+                <h4 style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">Group Information</h4>
+                <p><strong>Group:</strong> ${group.group_name}</p>
+                <p><strong>Program:</strong> ${(group.program || '').toUpperCase()}</p>
+                <p><strong>Adviser:</strong> ${group.adviser || 'N/A'}</p>
+            </div>
+             <div>
+                <h4 style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">Members</h4>
+                <ul style="padding-left: 20px; margin: 0; font-size: 0.9rem; color: #334155;">
+                    ${membersList}
+                </ul>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+             <h4 style="font-size:0.75rem; text-transform:uppercase; color:#94a3b8; margin-bottom:8px;">Panelists (Final Defense)</h4>
+              <ul style="padding-left: 20px; margin: 0; font-size: 0.9rem; color: #334155;">
+                    ${panelsList}
+             </ul>
+        </div>
+
+        <hr style="margin: 15px 0; border:0; border-top:1px solid #e2e8f0;">
+        <h4 style="margin-bottom:10px; font-size:0.9rem; color:#1e293b;">Archived Documents</h4>
         ${linksHtml}
     `;
 
