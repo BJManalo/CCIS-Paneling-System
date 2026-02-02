@@ -565,6 +565,10 @@ window.openFileModal = (groupId) => {
         section.appendChild(header);
 
         Object.entries(fileObj).forEach(([label, url]) => {
+            const isRevised = label.endsWith('_revised');
+            // SKIP: If URL is empty or the key is a revised version (revised versions are handled inside the parent item)
+            if (!url || url.toString().trim() === "" || isRevised) return;
+
             const itemContainer = document.createElement('div');
             itemContainer.style.background = 'white';
             itemContainer.style.border = '1px solid #e2e8f0';
@@ -592,9 +596,6 @@ window.openFileModal = (groupId) => {
                     projectTitles = { title1: group.projectTitle };
                 }
             }
-
-            // Exclude processing the _revised keys directly in the main loop
-            if (label.endsWith('_revised')) return;
 
             let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
             if (categoryKey === 'titles' && projectTitles[label]) {
