@@ -148,13 +148,9 @@ window.applyDashboardFilters = () => {
     displayRows = [];
 
     baseGroups.forEach(g => {
-        const titleRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Title Defense');
-        const preOralRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Pre-Oral Defense');
-        const finalRow = allDefenseStatuses.find(ds => ds.group_id === g.id && ds.defense_type === 'Final Defense');
-
-        const tMap = getStatusMap(titleRow);
-        const pMap = getStatusMap(preOralRow);
-        const fMap = getStatusMap(finalRow);
+        const tMap = resolveStatusMap(g.id, 'Title Defense');
+        const pMap = resolveStatusMap(g.id, 'Pre-Oral Defense');
+        const fMap = resolveStatusMap(g.id, 'Final Defense');
 
         const members = allStudents
             .filter(s => s.group_id == g.id) // Loose comparison (string vs number)
@@ -269,27 +265,58 @@ function getTitleText(pTitle, keyHint) {
     return parsed.title1 || parsed.title2 || parsed.title3 || Object.values(parsed)[0] || '';
 }
 
-function getStatusMap(row) {
-    if (!row || !row.statuses) return {};
-    let s = row.statuses;
-    if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
+function resolveStatusMap(groupId, defenseType) {
+    // 1. Gather all individual votes from New Table (capstone_feedback)
+    const feedbacks = allCapstoneFeedback.filter(cf => cf.group_id == groupId && cf.defense_type === defenseType);
 
-    const flat = {};
-    Object.keys(s).forEach(fileKey => {
-        const val = s[fileKey];
-        if (typeof val === 'object' && val !== null) {
-            const values = Object.values(val);
-            // Priority: Redefend > Rejected > Approved with Revisions > Approved
-            if (values.some(v => v === 'Redefend')) flat[fileKey] = 'Redefend';
-            else if (values.some(v => v === 'Rejected')) flat[fileKey] = 'Rejected';
-            else if (values.some(v => v.includes('Revision'))) flat[fileKey] = 'Approved with Revisions';
-            else if (values.some(v => v.includes('Approve') || v === 'Completed')) flat[fileKey] = 'Approved';
-            else flat[fileKey] = 'Pending';
+    // 2. Gather Legacy Statuses
+    const legRow = allDefenseStatuses.find(ds => ds.group_id == groupId && ds.defense_type === defenseType);
+    let legacyStatuses = {};
+    if (legRow && legRow.statuses) {
+        if (typeof legRow.statuses === 'string') {
+            try { legacyStatuses = JSON.parse(legRow.statuses); } catch (e) { }
         } else {
-            flat[fileKey] = val || 'Pending';
+            legacyStatuses = legRow.statuses || {};
+        }
+    }
+
+    // 3. Merge into a map: { fileKey: { PanelName: Status } }
+    const filePanelMap = {};
+
+    // Process Legacy
+    Object.keys(legacyStatuses).forEach(fk => {
+        if (!filePanelMap[fk]) filePanelMap[fk] = {};
+        const val = legacyStatuses[fk];
+        if (typeof val === 'object' && val !== null) {
+            Object.assign(filePanelMap[fk], val);
+        } else {
+            // Scalar value (Oldest format) -> Treat as consensus or single panel
+            filePanelMap[fk]['Legacy'] = val;
         }
     });
-    return flat;
+
+    // Process New (Overrides Legacy if same key/user)
+    feedbacks.forEach(fb => {
+        if (!filePanelMap[fb.file_key]) filePanelMap[fb.file_key] = {};
+        const pName = fb.user_name || 'Panel';
+        filePanelMap[fb.file_key][pName] = fb.status;
+    });
+
+    // 4. Resolve Consensus per File Key
+    const resolved = {};
+    Object.keys(filePanelMap).forEach(fk => {
+        const votes = Object.values(filePanelMap[fk]);
+        // Priority: Redefend > Rejected > Approved with Revisions > Approved
+        // Also normalize "Approve" (legacy) to "Approved"
+
+        if (votes.some(v => v === 'Redefend')) resolved[fk] = 'Redefend';
+        else if (votes.some(v => v === 'Rejected')) resolved[fk] = 'Rejected';
+        else if (votes.some(v => v && v.includes('Revision'))) resolved[fk] = 'Approved with Revisions';
+        else if (votes.some(v => v && (v.includes('Approved') || v.includes('Approve') || v === 'Completed'))) resolved[fk] = 'Approved';
+        else resolved[fk] = 'Pending';
+    });
+
+    return resolved;
 }
 
 function updateCounts(groups) {
@@ -297,21 +324,16 @@ function updateCounts(groups) {
     let rejectedTotal = 0;
 
     groups.forEach(g => {
-        const titleRow = allDefenseStatuses.find(ds => ds.group_id == g.id && ds.defense_type === 'Title Defense');
+        const tMap = resolveStatusMap(g.id, 'Title Defense');
+        const values = Object.values(tMap);
 
-        if (titleRow && titleRow.statuses) {
-            const tMap = getStatusMap(titleRow);
-            const values = Object.values(tMap);
-
-            // Count based on resolved status
-            values.forEach(v => {
-                if (v && (v.includes('Approved') || v === 'Completed')) {
-                    approvedTotal++;
-                } else if (v === 'Rejected' || v === 'Redefend') {
-                    rejectedTotal++;
-                }
-            });
-        }
+        values.forEach(v => {
+            if (v && (v === 'Approved' || v === 'Approved with Revisions' || v === 'Completed')) {
+                approvedTotal++;
+            } else if (v === 'Rejected' || v === 'Redefend') {
+                rejectedTotal++;
+            }
+        });
     });
 
     // OVERRIDE: If we are actively filtering by a category, the count should reflect visible rows
@@ -323,7 +345,7 @@ function updateCounts(groups) {
 
     // Display Counts
     const titleEl = document.getElementById('countTitle');
-    const rejectedEl = document.getElementById('countPreOral'); // Middle card
+    const rejectedEl = document.getElementById('countPreOral');
     const finalEl = document.getElementById('countFinal');
 
     if (titleEl) titleEl.innerText = approvedTotal;
