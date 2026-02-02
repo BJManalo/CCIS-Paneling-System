@@ -431,6 +431,10 @@ function updateSaveButtonState(tabId) {
         const fieldKey = getFieldKey(subContent);
 
         if (!isScheduled) {
+            // Hide the revision group
+            const revGroup = subContent.querySelector('.revision-group');
+            if (revGroup) revGroup.style.display = 'none';
+
             if (saveBtn) {
                 saveBtn.innerHTML = '<span class="material-icons-round">event_busy</span> Not Scheduled';
                 saveBtn.disabled = true;
@@ -462,6 +466,10 @@ function updateSaveButtonState(tabId) {
             }
 
             if (hasFeedback) {
+                // Show the revision group
+                const revGroup = subContent.querySelector('.revision-group');
+                if (revGroup) revGroup.style.display = 'block';
+
                 // PARTIAL LOCK: Original Locked, Revision Open
                 if (saveBtn) {
                     // Check if Revision is already submitted? Optional, but for now allow overwriting revision
@@ -498,6 +506,10 @@ function updateSaveButtonState(tabId) {
                     }
                 });
             } else {
+                // Hide the revision group
+                const revGroup = subContent.querySelector('.revision-group');
+                if (revGroup) revGroup.style.display = 'none';
+
                 // FULL LOCK: Submitted but no feedback yet
                 if (saveBtn) {
                     saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted';
@@ -522,6 +534,10 @@ function updateSaveButtonState(tabId) {
                 });
             }
         } else {
+            // Hide the revision group (no submission yet)
+            const revGroup = subContent.querySelector('.revision-group');
+            if (revGroup) revGroup.style.display = 'none';
+
             if (saveBtn) {
                 saveBtn.innerHTML = `<span class="material-icons-round">save</span> Save ${fieldKey ? fieldKey.toUpperCase() : 'Submission'}`;
                 saveBtn.disabled = false;
