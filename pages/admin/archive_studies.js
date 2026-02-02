@@ -6,42 +6,37 @@ let allArchives = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     loadArchives();
-
-    document.getElementById('searchInput').addEventListener('input', (e) => {
-        filterArchives(e.target.value);
-    });
+    document.getElementById('searchInput').addEventListener('input', (e) => filterArchives(e.target.value));
 });
 
 async function loadArchives() {
     const list = document.getElementById('archivesList');
     const loading = document.getElementById('loadingState');
-    const empty = document.getElementById('emptyState');
 
     try {
         console.log('Starting loadArchives...');
-        const { data: groups, error: gError } = await supabase
-            .from('student_groups')
-            .select('*');
+        // 1. Fetch Groups
+        const { data: groups, error: gError } = await supabase.from('student_groups').select('*');
         if (gError) throw gError;
 
-        // Fetch supporting data safely
+        // 2. Fetch supporting data safely
         const fetchSafe = (prom) => prom.then(res => res).catch(err => ({ error: err, data: [] }));
 
-        // Optimize: select specific columns
+        // Optimize: select specific columns where possible
         const dsRes = await fetchSafe(supabase.from('defense_statuses').select('*'));
         const cfRes = await fetchSafe(supabase.from('capstone_feedback').select('group_id, defense_type, status, user_name'));
         const studentsRes = await fetchSafe(supabase.from('students').select('group_id, first_name, last_name'));
         const schedRes = await fetchSafe(supabase.from('schedules').select('group_id, schedule_type, panel1, panel2, panel3, panel4, panel5'));
-
-        if (dsRes.error) console.warn('Error fetching defense_statuses:', dsRes.error);
-        if (cfRes.error) console.warn('Error fetching capstone_feedback:', cfRes.error);
+        // Added: Fetch grades to check if instructor GRADED them
+        const gradesRes = await fetchSafe(supabase.from('grades').select('group_id, defense_type'));
 
         const statuses = dsRes.data || [];
         const feedbacks = cfRes.data || [];
         const students = studentsRes.data || [];
         const schedules = schedRes.data || [];
+        const grades = gradesRes.data || [];
 
-        // 3. Filter for Completed Final Defense
+        // 3. Process Groups
         const archivedGroups = groups.map(g => {
             // Attach Members
             const members = students.filter(s => String(s.group_id) === String(g.id)).map(s => `${s.first_name} ${s.last_name}`);
@@ -56,7 +51,6 @@ async function loadArchives() {
             if (finalSched) {
                 panels = [finalSched.panel1, finalSched.panel2, finalSched.panel3, finalSched.panel4, finalSched.panel5].filter(p => p);
             } else {
-                // Fallback: Check who gave feedback
                 const groupFeedbacks = feedbacks.filter(f => String(f.group_id) === String(g.id));
                 const uniquePanels = [...new Set(groupFeedbacks.map(f => f.user_name).filter(n => n))];
                 panels = uniquePanels;
@@ -64,38 +58,38 @@ async function loadArchives() {
 
             return { ...g, members, panels };
         }).filter(g => {
-            // A. Check Legacy Data
-            const relevantStatuses = statuses.filter(s =>
-                String(s.group_id) === String(g.id) &&
-                String(s.defense_type || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
-            );
+            const gid = String(g.id);
+            const isFinal = (type) => String(type || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes('final');
 
+            // 1. Check if Graded (New requirement: "if instructor graded... it is now completed")
+            // Checked against 'grades' table
+            const hasGrade = grades.some(gr => String(gr.group_id) === gid && isFinal(gr.defense_type));
+            if (hasGrade) return true;
+
+            // 2. Check Legacy Status
+            const relevantStatuses = statuses.filter(s => String(s.group_id) === gid && isFinal(s.defense_type));
             const legacyCompleted = relevantStatuses.some(record => {
                 if (!record.statuses) return false;
                 let sObj = record.statuses;
-                if (typeof sObj === 'string') {
-                    try { sObj = JSON.parse(sObj); } catch (e) { return false; }
-                }
-                for (const fileKey in sObj) {
-                    const panelStatuses = sObj[fileKey];
-                    for (const panelName in panelStatuses) {
-                        if (String(panelStatuses[panelName]).trim().toLowerCase() === 'completed') return true;
+                if (typeof sObj === 'string') { try { sObj = JSON.parse(sObj); } catch (e) { return false; } }
+                for (const k in sObj) {
+                    for (const p in sObj[k]) {
+                        if (String(sObj[k][p]).trim().toLowerCase() === 'completed') return true;
                     }
                 }
                 return false;
             });
-
             if (legacyCompleted) return true;
 
-            // B. Check New Feedback Data
+            // 3. Check Feedback Status (Completed)
             const feedbackCompleted = feedbacks.some(f =>
-                f && f.group_id && f.status &&
-                String(f.group_id) === String(g.id) &&
-                String(f.defense_type || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes('final') &&
+                String(f.group_id) === gid &&
+                isFinal(f.defense_type) &&
                 String(f.status).trim().toLowerCase() === 'completed'
             );
+            if (feedbackCompleted) return true;
 
-            return feedbackCompleted;
+            return false;
         });
 
         allArchives = archivedGroups;
@@ -103,8 +97,9 @@ async function loadArchives() {
 
     } catch (err) {
         console.error('Error loading archives:', err);
-        loading.style.display = 'none';
-        list.innerHTML = `<div style="text-align:center; padding:20px; color:red;">Error loading archives. Please try refreshing.</div>`;
+        if (list) list.innerHTML = `<div style="text-align:center; padding:20px; color:red;">Error loading archives. Please try refreshing.</div>`;
+    } finally {
+        if (loading) loading.style.display = 'none';
     }
 }
 
@@ -113,7 +108,7 @@ function renderList(groups) {
     const loading = document.getElementById('loadingState');
     const empty = document.getElementById('emptyState');
 
-    loading.style.display = 'none';
+    if (loading) loading.style.display = 'none';
     list.innerHTML = '';
 
     if (groups.length === 0) {
