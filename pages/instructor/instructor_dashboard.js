@@ -278,42 +278,46 @@ window.applyDashboardFilters = () => {
 
 function updateCounts(groups) {
     const groupIds = groups.map(g => g.id);
-    const relevantStatuses = allDefenseStatuses.filter(ds => groupIds.includes(ds.group_id));
+
+    // Filter feedback relevant to these displayed groups
+    const relevantFeedback = allCapstoneFeedback.filter(cf => groupIds.includes(cf.group_id));
 
     let approvedTotal = 0;
     let rejectedTotal = 0;
-    let completedTotal = 0;
 
     groupIds.forEach(id => {
-        const titleRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Title Defense');
-        const finalRow = relevantStatuses.find(ds => ds.group_id === id && ds.defense_type === 'Final Defense');
+        // Get all feedback for this group's Title Defense
+        const titleFeedback = relevantFeedback.filter(cf =>
+            cf.group_id === id &&
+            cf.defense_type &&
+            cf.defense_type.toLowerCase().includes('title')
+        );
 
-        // Check Titles
-        if (titleRow && titleRow.statuses) {
-            const tMap = getStatusMap(titleRow);
-            Object.values(tMap).forEach(v => {
-                if (v.includes('Approved') || v.includes('Revisions')) approvedTotal++;
-                if (v === 'Rejected' || v === 'Redefend') rejectedTotal++;
-            });
+        // Check for 'Approved' status
+        // User Logic: "if the status set by the panels=approved that counts as 1"
+        // We count the GROUP as 1 if at least one panel marked it Approved.
+        const headerStatusApproved = titleFeedback.some(cf => cf.status === 'Approved');
+        if (headerStatusApproved) {
+            approvedTotal++;
         }
 
-        // Check if Overall Completed (Final Defense)
-        if (finalRow && finalRow.statuses) {
-            const fMap = getStatusMap(finalRow);
-            if (Object.values(fMap).some(v => v === 'Completed')) {
-                completedTotal++;
-            }
+        // Check for 'Rejected' status
+        const headerStatusRejected = titleFeedback.some(cf => cf.status === 'Rejected');
+        if (headerStatusRejected) {
+            rejectedTotal++;
         }
     });
 
     // Display Counts
     const titleEl = document.getElementById('countTitle');
-    const rejectedEl = document.getElementById('countPreOral'); // This is the middle card (Rejected Titles)
-    const finalEl = document.getElementById('countFinal');
+    const rejectedEl = document.getElementById('countPreOral'); // Middle card is Rejected Titles
 
     if (titleEl) titleEl.innerText = approvedTotal;
     if (rejectedEl) rejectedEl.innerText = rejectedTotal;
-    if (finalEl) finalEl.innerText = completedTotal;
+
+    // Legacy 'countFinal' is removed from HTML, so we ignore it or clear it if it exists
+    const finalEl = document.getElementById('countFinal');
+    if (finalEl) finalEl.innerText = '-';
 }
 
 function countDefenseStatus(allStatuses, defenseType, passValues) { return 0; }
