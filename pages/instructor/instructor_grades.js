@@ -42,7 +42,7 @@ window.switchMainTab = (tab) => {
         manageBtn.style.color = 'var(--primary-color)';
         advBtn.style.background = 'transparent';
         advBtn.style.color = '#64748b';
-        pageTitle.textContent = 'Manage Grades';
+        pageTitle.textContent = 'All Grades';
     }
 
     renderGrades();
