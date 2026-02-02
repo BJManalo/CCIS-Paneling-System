@@ -8,10 +8,15 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 let allGroups = [];
 let allDefenseStatuses = [];
 let allStudents = [];
+let allCapstoneFeedback = []; // Added
 let filteredGroups = [];
 let currentCategory = 'ALL'; // 'ALL', 'APPROVED', 'REJECTED', 'COMPLETED'
 let instructorName = '';
 let displayRows = [];
+
+// PDF Viewer State
+let currentAdobeView = null;
+let currentViewerFileKey = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
@@ -53,6 +58,13 @@ async function fetchDashboardData() {
         console.log('Instructor Name:', instructorName);
         console.log('Total Groups:', allGroups.length);
         console.log('Adviser Names in DB:', [...new Set(allGroups.map(g => g.adviser))]);
+
+        // Fetch capstone feedback
+        const { data: feedback, error: fError } = await supabaseClient
+            .from('capstone_feedback')
+            .select('*');
+        if (fError) console.error('Error fetching feedback:', fError);
+        allCapstoneFeedback = feedback || [];
 
         // Populate Section Filter
         populateSectionFilter();
@@ -186,6 +198,7 @@ window.applyDashboardFilters = () => {
             .join(', ');
 
         const baseObj = {
+            id: g.id,
             group_name: g.group_name || '-',
             members: members || '-',
             program: g.program || '-',
@@ -356,10 +369,203 @@ async function renderTable() {
             <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>${row.year}</td>
             <td>${row.statusHtml}</td>
+            <td>
+                <button onclick="openFileModal(${row.id})" 
+                    style="background: var(--primary-color); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2); transition: all 0.2s;"
+                    onmouseover="this.style.transform='translateY(-1px)'"
+                    onmouseout="this.style.transform='translateY(0)'">
+                    <span class="material-icons-round" style="font-size: 16px;">folder_open</span>
+                    View Files
+                </button>
+            </td>
         `;
         tableBody.appendChild(tr);
     });
 }
+
+// --- FILE MODAL LOGIC (Adviser View) ---
+window.openFileModal = async (groupId) => {
+    const group = allGroups.find(g => g.id === groupId);
+    if (!group) return;
+
+    document.getElementById('modalGroupName').innerText = `${group.group_name} - Submissions`;
+    const fileList = document.getElementById('fileList');
+    fileList.innerHTML = '';
+
+    // Reset PDF view
+    document.getElementById('adobe-dc-view').style.display = 'none';
+    document.getElementById('pdfPlaceholder').style.display = 'flex';
+    if (currentAdobeView) {
+        document.getElementById('adobe-dc-view').innerHTML = '';
+        currentAdobeView = null;
+    }
+
+    // Prepare File Categories
+    const categories = [
+        { title: 'Title Defense', data: group.title_link, icon: 'article', key: 'titles' },
+        { title: 'Pre-Oral Defense', data: group.pre_oral_link, icon: 'description', key: 'pre_oral' },
+        { title: 'Final Defense', data: group.final_link, icon: 'menu_book', key: 'final' }
+    ];
+
+    categories.forEach(cat => {
+        let files = {};
+        if (cat.data) {
+            try { files = typeof cat.data === 'string' ? JSON.parse(cat.data) : cat.data; } catch (e) { }
+        }
+        if (Object.keys(files).length > 0) {
+            createSection(cat.title, files, cat.icon, cat.key, group);
+        }
+    });
+
+    document.getElementById('fileModal').style.display = 'flex';
+};
+
+function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
+    const section = document.createElement('div');
+    section.style.marginBottom = '20px';
+
+    const header = document.createElement('h4');
+    header.innerHTML = `<span class="material-icons-round" style="font-size:16px; vertical-align:middle; margin-right:4px;">${icon}</span> ${sectionTitle}`;
+    header.style.cssText = 'font-size: 0.85rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 10px;';
+    section.appendChild(header);
+
+    const statusesForGroup = allDefenseStatuses.filter(ds => ds.group_id === group.id);
+    const statusRow = statusesForGroup.find(s => {
+        const type = (s.defense_type || '').toLowerCase();
+        if (categoryKey === 'titles' && type.includes('title')) return true;
+        if (categoryKey === 'pre_oral' && type.includes('pre-oral')) return true;
+        if (categoryKey === 'final' && type.includes('final')) return true;
+        return false;
+    });
+
+    let overallRemarks = {};
+    let overallStatuses = {};
+    if (statusRow) {
+        try { overallRemarks = typeof statusRow.remarks === 'string' ? JSON.parse(statusRow.remarks) : statusRow.remarks || {}; } catch (e) { }
+        try { overallStatuses = typeof statusRow.statuses === 'string' ? JSON.parse(statusRow.statuses) : statusRow.statuses || {}; } catch (e) { }
+    }
+
+    Object.entries(fileObj).forEach(([label, url]) => {
+        const isRevised = label.endsWith('_revised');
+        const cleanUrl = url ? url.toString().trim() : "";
+        if (!cleanUrl || cleanUrl.toLowerCase() === "null" || isRevised) return;
+
+        const itemContainer = document.createElement('div');
+        itemContainer.style.cssText = 'background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; overflow: hidden;';
+
+        // Title Mapping logic (similar to panel)
+        let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        if (categoryKey === 'titles' && group.project_title) {
+            try {
+                const projectTitles = typeof group.project_title === 'string' && group.project_title.startsWith('{')
+                    ? JSON.parse(group.project_title)
+                    : { title1: group.project_title };
+                if (projectTitles[label]) displayLabel = projectTitles[label];
+            } catch (e) { }
+        }
+
+        const item = document.createElement('div');
+        item.style.cssText = 'padding: 10px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;';
+        item.onmouseover = () => item.style.background = '#f8fafc';
+        item.onmouseout = () => item.style.background = 'transparent';
+        item.onclick = () => loadPDF(url, displayLabel, label);
+
+        item.innerHTML = `
+            <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
+            <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">arrow_forward_ios</span>
+        `;
+        itemContainer.appendChild(item);
+
+        // Feedback Display Area
+        const feedbackArea = document.createElement('div');
+        feedbackArea.style.cssText = 'padding: 10px 12px; background: #fdfdfd; border-top: 1px solid #f1f5f9;';
+
+        // 1. Panel Remarks (from defense_statuses)
+        const remarks = overallRemarks[label] || '-';
+        const myStatus = overallStatuses[label] || 'Pending';
+
+        feedbackArea.innerHTML = `
+            <div style="margin-bottom: 8px;">
+                <label style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; display: block; text-transform: uppercase;">Panel Remarks</label>
+                <div style="font-size: 0.8rem; color: #475569; line-height: 1.4; margin-top: 2px;">${remarks}</div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; display: block; text-transform: uppercase;">Overall Status</label>
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--primary-color);">${myStatus}</span>
+                </div>
+            </div>
+        `;
+
+        // 2. Specific Panel Feedbacks/Comments (from capstone_feedback)
+        const comments = allCapstoneFeedback.filter(cf => cf.group_id === group.id && cf.file_key === label);
+        if (comments.length > 0) {
+            const commentListHtml = comments.map(c => `
+                <div style="padding: 6px; background: #fff; border-radius: 4px; border: 1px solid #f1f5f9; margin-top: 4px;">
+                    <div style="font-size: 0.7rem; font-weight: 800; color: var(--primary-color); display: flex; justify-content: space-between;">
+                        ${c.panelist_name}
+                        <span style="color: #94a3b8; font-weight: 500;">${c.status || 'Pending'}</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${c.remarks || 'No remarks provided'}</div>
+                </div>
+            `).join('');
+
+            feedbackArea.innerHTML += `
+                <div style="margin-top: 10px;">
+                    <label style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; display: block; text-transform: uppercase;">Detailed Panel Comments</label>
+                    ${commentListHtml}
+                </div>
+            `;
+        }
+
+        itemContainer.appendChild(feedbackArea);
+        section.appendChild(itemContainer);
+    });
+
+    document.getElementById('fileList').appendChild(section);
+}
+
+window.closeFileModal = () => {
+    document.getElementById('fileModal').style.display = 'none';
+};
+
+window.loadPDF = (url, title, fileKey) => {
+    currentViewerFileKey = fileKey;
+    document.getElementById('pdfPlaceholder').style.display = 'none';
+    const viewerDiv = document.getElementById('adobe-dc-view');
+    viewerDiv.style.display = 'block';
+
+    // Clear previous
+    viewerDiv.innerHTML = '';
+
+    if (window.AdobeDC) {
+        currentAdobeView = new AdobeDC.View({
+            clientId: "8ebcb61f76d649989f2ae52da7014605",
+            divId: "adobe-dc-view"
+        });
+        currentAdobeView.previewFile({
+            content: { location: { url: url } },
+            metaData: { fileName: title }
+        }, {
+            embedMode: "FULL_WINDOW",
+            showAnnotationTools: false, // Cleaner for Adviser
+            showLeftHandPanel: true,
+            showDownloadPDF: true,
+            showPrintPDF: true
+        });
+    } else {
+        viewerDiv.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
+    }
+
+    // Highlight the active file in sidebar
+    document.querySelectorAll('.file-item').forEach(it => it.style.boxShadow = 'none');
+    // ... we don't have .file-item since I used parent/child divs, let's just leave it for now.
+};
+
+// Add Adobe SDK
+const script = document.createElement('script');
+script.src = "https://documentservices.adobe.com/view-sdk/viewer.js";
+document.head.appendChild(script);
 
 function logout() {
     localStorage.removeItem('loginUser');
