@@ -364,6 +364,44 @@ function updateCounts(groups) {
         window.statusChart.data.datasets[0].data = [approvedTotal, rejectedTotal];
         window.statusChart.update();
     }
+
+    // Update Status Log
+    const logEl = document.getElementById('statusLog');
+    if (logEl) {
+        const updates = [];
+        groups.forEach(g => {
+            const tMap = resolveStatusMap(g.id, 'Title Defense');
+            const values = Object.values(tMap);
+
+            // Determine display status
+            let displayStatus = 'Pending';
+            if (values.some(v => v === 'Redefend')) displayStatus = 'Redefend';
+            else if (values.some(v => v === 'Rejected')) displayStatus = 'Rejected';
+            else if (values.some(v => v && v.includes('Revision'))) displayStatus = 'Approved w/ Rev';
+            else if (values.some(v => v && (v.includes('Approved') || v.includes('Approve') || v === 'Completed'))) displayStatus = 'Approved';
+
+            if (displayStatus !== 'Pending') {
+                updates.push({ name: g.group_name, status: displayStatus });
+            }
+        });
+
+        if (updates.length > 0) {
+            logEl.innerHTML = updates.map(u => {
+                let color = '#64748b';
+                if (u.status === 'Approved') color = '#22c55e';
+                else if (u.status === 'Rejected' || u.status === 'Redefend') color = '#ef4444';
+                else if (u.status.includes('Rev')) color = '#f59e0b';
+
+                return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding: 10px 0; border-bottom:1px solid #f1f5f9;">
+                    <span style="font-weight:600; font-size:0.85rem; color:#334155;">${u.name}</span>
+                    <span style="font-size:0.75rem; font-weight:700; padding: 4px 10px; border-radius:12px; background:${color}20; color:${color};">${u.status.toUpperCase()}</span>
+                </div>`;
+            }).join('');
+        } else {
+            logEl.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:0.9rem; margin-top: 20px;">No graded titles found.</div>';
+        }
+    }
 }
 
 // Global variable for chart
