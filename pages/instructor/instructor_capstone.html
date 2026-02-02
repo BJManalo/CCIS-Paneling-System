@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCIS Paneling System - Admin Dashboard</title>
+    <title>CCIS Paneling System - Capstone Manager</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,45 +16,69 @@
     <link rel="icon" type="image/png" href="../../assets/images/favicon.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .charts-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        .tabs-container {
+            display: flex;
             gap: 20px;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 1px;
         }
 
-        .chart-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            border: 1px solid #f0f0f0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .chart-title {
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            font-family: 'Outfit', sans-serif;
             font-size: 1rem;
-            font-weight: 700;
-            color: var(--primary-dark);
-            margin-bottom: 15px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
         }
 
-        .filters-container {
+        .tab-btn span {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--primary-color);
+            border-radius: 3px 3px 0 0;
+        }
+
+        .panel-tags {
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
+            gap: 4px;
         }
 
-        .filter-select {
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            font-family: inherit;
+        .panel-tag {
+            background: #f1f5f9;
             color: #475569;
-            outline: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
         }
     </style>
 </head>
@@ -75,45 +99,28 @@
             </button>
         </header>
 
+        <!-- Page Title & Tabs -->
+        <div style="margin-bottom: 20px;">
+            <h2 style="color: var(--primary-dark); font-weight: 700; margin-bottom: 5px;">Capstone Submissions</h2>
+            <p style="color: #64748b; font-size: 0.9rem;">Manage advisory groups and view all submissions.</p>
+        </div>
+
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('ADVISORY')">My Advisory</button>
+            <button class="tab-btn" onclick="switchTab('ALL')">All Submissions</button>
+        </div>
+
         <!-- Filters (Top Level) -->
-        <div class="filters-container">
-            <select id="programFilter" class="filter-select" onchange="applyDashboardFilters()">
-                <option value="ALL">All Programs</option>
-                <option value="BSIS">BSIS</option>
-                <option value="BSIT">BSIT</option>
-                <option value="BSCS">BSCS</option>
-            </select>
-            <select id="sectionFilter" class="filter-select" onchange="applyDashboardFilters()">
-                <option value="ALL">All Sections</option>
-                <!-- Populated dynamically -->
-            </select>
-        </div>
-
-        <!-- Charts Row -->
-        <!-- Status Summary Tabs (Instructor) -->
-        <div class="charts-row">
-            <div class="chart-card" onclick="setCategoryFilter('APPROVED')" style="cursor: pointer;">
-                <div class="chart-title">Approved Titles</div>
-                <h1 style="font-size: 3rem; color: #3b82f6; margin: 0;" id="countTitle">0</h1>
-                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Titles</div>
+        <div class="filters-container" style="justify-content: space-between;">
+            <div style="display:flex; gap: 15px;">
+                <select id="programFilter" class="filter-select" onchange="applyFilters()">
+                    <option value="ALL">All Programs</option>
+                    <option value="BSIS">BSIS</option>
+                    <option value="BSIT">BSIT</option>
+                    <option value="BSCS">BSCS</option>
+                </select>
+                <!-- Add more filters if needed like Defense Type -->
             </div>
-            <div class="chart-card" onclick="setCategoryFilter('REJECTED')" style="cursor: pointer;">
-                <div class="chart-title">Rejected Titles</div>
-                <h1 style="font-size: 3rem; color: #dc2626; margin: 0;" id="countPreOral">0</h1>
-                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Titles</div>
-            </div>
-            <div class="chart-card" onclick="setCategoryFilter('COMPLETED')" style="cursor: pointer;">
-                <div class="chart-title">Completed Titles</div>
-                <h1 style="font-size: 3rem; color: #16a34a; margin: 0;" id="countFinal">0</h1>
-                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Titles</div>
-            </div>
-        </div>
-
-        <!-- Filters -->
-        <div class="filter-section">
-            <button class="filter-btn bsis" onclick="filterTable('BSIS')">BSIS</button>
-            <button class="filter-btn bsit" onclick="filterTable('BSIT')">BSIT</button>
-            <button class="filter-btn bscs" onclick="filterTable('BSCS')">BSCS</button>
         </div>
 
         <!-- Data Table -->
@@ -121,23 +128,22 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Title</th>
-                        <th>Group Name</th>
-                        <th>Members</th>
-                        <th>Program</th>
-                        <th>Year</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                        <th style="width: 15%;">Type</th>
+                        <th style="width: 20%;">Group Name</th>
+                        <th style="width: 8%;">Program</th>
+                        <th style="width: 15%;">Date & Time</th>
+                        <th style="width: 12%;">Venue</th>
+                        <th style="width: 20%;">Panels</th>
+                        <th style="width: 10%; text-align: center;">Submission</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <!-- Data will be populated here by JS, leaving blank for now as requested -->
-                    <!-- Placeholder row to show structure if needed, or completely empty -->
+                    <!-- Data will be populated here by JS -->
                 </tbody>
             </table>
             <div class="empty-state" id="emptyState" style="display: none;">
                 <span class="material-icons-round">inbox</span>
-                <p>No data available</p>
+                <p>No submissions found.</p>
             </div>
         </div>
 
@@ -155,9 +161,9 @@
             <span class="material-icons-round">dashboard</span>
             <span class="nav-label">Dashboard</span>
         </a>
-        <a href="instructor_advisory" class="nav-item active">
+        <a href="instructor_capstone" class="nav-item active">
             <span class="material-icons-round">folder_shared</span>
-            <span class="nav-label">Advisory</span>
+            <span class="nav-label">Capstone</span>
         </a>
         <a href="instructor_evaluation" class="nav-item">
             <span class="material-icons-round">rate_review</span>
@@ -232,7 +238,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="instructor_advisory.js?v=2"></script>
+    <script src="instructor_capstone.js?v=2"></script>
 </body>
 
 </html>
