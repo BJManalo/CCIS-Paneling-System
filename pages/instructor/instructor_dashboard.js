@@ -193,7 +193,7 @@ window.applyDashboardFilters = () => {
         const fMap = getStatusMap(finalRow);
 
         const members = allStudents
-            .filter(s => s.group_id === g.id)
+            .filter(s => String(s.group_id) === String(g.id))
             .map(s => s.full_name)
             .join(', ');
 
@@ -208,7 +208,10 @@ window.applyDashboardFilters = () => {
 
         // Determine which title is approved
         const approvedKey = Object.keys(tMap).find(k => (tMap[k] || '').includes('Approved'));
-        let projectTitleDisplay = g.group_name;
+        // Default to Title 1 if available, else Group Name
+        let projectTitleDisplay = getTitleText(g.project_title, 'title1');
+        if (!projectTitleDisplay || projectTitleDisplay === 'undefined') projectTitleDisplay = g.group_name;
+
         if (approvedKey) {
             projectTitleDisplay = getTitleText(g.project_title, approvedKey);
         }
@@ -466,22 +469,25 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         // 2. REVISED VERSION (if exists)
         if (fileObj[label + '_revised']) {
             const revisedUrl = fileObj[label + '_revised'];
-            const revItem = document.createElement('div');
-            revItem.className = 'file-item';
-            revItem.style.cssText = 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #fffbeb; border-top: 1px dashed #fcd34d; transition: all 0.2s;';
-            revItem.innerHTML = `
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <span class="material-icons-round" style="font-size: 16px; color: #b45309;">history_edu</span>
-                    <span style="font-size: 0.8rem; font-weight: 600; color: #b45309;">Revised Version</span>
-                </div>
-                <span class="material-icons-round" style="font-size: 16px; color: #b45309;">arrow_forward</span>
-            `;
-            revItem.onclick = () => {
-                document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
-                revItem.style.background = '#fcd34d';
-                loadPDF(revisedUrl, `Revised - ${displayLabel}`, label + '_revised');
-            };
-            itemContainer.appendChild(revItem);
+            // Valid check
+            if (revisedUrl && revisedUrl.toLowerCase() !== 'null' && revisedUrl.trim() !== '') {
+                const revItem = document.createElement('div');
+                revItem.className = 'file-item';
+                revItem.style.cssText = 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #fffbeb; border-top: 1px dashed #fcd34d; transition: all 0.2s;';
+                revItem.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="material-icons-round" style="font-size: 16px; color: #b45309;">history_edu</span>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: #b45309;">Revised Version</span>
+                    </div>
+                    <span class="material-icons-round" style="font-size: 16px; color: #b45309;">arrow_forward</span>
+                `;
+                revItem.onclick = () => {
+                    document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
+                    revItem.style.background = '#fcd34d';
+                    loadPDF(revisedUrl, `Revised - ${displayLabel}`, label + '_revised');
+                };
+                itemContainer.appendChild(revItem);
+            }
         }
 
         // 3. FEEDBACK AREA (Adviser Read-Only)
