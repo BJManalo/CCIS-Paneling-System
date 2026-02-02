@@ -791,8 +791,16 @@ window.saveSubmissions = async function (specificField) {
 
         // Update local state and lock current sub-tab only
         window.currentLinks[tabId] = activeLinks;
-        // Delay refresh slightly for user to see success
-        setTimeout(() => { if (btn) { btn.innerHTML = originalContent; btn.disabled = false; } window.location.reload(); }, 1500);
+        // Refresh data without full page reload to maintain current tab
+        setTimeout(async () => {
+            if (btn) {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+            await loadSubmissionData();
+            // Re-select the active tab to ensure UI is consistent
+            updateSaveButtonState(tabId);
+        }, 1500);
 
     } catch (err) {
         console.error('Submission error:', err);
