@@ -282,7 +282,7 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
 
     const header = document.createElement('h4');
     header.innerHTML = `<span class="material-icons-round" style="font-size:16px; vertical-align:middle; margin-right:4px;">${icon}</span> ${sectionTitle}`;
-    header.style.cssText = 'font-size: 0.85rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 10px;';
+    header.style.cssText = 'font-size: 0.85rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 10px; font-weight: 700;';
     section.appendChild(header);
 
     const statusesForGroup = allDefenseStatuses.filter(ds => ds.group_id === group.id);
@@ -307,12 +307,12 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         if (!cleanUrl || cleanUrl.toLowerCase() === "null" || isRevised) return;
 
         const itemContainer = document.createElement('div');
-        itemContainer.style.cssText = 'background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; overflow: hidden;';
+        itemContainer.style.cssText = 'background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; overflow: hidden; transition: all 0.2s;';
 
         // 1. MAIN FILE ITEM
         const item = document.createElement('div');
         item.className = 'file-item';
-        item.style.cssText = 'padding: 10px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;';
+        item.style.cssText = 'padding: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;';
 
         let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
         if (categoryKey === 'titles' && group.project_title) {
@@ -325,13 +325,18 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         }
 
         item.innerHTML = `
-            <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
+            <span style="font-size: 0.95rem; font-weight: 600; color: #334155;">${displayLabel}</span>
             <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">arrow_forward_ios</span>
         `;
 
         item.onclick = () => {
-            document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
+            document.querySelectorAll('.file-item').forEach(el => {
+                el.style.background = 'white';
+                if (el.parentElement) el.parentElement.style.borderColor = '#e2e8f0';
+            });
             item.style.background = '#f0f9ff';
+            itemContainer.style.borderColor = 'var(--primary-color)';
+            itemContainer.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.1)';
             loadPDF(url, displayLabel, label);
         };
         itemContainer.appendChild(item);
@@ -341,11 +346,11 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
             const revisedUrl = fileObj[label + '_revised'];
             const revItem = document.createElement('div');
             revItem.className = 'file-item';
-            revItem.style.cssText = 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #fffbeb; border-top: 1px dashed #fcd34d; transition: all 0.2s;';
+            revItem.style.cssText = 'padding: 10px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: #fffbeb; border-top: 1px dashed #fcd34d; transition: all 0.2s;';
             revItem.innerHTML = `
                 <div style="display:flex; align-items:center; gap:6px;">
                     <span class="material-icons-round" style="font-size: 16px; color: #b45309;">history_edu</span>
-                    <span style="font-size: 0.8rem; font-weight: 600; color: #b45309;">Revised Version</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: #b45309;">Revised Version</span>
                 </div>
                 <span class="material-icons-round" style="font-size: 16px; color: #b45309;">arrow_forward</span>
             `;
@@ -357,44 +362,62 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
             itemContainer.appendChild(revItem);
         }
 
-        // 3. FEEDBACK AREA
-        const feedbackArea = document.createElement('div');
-        feedbackArea.style.cssText = 'padding: 12px; background: #f8fafc; border-top: 1px solid #e2e8f0;';
-
+        // 3. FEEDBACK AREA (Read Only - Card Style)
         const fileStatuses = typeof overallStatuses[label] === 'object' ? overallStatuses[label] : {};
         const fileRemarks = typeof overallRemarks[label] === 'object' ? overallRemarks[label] : {};
         const panelsList = Object.keys(fileStatuses);
+
+        const feedbackArea = document.createElement('div');
+        feedbackArea.style.cssText = 'padding: 15px; background: #f8fafc; border-top: 1px solid #e2e8f0;';
+
+        const readOnlyBanner = `
+            <div style="padding: 10px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 8px; color: #0369a1; font-size: 0.8rem; font-weight: 600; text-align: center; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span class="material-icons-round" style="font-size: 16px;">visibility</span>
+                Adviser Read-Only View
+            </div>
+        `;
 
         let evaluationsHtml = '';
         if (panelsList.length > 0) {
             evaluationsHtml = panelsList.map(panel => {
                 const status = fileStatuses[panel] || 'Pending';
-                const rmk = fileRemarks[panel] || '';
-                let color = '#64748b';
-                if (status.includes('Approved') || status === 'Completed') color = '#059669';
-                else if (status.includes('Revisions')) color = '#d97706';
-                else if (status === 'Rejected' || status === 'Redefend') color = '#dc2626';
+                const remark = fileRemarks[panel] || '';
+
+                // Style Logic
+                let sColor = '#64748b'; let sBg = '#f1f5f9'; let iText = 'hourglass_empty';
+                if (status.includes('Approved') || status === 'Completed') {
+                    sColor = '#059669'; sBg = '#dcfce7'; iText = 'check_circle';
+                } else if (status.includes('Revisions')) {
+                    sColor = '#d97706'; sBg = '#fef3c7'; iText = 'warning';
+                } else if (status.includes('Rejected') || status.includes('Redefend')) {
+                    sColor = '#dc2626'; sBg = '#fee2e2'; iText = 'cancel';
+                }
 
                 return `
-                    <div style="font-size: 11px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
-                            <strong style="color: var(--primary-color);">${panel}</strong>
-                            <span style="font-weight:700; color:${color};">${status}</span>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.8rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">${panel}</span>
+                        <div style="font-size: 11px; font-weight: 700; color: ${sColor}; background: ${sBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
+                            <span class="material-icons-round" style="font-size: 14px;">${iText}</span>
+                            ${status}
                         </div>
-                        <div style="color: #64748b; font-style: italic;">"${rmk || 'No specific remarks'}"</div>
                     </div>
+                    <div style="font-size: 0.85rem; color: #334155; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #f1f5f9; white-space: pre-wrap; line-height: 1.5;">${remark ? remark.replace(new RegExp('^' + panel + ':\\s*'), '') : '<em style="color:#cbd5e1;">No remarks provided.</em>'}</div>
+                </div>
                 `;
             }).join('');
         } else {
-            evaluationsHtml = '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:5px;">Waiting for panel evaluations...</div>';
+            evaluationsHtml = `
+                <div style="text-align: center; padding: 20px; color: #94a3b8;">
+                    <span class="material-icons-round" style="font-size: 24px; opacity: 0.5;">hourglass_empty</span>
+                    <p style="font-size: 0.85rem; margin-top: 5px;">Waiting for panel evaluations...</p>
+                </div>
+            `;
         }
 
         feedbackArea.innerHTML = `
-            <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 11px; font-weight: 600; text-align: center; margin-bottom: 12px;">
-                <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
-                ADVISER READ-ONLY VIEW
-            </div>
-            <div style="font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Panel Evaluations</div>
+            ${readOnlyBanner}
+            <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Panel Evaluations</div>
             ${evaluationsHtml}
         `;
 
