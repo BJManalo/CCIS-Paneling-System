@@ -361,15 +361,6 @@ async function renderTable() {
             </td>
             <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>${row.year}</td>
-            <td>
-                <button onclick="openFileModal(${row.id})" 
-                    style="background: var(--primary-color); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2); transition: all 0.2s;"
-                    onmouseover="this.style.transform='translateY(-1px)'"
-                    onmouseout="this.style.transform='translateY(0)'">
-                    <span class="material-icons-round" style="font-size: 16px;">folder_open</span>
-                    View Files
-                </button>
-            </td>
         `;
         tableBody.appendChild(tr);
     });
