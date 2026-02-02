@@ -149,31 +149,18 @@
     <div class="dashboard-container">
         <!-- Header with Logo & Search -->
         <header class="dashboard-header">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button id="menuBtn" class="menu-btn" onclick="toggleMenu()">
-                    <span class="material-icons-round">menu</span>
-                </button>
-                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
-            </div>
+            <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
 
-            <!-- Dropdown Menu -->
-            <div id="dropdownMenu" class="dropdown-menu">
-                <a href="archive_studies" class="dropdown-item">
-                    <span class="material-icons-round">inventory_2</span>
-                    Archive Studies
-                </a>
-                <div style="border-top: 1px solid #f1f5f9; margin: 4px 0;"></div>
-                <button onclick="logout()" class="dropdown-item"
-                    style="width: 100%; border: none; background: transparent; cursor: pointer; text-align: left;">
-                    <span class="material-icons-round" style="color: #ef4444;">logout</span>
-                    <span style="color: #ef4444;">Log Out</span>
-                </button>
-            </div>
+
 
             <div class="search-bar">
                 <span class="material-icons-round">search</span>
                 <input type="text" placeholder="Search Accounts..." id="searchInput">
             </div>
+            <button class="logout-btn" onclick="logout()">
+                <span class="material-icons-round">logout</span>
+                <span>Log Out</span>
+            </button>
         </header>
 
         <!-- Title -->
@@ -279,22 +266,13 @@
             <span class="material-icons-round">people</span>
             <span class="nav-label">Accounts</span>
         </a>
+        <a href="archive_studies" class="nav-item">
+            <span class="material-icons-round">inventory_2</span>
+            <span class="nav-label">Archive</span>
+        </a>
     </nav>
 
-    <script>
-        function toggleMenu() {
-            const menu = document.getElementById('dropdownMenu');
-            menu.classList.toggle('active');
-        }
 
-        document.addEventListener('click', (e) => {
-            const menu = document.getElementById('dropdownMenu');
-            const btn = document.getElementById('menuBtn');
-            if (menu.classList.contains('active') && !menu.contains(e.target) && !btn.contains(e.target)) {
-                menu.classList.remove('active');
-            }
-        });
-    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="accounts.js"></script>
