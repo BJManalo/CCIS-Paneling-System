@@ -293,32 +293,22 @@ function getStatusMap(row) {
 }
 
 function updateCounts(groups) {
-    const groupIds = groups.map(g => g.id);
-    // Use allDefenseStatuses because that is what populates the view
-    // Convert IDs to strings for safe comparison
-    const relevantStatuses = allDefenseStatuses.filter(ds =>
-        groupIds.some(gid => String(gid) === String(ds.group_id))
-    );
-
     let approvedTotal = 0;
     let rejectedTotal = 0;
 
-    groupIds.forEach(id => {
-        const titleRow = relevantStatuses.find(ds => String(ds.group_id) === String(id) && ds.defense_type === 'Title Defense');
+    groups.forEach(g => {
+        // Direct look-up matching the table's logic (using loose equality for safety)
+        const titleRow = allDefenseStatuses.find(ds => ds.group_id == g.id && ds.defense_type === 'Title Defense');
 
-        // Check Titles
         if (titleRow && titleRow.statuses) {
             const tMap = getStatusMap(titleRow);
             const values = Object.values(tMap);
 
-            // Count specific titles, not just the group aggregate
-            // "if the status set by the panels=approved that counts as 1"
-            // "1 title is rejected that count as 1"
-            // So we iterate over all values (files) in the map
+            // Count individual titles
             values.forEach(v => {
-                if (v.includes('Approved') || v.includes('Completed')) {
+                if (v && (v.includes('Approved') || v.includes('Completed'))) {
                     approvedTotal++;
-                } else if (v === 'Rejected' || v === 'Redefend') {
+                } else if (v && (v === 'Rejected' || v === 'Redefend')) {
                     rejectedTotal++;
                 }
             });
@@ -326,7 +316,6 @@ function updateCounts(groups) {
     });
 
     // OVERRIDE: If we are actively filtering by a category, the count should reflect visible rows
-    // This fixes the issue where clicking the card shows rows but the count says 0 (or mismatch)
     if (currentCategory === 'APPROVED') {
         approvedTotal = displayRows.length;
     } else if (currentCategory === 'REJECTED') {
