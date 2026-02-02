@@ -282,8 +282,8 @@ function getStatusMap(row) {
             // Priority: Redefend > Rejected > Approved with Revisions > Approved
             if (values.some(v => v === 'Redefend')) flat[fileKey] = 'Redefend';
             else if (values.some(v => v === 'Rejected')) flat[fileKey] = 'Rejected';
-            else if (values.some(v => v === 'Approved with Revisions')) flat[fileKey] = 'Approved with Revisions';
-            else if (values.some(v => v === 'Approved' || v === 'Completed')) flat[fileKey] = 'Approved';
+            else if (values.some(v => v.includes('Revision'))) flat[fileKey] = 'Approved with Revisions';
+            else if (values.some(v => v.includes('Approve') || v === 'Completed')) flat[fileKey] = 'Approved';
             else flat[fileKey] = 'Pending';
         } else {
             flat[fileKey] = val || 'Pending';
@@ -305,7 +305,7 @@ function updateCounts(groups) {
 
             // Count based on resolved status
             values.forEach(v => {
-                if (v === 'Approved' || v === 'Approved with Revisions' || v === 'Completed') {
+                if (v && (v.includes('Approved') || v === 'Completed')) {
                     approvedTotal++;
                 } else if (v === 'Rejected' || v === 'Redefend') {
                     rejectedTotal++;

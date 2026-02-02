@@ -682,7 +682,9 @@ window.openFileModal = (groupId) => {
             const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
             const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
 
-            const myStatus = fileStatuses[userName] || 'Pending';
+            let myStatus = fileStatuses[userName] || 'Pending';
+            if (myStatus === 'Approve') myStatus = 'Approved';
+            if (myStatus === 'Approve with Revisions') myStatus = 'Approved with Revisions';
             const myRemarks = fileRemarks[userName] || '';
 
             // ... (Controls Rendering Code) ...
