@@ -697,7 +697,8 @@ window.saveSubmissions = async function (specificField) {
 
         if (error) throw error;
 
-        showToast(`${specificField.toUpperCase()} saved successfully!`, 'success');
+        // Show a generic but clear success message
+        showToast('Successfully submitted', 'success');
 
         // Immediately update UI labels if it was a title update
         if (tabId === 'titles') {
@@ -721,10 +722,6 @@ window.saveSubmissions = async function (specificField) {
         window.currentLinks[tabId] = activeLinks;
         // Refresh data without full page reload to maintain current tab
         setTimeout(async () => {
-            if (btn) {
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-            }
             await loadSubmissionData();
             // Re-select the active tab to ensure UI is consistent
             updateSaveButtonState(tabId);
