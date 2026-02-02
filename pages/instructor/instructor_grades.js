@@ -119,7 +119,8 @@ function renderGrades() {
 
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
-    const userName = (user ? (user.full_name || '') : '').toLowerCase();
+    // Robust extraction: check 'name', then 'full_name'
+    const userName = (user ? (user.name || user.full_name || '') : '').toLowerCase().trim();
 
     tableBody.innerHTML = '';
 
@@ -145,9 +146,10 @@ function renderGrades() {
 
         // Role/Tab Filter
         const adviserField = (group.adviser || '').toLowerCase();
-        // Split by comma if multiple advisers, then check exact match against current user
-        const adviserList = adviserField.split(',').map(a => a.trim());
-        const isAdviser = adviserList.includes(userName);
+        // Split by comma or slash, trim, and check for exact match against the robust userName
+        // Using 'some' allows us to compare trimmed versions cleanly
+        const adviserList = adviserField.split(/[,/]+/).map(a => a.trim());
+        const isAdviser = adviserList.some(a => a === userName);
 
         if (!group.schedules || group.schedules.length === 0) return;
 
