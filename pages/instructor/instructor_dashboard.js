@@ -80,12 +80,8 @@ async function fetchDashboardData() {
 function populateSectionFilter() {
     const sectionFilter = document.getElementById('sectionFilter');
 
-    // Filter groups where I am the adviser
-    const myGroups = allGroups.filter(g =>
-        g.adviser && g.adviser.toLowerCase().trim() === instructorName.toLowerCase().trim()
-    );
-
-    const sections = [...new Set(myGroups.map(g => g.section).filter(Boolean))].sort();
+    // Use allGroups for section filtering to allow Instructor to see all sections
+    const sections = [...new Set(allGroups.map(g => g.section).filter(Boolean))].sort();
 
     sections.forEach(sec => {
         const option = document.createElement('option');
@@ -128,12 +124,13 @@ window.applyDashboardFilters = () => {
     const section = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-    // 1. Filter by Adviser, Program, Section, Search (Used for COUNTS)
+    // 1. Filter by Program, Section, Search
     const baseGroups = allGroups.filter(g => {
-        const dbAdviser = (g.adviser || '').toLowerCase().trim();
-        const me = instructorName.toLowerCase().trim();
-        const isMyGroup = dbAdviser.includes(me) || me.includes(dbAdviser);
-        if (!isMyGroup) return false;
+        // Removed Adviser restriction to show ALL records
+        // const dbAdviser = (g.adviser || '').toLowerCase().trim();
+        // const me = instructorName.toLowerCase().trim();
+        // const isMyGroup = dbAdviser.includes(me) || me.includes(dbAdviser);
+        // if (!isMyGroup) return false;
 
         const progMatch = program === 'ALL' || (g.program && g.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (g.section && g.section === section);
@@ -432,7 +429,8 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
     Object.entries(fileObj).forEach(([label, url]) => {
         const isRevised = label.endsWith('_revised');
         const cleanUrl = url ? url.toString().trim() : "";
-        if (!cleanUrl || cleanUrl.toLowerCase() === "null" || isRevised) return;
+        // Filter out null labels explicitly
+        if (!cleanUrl || cleanUrl.toLowerCase() === "null" || isRevised || label.toLowerCase() === 'null') return;
 
         const itemContainer = document.createElement('div');
         itemContainer.style.cssText = 'background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; overflow: hidden;';
