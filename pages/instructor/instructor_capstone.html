@@ -14,71 +14,103 @@
     <!-- Styles -->
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="icon" type="image/png" href="../../assets/images/favicon.png">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
+
     <style>
-        .tabs-container {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 25px;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 1px;
+        /* PDF.js Text Layer styles */
+        .textLayer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            opacity: 1;
+            /* Changed from 0.2 to 1 for better selection precision */
+            line-height: 1.0;
+            mix-blend-mode: multiply;
+            /* Natural highlight blend */
         }
 
-        .tab-btn {
+        .textLayer span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
+
+        .textLayer ::selection {
+            background: rgba(0, 84, 255, 0.25);
+            /* Standard blue highlight */
+        }
+
+        .role-tab {
             background: none;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 0;
             font-family: 'Outfit', sans-serif;
             font-size: 1rem;
-            font-weight: 600;
-            color: #64748b;
-            cursor: pointer;
-            position: relative;
-            transition: all 0.2s;
-        }
-
-        .tab-btn span {
-            display: inline-block;
-            vertical-align: middle;
-        }
-
-        .tab-btn.active {
-            color: var(--primary-color);
-        }
-
-        .tab-btn.active::after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: var(--primary-color);
-            border-radius: 3px 3px 0 0;
-        }
-
-        .panel-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-
-        .panel-tag {
-            background: #f1f5f9;
-            color: #475569;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
             font-weight: 500;
+            cursor: pointer;
+            color: #64748b;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
         }
 
-        .type-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.8rem;
+        .role-tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .role-tab:hover:not(.active) {
+            color: var(--primary-light);
+        }
+
+        .role-filter-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 99px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: #64748b;
+            font-size: 0.9rem;
             font-weight: 600;
-            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .role-filter-btn:hover {
+            background: #f8fafc;
+            color: var(--primary-dark);
+        }
+
+        .role-filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        }
+
+        .role-filter-btn .material-icons-round {
+            font-size: 18px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -99,28 +131,55 @@
             </button>
         </header>
 
-        <!-- Page Title & Tabs -->
-        <div style="margin-bottom: 20px;">
-            <h2 style="color: var(--primary-dark); font-weight: 700; margin-bottom: 5px;">Capstone Submissions</h2>
-            <p style="color: #64748b; font-size: 0.9rem;">Manage advisory groups and view all submissions.</p>
+        <!-- Role Context Tabs (Hidden for Instructor if they only have one role, but requested to copy panel logic) -->
+        <!-- Panel/Adviser Logic COPY -->
+        <div style="display: flex; gap: 15px; margin: 25px 0 0 0;  padding-left: 20px;">
+            <!-- We show Adviser by default for Instructor, but logic allows switching if they are also panel -->
+            <button class="role-filter-btn active" onclick="switchRole('Adviser')" id="role-Adviser">
+                <span class="material-icons-round">school</span>
+                Adviser
+            </button>
+            <button class="role-filter-btn" onclick="switchRole('Panel')" id="role-Panel">
+                <span class="material-icons-round">groups</span>
+                Panel
+            </button>
         </div>
 
-        <div class="tabs-container">
-            <button class="tab-btn active" onclick="switchTab('ADVISORY')">My Advisory</button>
-            <button class="tab-btn" onclick="switchTab('ALL')">All Submissions</button>
+        <!-- Defense Stage Tabs -->
+        <div class="role-tabs"
+            style="display: flex; gap: 40px; margin: 20px 0; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">
+            <button class="role-tab active" onclick="switchTab('Title Defense')" id="tab-Title Defense">
+                Title Defense
+            </button>
+            <button class="role-tab" onclick="switchTab('Pre-Oral Defense')" id="tab-Pre-Oral Defense"
+                style="display: flex; align-items: center; gap: 6px;">
+                Pre-Oral Defense
+                <span class="lock-icon material-icons-round" style="font-size: 16px; display: none;">lock</span>
+            </button>
+            <button class="role-tab" onclick="switchTab('Final Defense')" id="tab-Final Defense"
+                style="display: flex; align-items: center; gap: 6px;">
+                Final Defense
+                <span class="lock-icon material-icons-round" style="font-size: 16px; display: none;">lock</span>
+            </button>
         </div>
 
-        <!-- Filters (Top Level) -->
-        <div class="filters-container" style="justify-content: space-between;">
-            <div style="display:flex; gap: 15px;">
-                <select id="programFilter" class="filter-select" onchange="applyFilters()">
-                    <option value="ALL">All Programs</option>
-                    <option value="BSIS">BSIS</option>
-                    <option value="BSIT">BSIT</option>
-                    <option value="BSCS">BSCS</option>
-                </select>
-                <!-- Add more filters if needed like Defense Type -->
-            </div>
+        <!-- Filters -->
+        <div class="filter-section" style="display: flex; gap: 12px; margin-bottom: 25px; align-items: center;">
+            <button class="filter-btn bsis" onclick="filterTable('BSIS')"
+                style="background: #f472b6 !important; color: white !important;">BSIS</button>
+            <button class="filter-btn bsit" onclick="filterTable('BSIT')"
+                style="background: #60a5fa !important; color: white !important;">BSIT</button>
+            <button class="filter-btn bscs" onclick="filterTable('BSCS')"
+                style="background: #f87171 !important; color: white !important;">BSCS</button>
+
+            <div style="width: 1px; background: #e2e8f0; height: 24px; margin: 0 4px;"></div>
+
+            <button class="filter-btn status-btn active" id="status-ALL" onclick="filterStatus('ALL')"
+                style="background: #64748b !important; color: white !important;">All</button>
+            <button class="filter-btn status-btn" id="status-FINISHED" onclick="filterStatus('FINISHED')"
+                style="background: #10b981 !important; color: white !important; opacity: 0.5;">Finished</button>
+            <button class="filter-btn status-btn" id="status-UNFINISHED" onclick="filterStatus('UNFINISHED')"
+                style="background: #ef4444 !important; color: white !important; opacity: 0.5;">Unfinished</button>
         </div>
 
         <!-- Data Table -->
@@ -156,6 +215,7 @@
 
     </div>
 
+    <!-- Instructor Navigation (Preserved) -->
     <nav class="bottom-nav">
         <a href="instructor_dashboard" class="nav-item">
             <span class="material-icons-round">dashboard</span>
@@ -210,29 +270,45 @@
 
             <!-- Modal Body -->
             <div class="modal-body" style="display: flex; flex: 1; overflow: hidden; background: #f8fafc;">
-                <!-- Sidebar: File List -->
-                <div id="fileListSidebar"
-                    style="width: 350px; background: white; border-right: 1px solid #e2e8f0; overflow-y: auto; padding: 20px;">
-                    <h4
-                        style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 15px; font-weight: 700;">
-                        Submissions</h4>
-                    <div id="fileList" style="display: flex; flex-direction: column; gap: 10px;">
-                        <!-- Files populated by JS -->
+
+                <!-- Left Sidebar: File Selection -->
+                <div class="sidebar"
+                    style="width: 240px; background: #fff; border-right: 1px solid #eef2f6; display: flex; flex-direction: column; flex-shrink: 0;">
+                    <div style="padding: 15px 18px; border-bottom: 1px solid #f1f5f9;">
+                        <span
+                            style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px;">Submissions</span>
+                    </div>
+                    <div id="fileList" style="padding: 10px; overflow-y: auto; flex: 1;">
+                        <!-- Files injected here -->
                     </div>
                 </div>
 
-                <!-- Main Column: PDF Viewer -->
-                <div id="pdfViewerArea"
-                    style="flex: 1; display: flex; flex-direction: column; position: relative; background: #334155;">
-                    <div id="pdfPlaceholder"
-                        style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94a3b8;">
-                        <span class="material-icons-round"
-                            style="font-size: 64px; margin-bottom: 15px; opacity: 0.5;">find_in_page</span>
-                        <p style="font-size: 1.1rem; font-weight: 500;">Select a document to begin viewing</p>
+                <!-- Center: Viewer Area -->
+                <div class="viewer-area"
+                    style="flex: 1; background: #565b5f; position: relative; display: flex; flex-direction: column; min-width: 0; box-shadow: inset 0 0 30px rgba(0,0,0,0.1);">
+
+                    <div id="pdfViewerContainer" style="flex: 1; overflow: hidden; display: none; position: relative;">
+                        <!-- IFRAME FOR PDF OR GOOGLE VIEWER -->
+                        <iframe id="pdfFrame" src="" style="width: 100%; height: 100%; border: none;"></iframe>
                     </div>
-                    <!-- PDF Viewer Iframe/Object -->
-                    <div id="adobe-dc-view" style="width: 100%; height: 100%; display: none;"></div>
+
+                    <!-- Placeholder -->
+                    <div id="viewerPlaceholder"
+                        style="position: absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#94a3b8; background: #f8fafc;">
+                        <span class="material-icons-round"
+                            style="font-size: 56px; opacity: 0.3; margin-bottom: 15px;">description</span>
+                        <p style="font-weight: 500;">Select a file to review</p>
+                    </div>
+
+                    <!-- Silent Auto-save (UI Hidden as requested) -->
+                    <div id="saveAnnotationBtnContainer" style="display: none;">
+                        <div id="autoSaveStatus" style="display: none;">
+                            <span class="material-icons-round">sync</span>
+                            <span id="autoSaveText"></span>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </div>
     </div>
