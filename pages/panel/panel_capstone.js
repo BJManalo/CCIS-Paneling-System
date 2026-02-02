@@ -861,23 +861,34 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
         }
 
         // 2. Update Legacy/Group Status mapping (for table view)
-        let localMap = group.currentStatusJson || {};
-        if (typeof localMap[fileKey] !== 'object') localMap[fileKey] = {};
-        localMap[fileKey][userName] = newStatus;
+        // We must fetch the current row first to avoid overwriting other file keys!
+        const { data: existingRow } = await supabaseClient
+            .from('defense_statuses')
+            .select('statuses')
+            .eq('group_id', groupId)
+            .eq('defense_type', group.type)
+            .single();
+
+        let mergedStatuses = existingRow && existingRow.statuses ? (typeof existingRow.statuses === 'string' ? JSON.parse(existingRow.statuses) : existingRow.statuses) : {};
+        if (typeof mergedStatuses !== 'object') mergedStatuses = {};
+
+        // Ensure file key object exists
+        if (!mergedStatuses[fileKey]) mergedStatuses[fileKey] = {};
+        mergedStatuses[fileKey][userName] = newStatus;
 
         const { error: dsError } = await supabaseClient
             .from('defense_statuses')
             .upsert({
                 group_id: groupId,
                 defense_type: group.type,
-                statuses: localMap,
+                statuses: mergedStatuses,
                 updated_at: new Date()
             }, { onConflict: 'group_id, defense_type' });
 
         if (dsError) console.warn('Legacy status update failed (non-critical):', dsError);
 
         // Update local object and refresh UI
-        group.currentStatusJson = localMap;
+        group.currentStatusJson = mergedStatuses;
 
         // Ensure stage-specific statuses are also updated for immediate modal feedback
         if (normTab.includes('title')) group.titleStatus = localMap;
@@ -958,23 +969,37 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
         if (fError) throw fError;
 
         // 2. Sync Legacy/Group Status mapping
-        let localStatusMap = group.currentStatusJson || {};
-        if (typeof localStatusMap[fileKey] !== 'object') localStatusMap[fileKey] = {};
-        localStatusMap[fileKey][userName] = currentSelectedStatus;
+        // Fetch fresh data to merge properly
+        const { data: existingRow } = await supabaseClient
+            .from('defense_statuses')
+            .select('statuses, remarks')
+            .eq('group_id', groupId)
+            .eq('defense_type', group.type)
+            .single();
 
-        let localRemarksMap = group.currentRemarksJson || {};
-        if (typeof localRemarksMap[fileKey] !== 'object') localRemarksMap[fileKey] = {};
-        localRemarksMap[fileKey][userName] = `${userName}: ${newText}`;
+        let mergedStatuses = existingRow && existingRow.statuses ? (typeof existingRow.statuses === 'string' ? JSON.parse(existingRow.statuses) : existingRow.statuses) : {};
+        if (typeof mergedStatuses !== 'object') mergedStatuses = {};
+        if (!mergedStatuses[fileKey]) mergedStatuses[fileKey] = {};
+        mergedStatuses[fileKey][userName] = currentSelectedStatus;
+
+        let mergedRemarks = existingRow && existingRow.remarks ? (typeof existingRow.remarks === 'string' ? JSON.parse(existingRow.remarks) : existingRow.remarks) : {};
+        if (typeof mergedRemarks !== 'object') mergedRemarks = {};
+        if (!mergedRemarks[fileKey]) mergedRemarks[fileKey] = {};
+        mergedRemarks[fileKey][userName] = `${userName}: ${newText}`;
 
         await supabaseClient
             .from('defense_statuses')
             .upsert({
                 group_id: groupId,
                 defense_type: group.type,
-                statuses: localStatusMap,
-                remarks: localRemarksMap,
+                statuses: mergedStatuses,
+                remarks: mergedRemarks,
                 updated_at: new Date()
             }, { onConflict: 'group_id, defense_type' });
+
+        // Update local state to reflect changes immediately
+        group.currentStatusJson = mergedStatuses;
+        group.currentRemarksJson = mergedRemarks;
 
         // Success Feedback
         group.currentRemarksJson = localRemarksMap;
