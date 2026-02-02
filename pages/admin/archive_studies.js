@@ -18,24 +18,23 @@ async function loadArchives() {
     const empty = document.getElementById('emptyState');
 
     try {
-        // 1. Fetch Groups
+        console.log('Starting loadArchives...');
         const { data: groups, error: gError } = await supabase
             .from('student_groups')
             .select('*');
         if (gError) throw gError;
 
-        // 2. Fetch Defense Data (Legacy + Detailed Feedback), Students, and Schedules
-        const [dsRes, cfRes, studentsRes, schedRes] = await Promise.all([
-            supabase.from('defense_statuses').select('*'),
-            supabase.from('capstone_feedback').select('*'),
-            supabase.from('students').select('*'),
-            supabase.from('schedules').select('*')
-        ]);
+        // Fetch supporting data safely
+        const fetchSafe = (prom) => prom.then(res => res).catch(err => ({ error: err, data: [] }));
 
-        if (dsRes.error) console.warn('Error fetching legacy statuses:', dsRes.error);
-        if (cfRes.error) console.warn('Error fetching feedback:', cfRes.error);
-        if (studentsRes.error) console.warn('Error fetching students:', studentsRes.error);
-        if (schedRes.error) console.warn('Error fetching schedules:', schedRes.error);
+        // Optimize: select specific columns
+        const dsRes = await fetchSafe(supabase.from('defense_statuses').select('*'));
+        const cfRes = await fetchSafe(supabase.from('capstone_feedback').select('group_id, defense_type, status, user_name'));
+        const studentsRes = await fetchSafe(supabase.from('students').select('group_id, first_name, last_name'));
+        const schedRes = await fetchSafe(supabase.from('schedules').select('group_id, schedule_type, panel1, panel2, panel3, panel4, panel5'));
+
+        if (dsRes.error) console.warn('Error fetching defense_statuses:', dsRes.error);
+        if (cfRes.error) console.warn('Error fetching capstone_feedback:', cfRes.error);
 
         const statuses = dsRes.data || [];
         const feedbacks = cfRes.data || [];
@@ -45,12 +44,12 @@ async function loadArchives() {
         // 3. Filter for Completed Final Defense
         const archivedGroups = groups.map(g => {
             // Attach Members
-            const members = students.filter(s => s.group_id === g.id).map(s => `${s.first_name} ${s.last_name}`);
+            const members = students.filter(s => String(s.group_id) === String(g.id)).map(s => `${s.first_name} ${s.last_name}`);
 
-            // Attach Panels (Find schedule for Final Defense)
+            // Attach Panels
             const finalSched = schedules.find(s =>
-                s.group_id === g.id &&
-                s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
+                String(s.group_id) === String(g.id) &&
+                String(s.schedule_type || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
             );
 
             let panels = [];
@@ -58,8 +57,7 @@ async function loadArchives() {
                 panels = [finalSched.panel1, finalSched.panel2, finalSched.panel3, finalSched.panel4, finalSched.panel5].filter(p => p);
             } else {
                 // Fallback: Check who gave feedback
-                const groupFeedbacks = feedbacks.filter(f => f.group_id == g.id);
-                // Get unique user_names
+                const groupFeedbacks = feedbacks.filter(f => String(f.group_id) === String(g.id));
                 const uniquePanels = [...new Set(groupFeedbacks.map(f => f.user_name).filter(n => n))];
                 panels = uniquePanels;
             }
@@ -68,7 +66,7 @@ async function loadArchives() {
         }).filter(g => {
             // A. Check Legacy Data
             const relevantStatuses = statuses.filter(s =>
-                s.group_id === g.id &&
+                String(s.group_id) === String(g.id) &&
                 String(s.defense_type || '').toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
             );
 
@@ -90,7 +88,6 @@ async function loadArchives() {
             if (legacyCompleted) return true;
 
             // B. Check New Feedback Data
-            // We look for ANY Final Defense file marked as 'Completed'
             const feedbackCompleted = feedbacks.some(f =>
                 f && f.group_id && f.status &&
                 String(f.group_id) === String(g.id) &&
@@ -106,7 +103,8 @@ async function loadArchives() {
 
     } catch (err) {
         console.error('Error loading archives:', err);
-        loading.innerText = 'Error loading archives.';
+        loading.style.display = 'none';
+        list.innerHTML = `<div style="text-align:center; padding:20px; color:red;">Error loading archives. Please try refreshing.</div>`;
     }
 }
 
