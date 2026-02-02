@@ -24,47 +24,52 @@ async function loadArchives() {
             .select('*');
         if (gError) throw gError;
 
-        // 2. Fetch Defense Statuses for 'Final Defense'
-        // We fetch ALL statuses to filter client side for flexibility
-        const { data: statuses, error: sError } = await supabase
-            .from('defense_statuses')
-            .select('*');
-        if (sError) throw sError;
+        // 2. Fetch Defense Data (Legacy + Detailed Feedback)
+        const [dsRes, cfRes] = await Promise.all([
+            supabase.from('defense_statuses').select('*'),
+            supabase.from('capstone_feedback').select('*')
+        ]);
+
+        if (dsRes.error) console.warn('Error fetching legacy statuses:', dsRes.error);
+        if (cfRes.error) console.warn('Error fetching feedback:', cfRes.error);
+
+        const statuses = dsRes.data || [];
+        const feedbacks = cfRes.data || [];
 
         // 3. Filter for Completed Final Defense
-        // Condition: Has a record for Final Defense AND status includes "Completed"
         const archivedGroups = groups.filter(g => {
-            // Find status record for this group
-            // Normalize types just in case
+            // A. Check Legacy Data
             const relevantStatuses = statuses.filter(s =>
                 s.group_id === g.id &&
                 s.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '').includes('final')
             );
 
-            if (relevantStatuses.length === 0) return false;
-
-            // Check if ANY status in the JSON is 'Completed'
-            // Structure: { "fileKey": { "PanelName": "Status" } }
-            // or sometimes legacy string?
-
-            return relevantStatuses.some(record => {
+            const legacyCompleted = relevantStatuses.some(record => {
                 if (!record.statuses) return false;
-
                 let sObj = record.statuses;
                 if (typeof sObj === 'string') {
                     try { sObj = JSON.parse(sObj); } catch (e) { return false; }
                 }
-
-                // Iterate through files
                 for (const fileKey in sObj) {
                     const panelStatuses = sObj[fileKey];
-                    // panelStatuses is { "PanelName": "Status" }
                     for (const panelName in panelStatuses) {
-                        if (panelStatuses[panelName] === 'Completed') return true;
+                        if (String(panelStatuses[panelName]).toLowerCase() === 'completed') return true;
                     }
                 }
                 return false;
             });
+
+            if (legacyCompleted) return true;
+
+            // B. Check New Feedback Data
+            // We look for ANY Final Defense file marked as 'Completed'
+            const feedbackCompleted = feedbacks.some(f =>
+                f.group_id == g.id &&
+                f.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '').includes('final') &&
+                String(f.status).toLowerCase() === 'completed'
+            );
+
+            return feedbackCompleted;
         });
 
         allArchives = archivedGroups;
