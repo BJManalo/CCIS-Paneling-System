@@ -310,16 +310,7 @@
         <!-- Main Content -->
         <div class="evaluation-wrapper" style="padding: 0; max-width: 1000px; margin: 0 auto;">
 
-            <!-- Main Tabs (Advisory vs All Evaluations) -->
-            <div class="switcher-tabs"
-                style="margin-bottom: 20px; background: #e2e8f0; padding: 4px; max-width: 500px;">
-                <button class="switcher-btn active" id="tab-advisory" onclick="switchMainTab('Advisory')">
-                    <span class="material-icons-round">groups</span> My Advisory Evaluations
-                </button>
-                <button class="switcher-btn" id="tab-evaluation" onclick="switchMainTab('Evaluation')">
-                    <span class="material-icons-round">rate_review</span> All Evaluations
-                </button>
-            </div>
+            <!-- Switcher Removed -->
 
             <!-- Filters -->
             <div class="filter-container">
@@ -329,25 +320,7 @@
                 <button class="filter-chip" onclick="setFilter('final', this)">Final Defense</button>
             </div>
 
-            <!-- Advisory Mode Table -->
-            <div id="advisoryTableContainer" style="display: none; margin-top: 20px;">
-                <div class="table-responsive">
-                    <table class="data-table" style="width: 100%;">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Group Name</th>
-                                <th>Members</th>
-                                <th>Defense Type</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="advisoryTableBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <!-- Advisory Table Removed -->
 
             <div id="accordionContainer" class="accordion-list">
                 <!-- Populated by JS -->

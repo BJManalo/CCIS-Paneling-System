@@ -256,33 +256,17 @@ async function loadEvaluations() {
 }
 
 // --- Main Tab Logic ---
-let currentMainTab = 'Advisory';
+let currentMainTab = 'Evaluation'; // Default to All
 
 window.switchMainTab = (tab) => {
-    currentMainTab = tab;
-
-    // UI Toggles
-    document.getElementById('tab-advisory').classList.toggle('active', tab === 'Advisory');
-    document.getElementById('tab-evaluation').classList.toggle('active', tab === 'Evaluation');
+    currentMainTab = 'Evaluation';
 
     const filterContainer = document.querySelector('.filter-container');
     const accordion = document.getElementById('accordionContainer');
-    const advisoryTable = document.getElementById('advisoryTableContainer');
 
     // Always show filters
     if (filterContainer) filterContainer.style.display = 'flex';
-    const allBtn = document.querySelector('.filter-chips-container .filter-chip') || document.querySelector('.filter-chip'); // Support different possible structures
-
-    // We use the accordion for both now to show detailed panel ratings
     if (accordion) accordion.style.display = 'block';
-    if (advisoryTable) advisoryTable.style.display = 'none';
-
-    // Update Filter UI visually to ALL if reseting
-    currentTypeFilter = 'ALL';
-    document.querySelectorAll('.filter-chip').forEach(b => {
-        b.classList.remove('active');
-        if (b.textContent.includes('All')) b.classList.add('active');
-    });
 
     applyFilters();
 }

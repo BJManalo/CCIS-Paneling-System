@@ -10,7 +10,7 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 // State
 let allGradesData = [];
 let fetchedGroups = [];
-let currentMainTab = 'Advisory';
+let currentMainTab = 'Manage'; // Default to All Grades
 
 document.addEventListener('DOMContentLoaded', () => {
     loadGrades();
@@ -22,29 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('programFilter').addEventListener('change', renderGrades);
 });
 
-// --- Main Tab Switching ---
+// --- Main Tab Switching (Simulated) ---
 window.switchMainTab = (tab) => {
-    currentMainTab = tab;
-
-    // UI Updates
-    const advBtn = document.getElementById('tab-advisory');
-    const manageBtn = document.getElementById('tab-manage');
-    const pageTitle = document.getElementById('gradesPageTitle');
-
-    if (tab === 'Advisory') {
-        advBtn.style.background = 'white';
-        advBtn.style.color = 'var(--primary-color)';
-        manageBtn.style.background = 'transparent';
-        manageBtn.style.color = '#64748b';
-        pageTitle.textContent = 'Advisory Grades';
-    } else {
-        manageBtn.style.background = 'white';
-        manageBtn.style.color = 'var(--primary-color)';
-        advBtn.style.background = 'transparent';
-        advBtn.style.color = '#64748b';
-        pageTitle.textContent = 'All Grades';
-    }
-
+    currentMainTab = 'Manage';
     renderGrades();
 }
 
