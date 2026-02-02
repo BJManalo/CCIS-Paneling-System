@@ -265,11 +265,18 @@ function getTitleText(pTitle, keyHint) {
 }
 
 function resolveStatusMap(groupId, defenseType) {
+    const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const targetNorm = normalize(defenseType);
+
     // 1. Gather all individual votes from New Table (capstone_feedback)
-    const feedbacks = allCapstoneFeedback.filter(cf => cf.group_id == groupId && cf.defense_type === defenseType);
+    const feedbacks = allCapstoneFeedback.filter(cf =>
+        cf.group_id == groupId && normalize(cf.defense_type) === targetNorm
+    );
 
     // 2. Gather Legacy Statuses
-    const legRow = allDefenseStatuses.find(ds => ds.group_id == groupId && ds.defense_type === defenseType);
+    const legRow = allDefenseStatuses.find(ds =>
+        ds.group_id == groupId && normalize(ds.defense_type) === targetNorm
+    );
     let legacyStatuses = {};
     if (legRow && legRow.statuses) {
         if (typeof legRow.statuses === 'string') {
