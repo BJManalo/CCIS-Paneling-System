@@ -781,8 +781,19 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
     const iframe = document.getElementById('fileViewer');
 
     if (modal) modal.style.display = 'flex';
-    if (placeholder) placeholder.style.display = 'flex';
-    if (iframe) iframe.style.display = 'block';
+    if (placeholder) {
+        placeholder.style.display = 'flex';
+        placeholder.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center;">
+                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: viewer-spin 1s linear infinite;"></div>
+                <p style="margin-top: 15px; font-weight: 500; color: #64748b; font-family: inherit;">Loading file...</p>
+            </div>
+            <style>
+                @keyframes viewer-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+        `;
+    }
+    if (iframe) iframe.style.display = 'none';
 
     // Revoke previous blob if exists
     if (currentBlobUrl) {
@@ -792,56 +803,61 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
 
     let displayTitle = fileKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
-    // Check for actual project titles if fileKey is title1, title2, title3
+    // Check for actual project titles
     if (fileKey && fileKey.toLowerCase().startsWith('title')) {
-        const inputId = 'project' + fileKey.charAt(0).toUpperCase() + fileKey.slice(1); // e.g., projectTitle1
+        const inputId = 'project' + fileKey.charAt(0).toUpperCase() + fileKey.slice(1);
         const actualTitleInput = document.getElementById(inputId);
         if (actualTitleInput && actualTitleInput.value.trim()) {
             displayTitle = actualTitleInput.value.trim();
         }
     }
-
     titleEl.innerText = displayTitle;
 
     let absoluteUrl = url.trim();
     if (!absoluteUrl.startsWith('http') && !absoluteUrl.startsWith('//')) absoluteUrl = 'https://' + absoluteUrl;
 
     const lowerUrl = absoluteUrl.toLowerCase();
+    const isPDF = lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf');
+    const isDrive = lowerUrl.includes('drive.google.com');
 
     try {
-        // For PDF/Supabase files, use Blob loading to bypass CORS
-        if (lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf')) {
-            console.log("Fetching PDF as blob with cache-buster...");
-
-            // Add cache-buster to the fetch URL
+        if (isPDF) {
+            console.log("Loading PDF via PDF.js...");
             const urlObj = new URL(absoluteUrl);
             urlObj.searchParams.set('v', Date.now());
 
             const response = await fetch(urlObj.toString());
-            if (!response.ok) throw new Error("Network response was not ok");
+            if (!response.ok) throw new Error("Fetch failed");
             const blob = await response.blob();
             currentBlobUrl = URL.createObjectURL(blob);
 
             const viewerPath = "../../assets/library/web/viewer.html";
-            const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+            iframe.src = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+        } else if (isDrive) {
+            console.log("Loading Google Drive link...");
+            const fileIdMatch = absoluteUrl.match(/\/d\/([^\/]+)/) || absoluteUrl.match(/id=([^\&]+)/);
+            iframe.src = fileIdMatch ? `https://drive.google.com/file/d/${fileIdMatch[1]}/preview` : absoluteUrl;
+        } else {
+            console.log("Loading generic link...");
+            iframe.src = absoluteUrl;
+        }
 
-            iframe.src = "";
-            setTimeout(() => {
-                iframe.src = viewerUrl;
-            }, 50);
-        } else if (lowerUrl.includes('drive.google.com') && absoluteUrl.match(/\/d\/([^\/]+)/)) {
-            iframe.src = `https://drive.google.com/file/d/${absoluteUrl.match(/\/d\/([^\/]+)/)[1]}/preview`;
+        iframe.onload = () => {
+            if (placeholder) placeholder.style.display = 'none';
+            if (iframe) iframe.style.display = 'block';
+        };
+
+    } catch (e) {
+        console.warn("Fallback loading:", e);
+        if (isDrive) {
+            iframe.src = absoluteUrl;
         } else {
             iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
         }
-
-        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
-
-    } catch (e) {
-        console.warn("Blob loading failed, falling back:", e);
-        const viewerPath = "../../assets/library/web/viewer.html";
-        iframe.src = `${viewerPath}?file=${encodeURIComponent(absoluteUrl)}`;
-        iframe.onload = () => { if (placeholder) placeholder.style.display = 'none'; };
+        iframe.onload = () => {
+            if (placeholder) placeholder.style.display = 'none';
+            if (iframe) iframe.style.display = 'block';
+        };
     }
 };
 

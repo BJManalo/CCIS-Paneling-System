@@ -1046,13 +1046,13 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     const pdfFrame = document.getElementById('pdfFrame');
     const saveBtn = document.getElementById('saveAnnotationBtnContainer');
 
-    // Show loading state in placeholder
+    // Show loading state
     if (placeholder) {
         placeholder.style.display = 'flex';
         placeholder.innerHTML = `
             <div style="display:flex; flex-direction:column; align-items:center;">
                 <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: viewer-spin 1s linear infinite;"></div>
-                <p style="margin-top: 15px; font-weight: 500; color: #64748b; font-family: inherit;">Preparing PDF Viewer...</p>
+                <p style="margin-top: 15px; font-weight: 500; color: #64748b; font-family: inherit;">Loading file...</p>
             </div>
             <style>
                 @keyframes viewer-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -1062,8 +1062,10 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (container) container.style.display = 'none';
     if (saveBtn) saveBtn.style.display = 'none';
 
-    // Resolve URL (check for annotations)
-    let finalUrl = url;
+    // Resolve URL (check for existing annotations)
+    let finalUrl = url.trim();
+    if (!finalUrl.startsWith('http') && !finalUrl.startsWith('//')) finalUrl = 'https://' + finalUrl;
+
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
     const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
@@ -1080,54 +1082,73 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
             if (annotationsMap[fileKey] && annotationsMap[fileKey][userName]) {
                 const urlWithBuster = new URL(annotationsMap[fileKey][userName]);
-                urlWithBuster.searchParams.set('t', Date.now()); // Force fresh download
-                console.log("Loading existing annotation version with cache buster");
+                urlWithBuster.searchParams.set('t', Date.now());
+                console.log("Loading annotation version");
                 finalUrl = urlWithBuster.toString();
             }
         }
     }
 
+    const lowerUrl = finalUrl.toLowerCase();
+    const isPDF = lowerUrl.includes('supabase.co') || lowerUrl.endsWith('.pdf');
+    const isDrive = lowerUrl.includes('drive.google.com');
+
     try {
-        console.log("Fetching PDF as blob for CORS bypass...");
-        const response = await fetch(finalUrl);
-        if (!response.ok) throw new Error("Network response was not ok");
-        const blob = await response.blob();
-        currentBlobUrl = URL.createObjectURL(blob);
+        if (isPDF) {
+            console.log("Loading PDF via PDF.js...");
+            const response = await fetch(finalUrl);
+            if (!response.ok) throw new Error("Fetch failed");
+            const blob = await response.blob();
+            currentBlobUrl = URL.createObjectURL(blob);
 
-        const viewerPath = "../../assets/library/web/viewer.html";
-        const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+            const viewerPath = "../../assets/library/web/viewer.html";
+            const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
 
-        if (container) container.style.display = 'block';
-        if (placeholder) placeholder.style.display = 'none';
-
-        pdfFrame.src = ""; // Clear first
-        setTimeout(() => {
+            if (container) container.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
             pdfFrame.src = viewerUrl;
-        }, 50);
 
-        // Start Auto-save Timer (2 seconds)
-        if (autoSaveInterval) clearInterval(autoSaveInterval);
-        autoSaveInterval = setInterval(() => {
-            saveAnnotatedPDF(true);
-        }, 2000);
+            // Enable Auto-save for PDFs ONLY
+            if (autoSaveInterval) clearInterval(autoSaveInterval);
+            autoSaveInterval = setInterval(() => { saveAnnotatedPDF(true); }, 2000);
+            if (saveBtn) saveBtn.style.display = 'block';
+
+        } else if (isDrive) {
+            console.log("Loading Google Drive link...");
+            const fileIdMatch = finalUrl.match(/\/d\/([^\/]+)/) || finalUrl.match(/id=([^\&]+)/);
+            const drivePreview = fileIdMatch ? `https://drive.google.com/file/d/${fileIdMatch[1]}/preview` : finalUrl;
+
+            if (container) container.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+            pdfFrame.src = drivePreview;
+
+            if (autoSaveInterval) clearInterval(autoSaveInterval);
+            if (saveBtn) saveBtn.style.display = 'none';
+
+        } else {
+            console.log("Loading generic link...");
+            if (container) container.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+            pdfFrame.src = finalUrl;
+
+            if (autoSaveInterval) clearInterval(autoSaveInterval);
+            if (saveBtn) saveBtn.style.display = 'none';
+        }
 
     } catch (e) {
-        console.warn("Blob loading failed, falling back to direct URL:", e);
-        const viewerUrl = `../../assets/library/web/viewer.html?file=${encodeURIComponent(finalUrl)}`;
-
+        console.warn("Enhanced loading failed, falling back to basic display:", e);
         if (container) container.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
 
-        pdfFrame.src = "";
-        setTimeout(() => {
-            pdfFrame.src = viewerUrl;
-        }, 50);
+        // Final fallback: try Google Docs viewer for any link
+        if (!isDrive && !isPDF) {
+            pdfFrame.src = `https://docs.google.com/viewer?url=${encodeURIComponent(finalUrl)}&embedded=true`;
+        } else {
+            pdfFrame.src = finalUrl;
+        }
 
-        // Start Auto-save Timer (2 seconds)
         if (autoSaveInterval) clearInterval(autoSaveInterval);
-        autoSaveInterval = setInterval(() => {
-            saveAnnotatedPDF(true);
-        }, 2000);
+        if (saveBtn) saveBtn.style.display = 'none';
     }
 };
 
