@@ -163,10 +163,9 @@ function renderGrades() {
 
             if (currentMainTab === 'Advisory') {
                 if (!isAdviser) return;
-            } else {
-                // Manage tab: Must be a Panelist
-                if (!isPanelist) return;
             }
+            // For 'Manage' (All Grades), we allow ALL groups to be seen.
+            // No strict isPanelist check here anymore.
 
             // Type Filter
             if (typeFilter !== 'All' && schedType !== typeFilter) return;
@@ -228,7 +227,7 @@ function renderGrades() {
                 </td>
                 <td>
                     <div style="display:flex; gap: 5px;">
-                        ${(currentMainTab === 'Manage') ? `
+                        ${(currentMainTab === 'Manage' && isPanelist) ? `
                         <button class="action-btn edit" onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" title="Edit Grades">
                             <span class="material-icons-round">edit</span>
                         </button>` : ''}
