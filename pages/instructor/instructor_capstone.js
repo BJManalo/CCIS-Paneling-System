@@ -358,7 +358,13 @@ function renderTable() {
         else if (normCurrentTab.includes('preoral')) currentFileSet = g.files.pre_oral;
         else if (normCurrentTab.includes('final')) currentFileSet = g.files.final;
 
-        const fileKeys = Object.keys(currentFileSet);
+        // FILTER HIDDEN/NULL FILES (Fix for Unfinished/Finished Tab)
+        const fileKeys = Object.keys(currentFileSet).filter(key => {
+            const url = currentFileSet[key];
+            if (key.endsWith('_revised')) return false;
+            if (!url || String(url).trim().toLowerCase() === 'null') return false;
+            return true;
+        });
         let isFinished = false;
 
         if (fileKeys.length === 0) {
