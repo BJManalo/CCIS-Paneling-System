@@ -496,30 +496,67 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
 
         const fileStatuses = typeof overallStatuses[label] === 'object' ? overallStatuses[label] : {};
         const fileRemarks = typeof overallRemarks[label] === 'object' ? overallRemarks[label] : {};
-        const panelsList = Object.keys(fileStatuses);
+
+        // Use capstone_feedback as the primary source for the Detailed list, 
+        // fallback to defense_statuses if needed, or merge them.
+        // For simplicity, we just list the capstone_feedback entries which contain the annotations.
+        const comments = allCapstoneFeedback.filter(cf => cf.group_id === group.id && cf.file_key === label);
 
         let evaluationsHtml = '';
-        if (panelsList.length > 0) {
-            evaluationsHtml = panelsList.map(panel => {
-                const status = fileStatuses[panel] || 'Pending';
-                const rmk = fileRemarks[panel] || '';
-                let color = '#64748b';
-                if (status.includes('Approved') || status === 'Completed') color = '#059669';
-                else if (status.includes('Revisions')) color = '#d97706';
-                else if (status === 'Rejected' || status === 'Redefend') color = '#dc2626';
+        if (comments.length > 0) {
+            evaluationsHtml = comments.map(c => {
+                const color = c.status === 'Approved' || c.status === 'Completed' ? '#059669'
+                    : c.status === 'Approved with Revisions' ? '#d97706'
+                        : c.status === 'Rejected' || c.status === 'Redefend' ? '#dc2626'
+                            : '#64748b';
+
+                let annotationBtn = '';
+                if (c.annotated_file_url) {
+                    annotationBtn = `
+                        <button onclick="loadPDF('${c.annotated_file_url}', '${displayLabel} (${c.panelist_name})', '${label}_annotation')" 
+                            style="margin-top: 6px; background: #fff; border: 1px solid #cbd5e1; color: var(--primary-color); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                            <span class="material-icons-round" style="font-size: 12px;">draw</span>
+                            View Annotations
+                        </button>
+                    `;
+                }
 
                 return `
                     <div style="font-size: 11px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
-                            <strong style="color: var(--primary-color);">${panel}</strong>
-                            <span style="font-weight:700; color:${color};">${status}</span>
+                            <strong style="color: var(--primary-color);">${c.panelist_name || 'Panelist'}</strong>
+                            <span style="font-weight:700; color:${color};">${c.status || 'Pending'}</span>
                         </div>
-                        <div style="color: #64748b; font-style: italic;">"${rmk || 'No specific remarks'}"</div>
+                        <div style="color: #64748b; font-style: italic;">"${c.remarks || 'No remarks provided'}"</div>
+                        ${annotationBtn}
                     </div>
                 `;
             }).join('');
         } else {
-            evaluationsHtml = '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:5px;">Waiting for panel evaluations...</div>';
+            // Fallback to legacy statuses from defense_statuses if no granular feedback found
+            const panelsList = Object.keys(fileStatuses);
+            if (panelsList.length > 0) {
+                evaluationsHtml = panelsList.map(panel => {
+                    const status = fileStatuses[panel] || 'Pending';
+                    const rmk = fileRemarks[panel] || '';
+                    let color = '#64748b';
+                    if (status.includes('Approved') || status === 'Completed') color = '#059669';
+                    else if (status.includes('Revisions')) color = '#d97706';
+                    else if (status === 'Rejected' || status === 'Redefend') color = '#dc2626';
+
+                    return `
+                        <div style="font-size: 11px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
+                                <strong style="color: var(--primary-color);">${panel}</strong>
+                                <span style="font-weight:700; color:${color};">${status}</span>
+                            </div>
+                            <div style="color: #64748b; font-style: italic;">"${rmk || 'No specific remarks'}"</div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                evaluationsHtml = '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:5px;">Waiting for panel evaluations...</div>';
+            }
         }
 
         feedbackArea.innerHTML = `
