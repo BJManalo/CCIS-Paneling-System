@@ -566,8 +566,9 @@ window.openFileModal = (groupId) => {
 
         Object.entries(fileObj).forEach(([label, url]) => {
             const isRevised = label.endsWith('_revised');
-            // SKIP: If URL is empty or the key is a revised version (revised versions are handled inside the parent item)
-            if (!url || url.toString().trim() === "" || isRevised) return;
+            const cleanUrl = url ? url.toString().trim() : "";
+            // SKIP: If URL is empty, literally "null", or the key is a revised version 
+            if (!cleanUrl || cleanUrl === "" || cleanUrl.toLowerCase() === "null" || isRevised) return;
 
             const itemContainer = document.createElement('div');
             itemContainer.style.background = 'white';
