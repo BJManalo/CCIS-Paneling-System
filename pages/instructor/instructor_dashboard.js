@@ -325,6 +325,14 @@ function updateCounts(groups) {
         }
     });
 
+    // OVERRIDE: If we are actively filtering by a category, the count should reflect visible rows
+    // This fixes the issue where clicking the card shows rows but the count says 0 (or mismatch)
+    if (currentCategory === 'APPROVED') {
+        approvedTotal = displayRows.length;
+    } else if (currentCategory === 'REJECTED') {
+        rejectedTotal = displayRows.length;
+    }
+
     // Display Counts
     const titleEl = document.getElementById('countTitle');
     const rejectedEl = document.getElementById('countPreOral'); // Middle card
