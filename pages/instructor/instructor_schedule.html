@@ -101,26 +101,43 @@
             </button>
         </header>
 
-        <!-- Toolbar (Filter under Logout) -->
-        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-            <div class="custom-select-wrapper" style="width: 200px; position: relative;">
-                <select id="phaseFilter"
-                    style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
-                    <option value="All">All Phases</option>
-                    <option value="Title Defense">Title</option>
-                    <option value="Pre Oral Defense">Pre-Oral</option>
-                    <option value="Final Defense">Final</option>
-                </select>
-                <span class="material-icons-round select-arrow"
-                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
+        <!-- View Toggle & Toolbar -->
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
+            <div class="view-toggle"
+                style="background: #f1f5f9; padding: 6px; border-radius: 14px; display: flex; gap: 5px; border: 1px solid #e2e8f0;">
+                <button id="listViewBtn" class="toggle-btn active" onclick="switchView('list')"
+                    style="padding: 8px 16px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; transition: all 0.2s;">
+                    <span class="material-icons-round">list</span> Table
+                </button>
+                <button id="calendarViewBtn" class="toggle-btn" onclick="switchView('calendar')"
+                    style="padding: 8px 16px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; transition: all 0.2s;">
+                    <span class="material-icons-round">calendar_month</span> Calendar
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <div class="custom-select-wrapper" style="width: 180px; position: relative;" id="phaseFilterContainer">
+                    <select id="phaseFilter"
+                        style="padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
+                        <option value="All">All Phases</option>
+                        <option value="Title Defense">Title</option>
+                        <option value="Pre Oral Defense">Pre-Oral</option>
+                        <option value="Final Defense">Final</option>
+                    </select>
+                    <span class="material-icons-round select-arrow"
+                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b; font-size: 18px;">filter_list</span>
+                </div>
             </div>
         </div>
 
         <!-- Title -->
-        <h2 class="page-title">Defense Schedule</h2>
+        <h2 class="page-title" style="margin-bottom: 10px;">Defense Schedule</h2>
+        <p style="color: #64748b; margin-bottom: 30px; font-size: 0.95rem;" id="viewSubtitle">View and manage group
+            defense schedules.</p>
 
-        <!-- Schedule Table -->
-        <div class="table-container">
+        <!-- List View (Table) -->
+        <div id="listView" class="table-container">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -137,6 +154,54 @@
                     <!-- Populated by JS -->
                 </tbody>
             </table>
+        </div>
+
+        <!-- Calendar View -->
+        <div id="calendarView" class="calendar-container"
+            style="display: none; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; animation: fadeIn 0.3s ease;">
+            <div class="calendar-header"
+                style="padding: 25px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="calendarMonth" style="margin: 0; color: #1e293b; font-weight: 700; font-size: 1.4rem;">Month
+                    Year</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="prevMonth()"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; cursor: pointer; color: #475569; transition: all 0.2s;">
+                        <span class="material-icons-round">chevron_left</span>
+                    </button>
+                    <button onclick="nextMonth()"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; cursor: pointer; color: #475569; transition: all 0.2s;">
+                        <span class="material-icons-round">chevron_right</span>
+                    </button>
+                </div>
+            </div>
+            <div class="calendar-grid-header"
+                style="display: grid; grid-template-columns: repeat(7, 1fr); background: #f8fafc; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Sun</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Mon</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Tue</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Wed</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Thu</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Fri</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Sat</div>
+            </div>
+            <div id="calendarDays" class="calendar-grid"
+                style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #f1f5f9;">
+                <!-- Days injected by JS -->
+            </div>
         </div>
 
         <!-- Add Schedule FAB -->

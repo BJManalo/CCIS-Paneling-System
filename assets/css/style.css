@@ -436,6 +436,32 @@ body {
     font-size: 22px;
 }
 
+.toggle-btn {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-btn:hover {
+    color: var(--primary-color);
+    background: white;
+}
+
+.toggle-btn.active {
+    background: white;
+    color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
 .logout-btn {
     background: transparent;
     border: 1px solid #fee2e2;

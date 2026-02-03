@@ -9,7 +9,13 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
 // State
 let allSchedules = [];
+let filteredSchedules = [];
 let fetchedGroups = [];
+
+// Calendar State
+let currentView = 'list'; // 'list' or 'calendar'
+let calendarDate = new Date();
+
 const allPanels = [
     "May Lynn Farren",
     "Nolan Yumen",
@@ -24,6 +30,31 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSchedules();
     checkUrlParams();
 });
+
+function switchView(view) {
+    currentView = view;
+    const listView = document.getElementById('listView');
+    const calendarView = document.getElementById('calendarView');
+    const listViewBtn = document.getElementById('listViewBtn');
+    const calendarViewBtn = document.getElementById('calendarViewBtn');
+    const subtitle = document.getElementById('viewSubtitle');
+
+    if (view === 'list') {
+        listView.style.display = 'block';
+        calendarView.style.display = 'none';
+        listViewBtn.classList.add('active');
+        calendarViewBtn.classList.remove('active');
+        subtitle.innerText = 'View and manage group defense schedules in list format.';
+        renderSchedules(allSchedules);
+    } else {
+        listView.style.display = 'none';
+        calendarView.style.display = 'block';
+        listViewBtn.classList.remove('active');
+        calendarViewBtn.classList.add('active');
+        subtitle.innerText = 'Click on a date to set or manage defense schedules.';
+        renderCalendar();
+    }
+}
 
 // Check if we came from the Accounts page to schedule a specific group
 function checkUrlParams() {
@@ -63,11 +94,162 @@ async function getSchedules() {
 async function loadSchedules() {
     const tableBody = document.getElementById('scheduleTableBody');
     if (!tableBody) return;
-    tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">Loading schedules...</td></tr>';
+
+    // Show loading based on current view
+    if (currentView === 'list') {
+        tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">Loading schedules...</td></tr>';
+    }
 
     const schedules = await getSchedules();
     allSchedules = schedules;
-    renderSchedules(allSchedules);
+    filteredSchedules = schedules;
+
+    if (currentView === 'list') {
+        renderSchedules(allSchedules);
+    } else {
+        renderCalendar();
+    }
+}
+
+function prevMonth() {
+    calendarDate.setMonth(calendarDate.getMonth() - 1);
+    renderCalendar();
+}
+
+function nextMonth() {
+    calendarDate.setMonth(calendarDate.getMonth() + 1);
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const calendarDays = document.getElementById('calendarDays');
+    const calendarMonth = document.getElementById('calendarMonth');
+    if (!calendarDays || !calendarMonth) return;
+
+    calendarDays.innerHTML = '';
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+
+    calendarMonth.textContent = calendarDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+
+    // Fill empty days from previous month
+    for (let i = 0; i < firstDay; i++) {
+        const emptyDay = document.createElement('div');
+        emptyDay.style.cssText = 'background: white; padding: 15px; min-height: 120px; border: 1px solid #f1f5f9; color: #cbd5e1;';
+        calendarDays.appendChild(emptyDay);
+    }
+
+    // Fill days of current month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayEl = document.createElement('div');
+        const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
+
+        dayEl.style.cssText = `
+            background: white; 
+            padding: 12px; 
+            min-height: 130px; 
+            border: 1px solid #f1f5f9; 
+            cursor: pointer; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        `;
+
+        dayEl.innerHTML = `
+            <div style="
+                font-weight: 700; 
+                color: ${isToday ? 'var(--primary-color)' : '#1e293b'}; 
+                margin-bottom: 8px;
+                font-size: 0.95rem;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            ">
+                ${day}
+                ${isToday ? '<span style="width:6px; height:6px; background:var(--primary-color); border-radius:50%;"></span>' : ''}
+            </div>
+            <div id="day-events-${year}-${month + 1}-${day}" style="display: flex; flex-direction: column; gap: 4px;"></div>
+        `;
+
+        dayEl.onmouseover = () => {
+            dayEl.style.background = '#f8fafc';
+            dayEl.style.transform = 'scale(1.02)';
+            dayEl.style.zIndex = '10';
+            dayEl.style.boxShadow = '0 10px 20px rgba(0,0,0,0.08)';
+        };
+        dayEl.onmouseout = () => {
+            dayEl.style.background = 'white';
+            dayEl.style.transform = 'none';
+            dayEl.style.zIndex = '1';
+            dayEl.style.boxShadow = 'none';
+        };
+
+        dayEl.onclick = () => {
+            const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            openScheduleModalForDate(formattedDate);
+        };
+
+        calendarDays.appendChild(dayEl);
+
+        // Find events for this day
+        const dayDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const daySchedules = filteredSchedules.filter(s => s.schedule_date === dayDateString);
+
+        const eventsContainer = dayEl.querySelector(`#day-events-${year}-${month + 1}-${day}`);
+        daySchedules.forEach(sched => {
+            const eventEl = document.createElement('div');
+            const typeClass = sched.schedule_type?.toLowerCase().includes('title') ? 'type-title' :
+                (sched.schedule_type?.toLowerCase().includes('pre-oral') || sched.schedule_type?.toLowerCase().includes('preoral')) ? 'type-pre-oral' :
+                    'type-final';
+
+            eventEl.style.cssText = `
+                font-size: 10px; 
+                padding: 4px 8px; 
+                border-radius: 6px; 
+                font-weight: 700;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                margin-bottom: 2px;
+                transition: transform 0.1s;
+                border: 1px solid rgba(0,0,0,0.05);
+            `;
+
+            // Re-use colors from style.css badges
+            if (typeClass === 'type-title') {
+                eventEl.style.background = '#dbeafe';
+                eventEl.style.color = '#1e40af';
+            } else if (typeClass === 'type-pre-oral') {
+                eventEl.style.background = '#fef3c7';
+                eventEl.style.color = '#92400e';
+            } else {
+                eventEl.style.background = '#dcfce7';
+                eventEl.style.color = '#166534';
+            }
+
+            eventEl.textContent = `${sched.schedule_time || ''} ${sched.student_groups?.group_name || 'Group'}`;
+            eventEl.title = `${sched.schedule_type}: ${sched.student_groups?.group_name}`;
+
+            eventEl.onclick = (e) => {
+                e.stopPropagation();
+                openEditScheduleModal(sched.id);
+            };
+
+            eventEl.onmouseenter = () => eventEl.style.transform = 'translateX(2px)';
+            eventEl.onmouseleave = () => eventEl.style.transform = 'none';
+
+            eventsContainer.appendChild(eventEl);
+        });
+    }
+}
+
+async function openScheduleModalForDate(date) {
+    await openScheduleModal();
+    const dateInput = document.getElementById('schedDate');
+    if (dateInput) dateInput.value = date;
 }
 
 function renderSchedules(schedules) {
@@ -233,7 +415,7 @@ function applyFilters() {
     const term = document.getElementById('searchInput').value.toLowerCase();
     const phase = document.getElementById('phaseFilter').value;
 
-    const filtered = allSchedules.filter(sched => {
+    filteredSchedules = allSchedules.filter(sched => {
         const groupName = (sched.student_groups?.group_name || '').toLowerCase();
         const program = (sched.student_groups?.program || '').toLowerCase();
         const venue = (sched.schedule_venue || '').toLowerCase();
@@ -244,7 +426,12 @@ function applyFilters() {
 
         return matchesSearch && matchesPhase;
     });
-    renderSchedules(filtered);
+
+    if (currentView === 'list') {
+        renderSchedules(filteredSchedules);
+    } else {
+        renderCalendar();
+    }
 }
 
 document.getElementById('searchInput')?.addEventListener('input', applyFilters);
