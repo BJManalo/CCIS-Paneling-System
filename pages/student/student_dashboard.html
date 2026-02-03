@@ -486,9 +486,12 @@
             <div class="modal-header"
                 style="padding: 15px 25px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 12px 12px 0 0;">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <h3 id="modalFileTitle"
-                        style="margin: 0; color: var(--primary-dark); font-size: 1.1rem; border-right: 2px solid #e2e8f0; padding-right: 15px;">
-                        Document Preview</h3>
+                    <div style="border-right: 2px solid #e2e8f0; padding-right: 15px; margin-right: 15px;">
+                        <h3 id="modalFileTitle" style="margin: 0; color: var(--primary-dark); font-size: 1.1rem;">
+                            Document Preview</h3>
+                        <p style="margin: 3px 0 0; color: #64748b; font-size: 0.75rem; font-weight: 500;">Review your
+                            submission status and panelist feedback.</p>
+                    </div>
                     <div id="feedbackSelectorContainer" style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 0.85rem; color: #64748b; font-weight: 500;">Viewing:</span>
                         <select id="feedbackSelector" onchange="window.handlePanelSwitch(this.value)"
