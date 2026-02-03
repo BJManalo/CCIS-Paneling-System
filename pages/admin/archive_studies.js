@@ -74,8 +74,6 @@ async function autoSyncMissingArchives() {
         const archivedIds = new Set((aRes.data || []).map(a => a.group_id));
 
         for (const group of groups) {
-            if (archivedIds.has(group.id)) continue;
-
             const groupStudents = students.filter(s => s.group_id === group.id);
             if (groupStudents.length === 0) continue;
 
@@ -103,11 +101,12 @@ async function autoSyncMissingArchives() {
                 }
             });
 
+            // We now update archives even if they exist, to pick up "Revised" uploads
             if (isGroupComplete) {
-                console.log(`%c[ArchiveSync] Group ${group.group_name} is complete! Archiving...`, "color: #22c55e; font-weight: bold;");
+                console.log(`%c[ArchiveSync] Synchronizing ${group.group_name}...`, "color: #22c55e; font-weight: bold;");
                 const success = await archiveProject(group.id);
-                if (success) console.log(`%c[ArchiveSync] Successfully archived ${group.group_name}`, "color: #22c55e;");
-                else console.error(`[ArchiveSync] Failed to archive ${group.group_name}.`);
+                if (success) console.log(`%c[ArchiveSync] Successfully synced ${group.group_name}`, "color: #22c55e;");
+                else console.error(`[ArchiveSync] Failed to sync ${group.group_name}.`);
             }
         }
     } catch (e) {
@@ -155,11 +154,6 @@ async function archiveProject(groupId) {
             });
         }
 
-        const { data: annotations } = await supabaseClient
-            .from('capstone_annotations')
-            .select('*')
-            .eq('group_id', groupId);
-
         // --- IMPROVED: RESOLVE APPROVED TITLE ---
         let resolvedTitle = group.group_name;
         try {
@@ -189,16 +183,6 @@ async function archiveProject(groupId) {
             grades_snapshot: gradesSnapshot
         };
 
-        const annotationsMap = {};
-        if (annotations) {
-            annotations.forEach(a => {
-                const type = (a.defense_type || 'unknown').toLowerCase();
-                if (!annotationsMap[type]) annotationsMap[type] = {};
-                if (!annotationsMap[type][a.file_key]) annotationsMap[type][a.file_key] = {};
-                annotationsMap[type][a.file_key][a.user_name] = a.annotated_file_url;
-            });
-        }
-
         // 7. Manual Upsert
         const { data: existing } = await supabaseClient
             .from('archived_projects')
@@ -213,16 +197,13 @@ async function archiveProject(groupId) {
             members: (studentsData || []).map(s => s.full_name),
             panelists: Array.from(panelSet),
             submissions: submissions,
-            annotations: annotationsMap,
             completed_at: new Date().toISOString()
         };
 
         if (existing) {
-            const { error } = await supabaseClient.from('archived_projects').update(archivePayload).eq('id', existing.id);
-            if (error) throw error;
+            await supabaseClient.from('archived_projects').update(archivePayload).eq('id', existing.id);
         } else {
-            const { error } = await supabaseClient.from('archived_projects').insert(archivePayload);
-            if (error) throw error;
+            await supabaseClient.from('archived_projects').insert(archivePayload);
         }
 
         return true;
@@ -391,10 +372,13 @@ function viewArchiveDetails(id) {
 
             Object.entries(links).forEach(([fileKey, url]) => {
                 if (url && url.toString().trim() !== '' && url !== "null") {
-                    // STRICTLY ONLY FETCH REVISIONS AS REQUESTED 
-                    // (Unless it is the final manuscript which is inherently the 'final' version, 
-                    // but we will stick to 'revised' pattern for safety if that is how they are tagged)
-                    const isRevision = fileKey.toLowerCase().includes('revised');
+                    // RESOLVE CORRECT DOCUMENTATION:
+                    // 1. Strictly anything with 'revised' in the key
+                    // 2. Everything from 'final_link' (since it is the final version)
+                    // 3. Chapters 1-3 for Pre Oral (often uploaded without '_revised' but are the target)
+                    const isRevision = fileKey.toLowerCase().includes('revised') ||
+                        catKey === 'final_link' ||
+                        (catKey === 'pre_oral_link' && fileKey.match(/^ch[1-3]$/));
 
                     if (isRevision) {
                         const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
