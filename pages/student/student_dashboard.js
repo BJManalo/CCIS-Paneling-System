@@ -175,115 +175,38 @@ async function loadSubmissionData() {
             const preOralData = getFeedbackMaps('Pre-Oral Defense');
             const finalData = getFeedbackMaps('Final Defense');
 
-            window.fullDefenseData = {
-                titles: { links: tLinks, ...titleData },
-                preoral: { links: pLinks, ...preOralData },
-                final: { links: fLinks, ...finalData }
+            window.feedbackStatus = {
+                titles: titleData.statuses,
+                preoral: preOralData.statuses,
+                final: finalData.statuses
             };
 
-            const renderField = (linkMap, statusMap, remarksMap, annotationsMap, key, elementId, stageId) => {
+            const renderField = (linkMap, annotationsMap, key, elementId) => {
                 const el = document.getElementById(elementId);
                 if (!el) return;
                 const formGroup = el.closest('.form-group');
                 if (!formGroup) return;
 
-                formGroup.querySelectorAll('.status-badge-container, .remarks-list-container').forEach(node => node.remove());
+                // Remove previous injections
+                formGroup.querySelectorAll('.status-badge-container, .remarks-list-container, .view-doc-container').forEach(node => node.remove());
 
-                const rawStatus = statusMap[key] || 'Pending';
-                const rawRemarks = remarksMap[key] || {};
+                const hasFile = linkMap[key] && linkMap[key].trim() !== '';
                 const rawAnnotations = annotationsMap[key] || {};
-                let feedbackData = [];
+                const hasAnnotations = Object.keys(rawAnnotations).length > 0;
 
-                if (typeof rawStatus === 'object') {
-                    Object.keys(rawStatus).forEach(panel => {
-                        feedbackData.push({
-                            panel: panel,
-                            status: rawStatus[panel],
-                            remarks: typeof rawRemarks === 'object' ? (rawRemarks[panel] || '') : '',
-                            hasAnnotation: !!rawAnnotations[panel]
-                        });
-                    });
-                } else {
-                    feedbackData.push({
-                        panel: 'Panel',
-                        status: rawStatus,
-                        remarks: typeof rawRemarks === 'string' ? rawRemarks : '',
-                        hasAnnotation: Object.keys(rawAnnotations).length > 0
-                    });
-                }
-
-                const hasActualFeedback = feedbackData.some(f =>
-                    (f.status && f.status !== 'Pending') ||
-                    (f.remarks && f.remarks.trim() !== '') ||
-                    f.hasAnnotation
-                );
-
-                const badgesHtml = feedbackData.map(f => {
-                    let color = '#64748b'; let icon = 'hourglass_empty'; let bg = '#f1f5f9'; let border = '#e2e8f0';
-                    const s = (f.status || 'Pending').toLowerCase();
-                    if (s.includes('approved') || s.includes('completed')) { color = '#059669'; icon = 'check_circle'; bg = '#f0fdf4'; border = '#bbf7d0'; }
-                    else if (s.includes('revision')) { color = '#d97706'; icon = 'warning'; bg = '#fffbeb'; border = '#fde68a'; }
-                    else if (s.includes('reject') || s.includes('redefend')) { color = '#dc2626'; icon = 'cancel'; bg = '#fef2f2'; border = '#fecaca'; }
-                    return `
-                        <div class="status-badge" style="font-size: 0.65rem; font-weight: 700; color: ${color}; background: ${bg}; border: 1px solid ${border}; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase;">
-                            <span class="material-icons-round" style="font-size: 10px;">${icon}</span>
-                            ${f.status} ${feedbackData.length > 1 ? `<span style="opacity:0.6; font-size:9px;">(${f.panel})</span>` : ''}
+                if (hasFile) {
+                    const headerHtml = `
+                        <div class="view-doc-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-size: 0.85rem; font-weight: 700; color: #475569;">Submission Link</span>
+                            <button onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: linkMap[key], annotations: annotationsMap[key] || {} }))}', '${key}')" 
+                                    style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                                <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
+                                ${hasAnnotations ? 'View Document & Feedback' : 'View Document'}
+                            </button>
                         </div>
                     `;
-                }).join('');
-
-                const headerHtml = `
-                    <div class="status-badge-container" style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 10px;">
-                        <span style="font-size: 0.85rem; font-weight: 700; color: #475569;">Submission Link</span>
-                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                            <div style="display: flex; flex-wrap: wrap; gap: 4px; border-right: ${hasActualFeedback ? '1.5px solid #e2e8f0' : 'none'}; padding-right: ${hasActualFeedback ? '8px' : '0'};">
-                                ${badgesHtml}
-                            </div>
-                            ${hasActualFeedback ? `
-                                <button onclick="window.prepareViewer('${stageId}', '${key}')" 
-                                        style="background: #eff6ff; color: #1e40af; border: none; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; border: 1px solid #bfdbfe;">
-                                    <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
-                                    View Feedback
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-                const targetNode = el.closest('.input-with-action') || el;
-                targetNode.insertAdjacentHTML('beforebegin', headerHtml);
-
-                const validRemarks = feedbackData.filter(f => f.remarks && f.remarks.trim() !== '');
-                if (validRemarks.length > 0) {
-                    const remarksHtml = `
-                        <div class="remarks-list-container" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
-                            ${validRemarks.map(f => {
-                        let color = '#64748b'; let bg = '#f1f5f9';
-                        const s = f.status.toLowerCase();
-                        if (s.includes('approved')) { color = '#059669'; bg = '#f0fdf4'; }
-                        else if (s.includes('revision')) { color = '#d97706'; bg = '#fffbeb'; }
-                        else if (s.includes('reject') || s.includes('redefense')) { color = '#dc2626'; bg = '#fef2f2'; }
-                        let headerText = f.panel;
-                        let bodyText = f.remarks;
-                        if (f.remarks.includes(':')) {
-                            const parts = f.remarks.split(':');
-                            headerText = parts[0].trim();
-                            bodyText = parts.slice(1).join(':').trim();
-                        }
-                        return `
-                                    <div class="panel-remark" style="background: ${bg}; border-left: 4px solid ${color}; padding: 12px 15px; border-radius: 0 10px 10px 0; animation: slideDown 0.3s ease;">
-                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                            <span class="material-icons-round" style="font-size: 14px; color: ${color}; opacity: 0.8;">comment</span>
-                                            <span style="font-size: 0.7rem; font-weight: 800; color: ${color}; text-transform: uppercase;">${headerText}</span>
-                                        </div>
-                                        <div style="font-size: 0.9rem; color: #334155; line-height: 1.5; font-weight: 500;">
-                                            ${bodyText}
-                                        </div>
-                                    </div>
-                                `;
-                    }).join('')}
-                        </div>
-                    `;
-                    targetNode.insertAdjacentHTML('afterend', remarksHtml);
+                    const targetNode = el.closest('.input-with-action') || el;
+                    targetNode.insertAdjacentHTML('beforebegin', headerHtml);
                 }
                 el.value = linkMap[key] || '';
                 const revEl = document.getElementById(elementId + '_revised');
@@ -334,14 +257,14 @@ async function loadSubmissionData() {
                 }
             };
 
-            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title1', 'titleLink1', 'titles');
-            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title2', 'titleLink2', 'titles');
-            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title3', 'titleLink3', 'titles');
-            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch1', 'preOralCh1', 'preoral');
-            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch2', 'preOralCh2', 'preoral');
-            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch3', 'preOralCh3', 'preoral');
-            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch4', 'finalCh4', 'final');
-            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch5', 'finalCh5', 'final');
+            renderField(tLinks, titleData.annotations, 'title1', 'titleLink1');
+            renderField(tLinks, titleData.annotations, 'title2', 'titleLink2');
+            renderField(tLinks, titleData.annotations, 'title3', 'titleLink3');
+            renderField(pLinks, preOralData.annotations, 'ch1', 'preOralCh1');
+            renderField(pLinks, preOralData.annotations, 'ch2', 'preOralCh2');
+            renderField(pLinks, preOralData.annotations, 'ch3', 'preOralCh3');
+            renderField(fLinks, finalData.annotations, 'ch4', 'finalCh4');
+            renderField(fLinks, finalData.annotations, 'ch5', 'finalCh5');
 
             injectActionButtons(document.getElementById('titleLink1'), tLinks.title1);
             injectActionButtons(document.getElementById('titleLink1_revised'), tLinks.title1_revised);
@@ -750,157 +673,61 @@ window.saveSubmissions = async function (specificField) {
 }
 
 let currentViewerFileKey = null;
-let currentViewerStageId = null;
+let currentViewerData = null; // Stores all URLs for the dropdown
 
-window.prepareViewer = (stageId, fileKey) => {
-    const stageData = window.fullDefenseData[stageId];
-    if (!stageData) return;
-
-    currentViewerStageId = stageId;
+window.prepareViewer = (encodedData, fileKey) => {
+    const data = JSON.parse(decodeURIComponent(encodedData));
+    currentViewerData = data;
     currentViewerFileKey = fileKey;
 
-    // Update Stage Name in UI
-    const stageLabel = document.getElementById('modalStageName');
-    if (stageLabel) stageLabel.innerText = stageId.toUpperCase();
-
-    // 1. Populate Sidebar with all files in this stage
-    const sidebar = document.getElementById('modalSidebarContent');
-    if (sidebar) {
-        sidebar.innerHTML = "";
-
-        // Determine which keys to show based on stage
-        let keys = [];
-        if (stageId === 'titles') keys = ['title1', 'title2', 'title3'];
-        else if (stageId === 'preoral') keys = ['ch1', 'ch2', 'ch3'];
-        else if (stageId === 'final') keys = ['ch4', 'ch5'];
-
-        keys.forEach(key => {
-            const link = stageData.links[key];
-            if (!link) return;
-
-            const statusMap = stageData.statuses[key] || 'Pending';
-            const remarksMap = stageData.remarks[key] || {};
-            const annotationsMap = stageData.annotations[key] || {};
-
-            let displayTitle = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-            // Check for project title if stage is titles
-            if (stageId === 'titles') {
-                const inputId = 'project' + key.charAt(0).toUpperCase() + key.slice(1);
-                const actualTitleInput = document.getElementById(inputId);
-                if (actualTitleInput && actualTitleInput.value.trim()) {
-                    displayTitle = actualTitleInput.value.trim();
-                }
-            }
-
-            const isActive = (key === fileKey);
-
-            // Create Sidebar Item
-            const item = document.createElement('div');
-            item.style.cssText = `
-                padding: 12px; border-radius: 10px; border: 1.5px solid ${isActive ? 'var(--primary-color)' : '#f1f5f9'};
-                background: ${isActive ? '#eff6ff' : 'white'}; margin-bottom: 12px; cursor: pointer;
-                transition: all 0.2s; box-shadow: ${isActive ? '0 4px 12px rgba(37, 99, 235, 0.1)' : 'none'};
-            `;
-            item.onclick = () => window.prepareViewer(stageId, key);
-
-            // Build Item Content (Header + Badge)
-            item.innerHTML = `
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px;">
-                    <span style="font-size: 0.85rem; font-weight: 700; color: ${isActive ? 'var(--primary-dark)' : '#334155'}; line-height: 1.3;">${displayTitle}</span>
-                    <span class="material-icons-round" style="font-size: 16px; color: ${isActive ? 'var(--primary-color)' : '#94a3b8'}; transition: transform 0.2s;">
-                        ${isActive ? 'arrow_circle_right' : 'arrow_forward_ios'}
-                    </span>
-                </div>
-            `;
-
-            // Build Panel Statuses
-            let feedbackItems = [];
-            if (typeof statusMap === 'object') {
-                Object.keys(statusMap).forEach(panel => {
-                    feedbackItems.push({ panel, status: statusMap[panel], remark: remarksMap[panel] || '', hasAnnot: !!annotationsMap[panel] });
-                });
-            } else {
-                feedbackItems.push({ panel: 'Panel', status: statusMap, remark: (typeof remarksMap === 'string' ? remarksMap : ''), hasAnnot: Object.keys(annotationsMap).length > 0 });
-            }
-
-            feedbackItems.forEach(f => {
-                let color = '#64748b'; let bg = '#f1f5f9';
-                const s = (f.status || 'Pending').toLowerCase();
-                if (s.includes('approved')) { color = '#059669'; bg = '#ecfdf5'; }
-                else if (s.includes('revision')) { color = '#d97706'; bg = '#fffbeb'; }
-                else if (s.includes('reject')) { color = '#dc2626'; bg = '#fef2f2'; }
-
-                const badge = document.createElement('div');
-                badge.style.cssText = `
-                    display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px;
-                    background: ${bg}; border: 1px solid ${color}33; color: ${color}; font-size: 0.65rem; font-weight: 800;
-                    text-transform: uppercase; margin-top: 4px;
-                `;
-                badge.innerHTML = `<span class="material-icons-round" style="font-size: 10px;">${s.includes('approved') ? 'check_circle' : s.includes('revision') ? 'warning' : 'hourglass_empty'}</span> ${f.status} ${feedbackItems.length > 1 ? `<span style="opacity:0.6; font-weight:600;">(${f.panel})</span>` : ''}`;
-                item.appendChild(badge);
-
-                // If active, also show remarks in sidebar card
-                if (isActive && f.remark) {
-                    const rem = document.createElement('div');
-                    rem.style.cssText = `
-                        margin-top: 8px; padding-top: 8px; border-top: 1px dashed ${color}44;
-                        font-size: 0.75rem; color: #475569; line-height: 1.4; font-weight: 500;
-                    `;
-                    rem.innerText = f.remark.includes(':') ? f.remark.split(':').slice(1).join(':').trim() : f.remark;
-                    item.appendChild(rem);
-                }
-            });
-
-            sidebar.appendChild(item);
-        });
-    }
-
-    // 2. Prepare Feedback Selector (Toolbar)
     const selector = document.getElementById('feedbackSelector');
     if (selector) {
         selector.innerHTML = "";
-        const links = stageData.links[fileKey] || "";
-        const annotations = stageData.annotations[fileKey] || {};
 
-        if (links) {
+        // 1. Add Draft Option if exists
+        if (data.draft) {
             const opt = document.createElement('option');
             opt.value = "draft";
             opt.innerText = "Original Draft";
             selector.appendChild(opt);
         }
 
-        Object.keys(annotations).forEach(panel => {
+        // 2. Add Annotation Options
+        Object.keys(data.annotations).forEach(panel => {
             const opt = document.createElement('option');
             opt.value = panel;
             opt.innerText = `Feedback (${panel})`;
             selector.appendChild(opt);
         });
 
+        // 3. Selection visibility
         const container = document.getElementById('feedbackSelectorContainer');
         if (container) {
             container.style.display = (selector.options.length > 1) ? "flex" : "none";
         }
+    }
 
-        if (selector.options.length > 0) {
-            selector.selectedIndex = 0;
-            window.handlePanelSwitch(selector.value);
-        }
+    // Default to first option or specific logic
+    if (selector && selector.options.length > 0) {
+        selector.selectedIndex = 0;
+        window.handlePanelSwitch(selector.value);
     }
 };
 
 window.handlePanelSwitch = async (value) => {
-    if (!currentViewerStageId || !currentViewerFileKey) return;
-    const stageData = window.fullDefenseData[currentViewerStageId];
-    if (!stageData) return;
+    if (!currentViewerData || !currentViewerFileKey) return;
 
     let targetUrl = "";
+    let panelName = null;
+
     if (value === "draft") {
-        targetUrl = stageData.links[currentViewerFileKey];
+        targetUrl = currentViewerData.draft;
     } else {
-        targetUrl = stageData.annotations[currentViewerFileKey][value];
+        targetUrl = currentViewerData.annotations[value];
+        panelName = value;
     }
 
-    window.openFileViewer(targetUrl, currentViewerFileKey);
+    window.openFileViewer(targetUrl, currentViewerFileKey, panelName);
 };
 
 window.openFileViewer = async (url, fileKey, panelName = null) => {
