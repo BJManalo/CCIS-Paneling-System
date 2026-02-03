@@ -164,19 +164,37 @@ async function archiveProject(groupId) {
                 annotationsMap[type][a.file_key][a.user_name] = a.annotated_file_url;
             });
         }
-
-        const { error: archError } = await supabaseClient
+        // 7. Manual Upsert (Check if exists first to avoid constraint errors)
+        const { data: existing } = await supabaseClient
             .from('archived_projects')
-            .upsert({
-                group_id: groupId,
-                group_name: group.group_name,
-                project_title: group.project_title,
-                members: (studentsData || []).map(s => s.full_name),
-                panelists: Array.from(panelSet),
-                submissions: submissions,
-                annotations: annotationsMap,
-                completed_at: new Date().toISOString()
-            }, { onConflict: 'group_id' });
+            .select('id')
+            .eq('group_id', groupId)
+            .single();
+
+        const archivePayload = {
+            group_id: groupId,
+            group_name: group.group_name,
+            project_title: group.project_title,
+            members: (studentsData || []).map(s => s.full_name),
+            panelists: Array.from(panelSet),
+            submissions: submissions,
+            annotations: annotationsMap,
+            completed_at: new Date().toISOString()
+        };
+
+        let archError;
+        if (existing) {
+            const { error } = await supabaseClient
+                .from('archived_projects')
+                .update(archivePayload)
+                .eq('id', existing.id);
+            archError = error;
+        } else {
+            const { error } = await supabaseClient
+                .from('archived_projects')
+                .insert(archivePayload);
+            archError = error;
+        }
 
         if (archError) console.error("[ArchiveProject] DB Error:", archError);
         return !archError;
