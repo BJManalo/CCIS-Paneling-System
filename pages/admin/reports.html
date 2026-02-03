@@ -74,6 +74,44 @@
         color: #475569;
         min-width: 150px;
     }
+
+    .role-tabs {
+        display: flex;
+        gap: 10px;
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 20px;
+    }
+
+    .role-tab {
+        padding: 12px 24px;
+        border: none;
+        background: none;
+        font-family: inherit;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+
+    .role-tab.active {
+        color: var(--primary-color);
+    }
+
+    .role-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: var(--primary-color);
+    }
+
+    .role-tab:hover:not(.active) {
+        color: var(--primary-dark);
+        background: #f8fafc;
+    }
 </style>
 </head>
 
@@ -106,20 +144,27 @@
         <!-- Metrics Row (Dashboard Style) -->
         <div class="charts-row">
             <div class="chart-card">
-                <div class="chart-title">Students Passed</div>
-                <h1 style="font-size: 3rem; color: #16a34a; margin: 0;" id="countTitle">0</h1>
-                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Students</div>
+                <div class="chart-title">Student Pass</div>
+                <h1 style="font-size: 3rem; color: #16a34a; margin: 0;" id="countPass">0</h1>
+                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Total Graded</div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">Students Failed/Incomplete</div>
-                <h1 style="font-size: 3rem; color: #dc2626; margin: 0;" id="countRejected">0</h1>
-                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Students</div>
+                <div class="chart-title">Student Failed/Incomplete</div>
+                <h1 style="font-size: 3rem; color: #dc2626; margin: 0;" id="countFailed">0</h1>
+                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Total Ungraded</div>
             </div>
             <div class="chart-card">
                 <div class="chart-title">Total Records</div>
-                <h1 style="font-size: 3rem; color: #3b82f6; margin: 0;" id="countCompleted">0</h1>
-                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Students</div>
+                <h1 style="font-size: 3rem; color: #3b82f6; margin: 0;" id="countTotal">0</h1>
+                <div style="font-size: 0.9rem; color: #64748b; margin-top: 5px;">Overall Students</div>
             </div>
+        </div>
+
+        <!-- Role Tabs -->
+        <div class="role-tabs" style="margin-bottom: 25px;">
+            <button class="role-tab active" id="tab-pass" onclick="switchReportTab('pass')">Student Pass</button>
+            <button class="role-tab" id="tab-failed" onclick="switchReportTab('failed')">Student
+                Failed/Incomplete</button>
         </div>
 
         <!-- Controls -->
@@ -127,7 +172,7 @@
             <div class="filter-group">
                 <select id="defenseFilter" class="filter-select" onchange="applyFilters()">
                     <option value="Title Defense">Title Defense</option>
-                    <option value="Pre Oral Defense">Pre-Oral Defense</option>
+                    <option value="Pre-Oral Defense">Pre-Oral Defense</option>
                     <option value="Final Defense">Final Defense</option>
                 </select>
                 <select id="programFilter" class="filter-select" onchange="applyFilters()">

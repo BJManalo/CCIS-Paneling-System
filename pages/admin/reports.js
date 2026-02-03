@@ -1,4 +1,3 @@
-
 // Initialize Supabase client
 const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
 const PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
@@ -11,6 +10,7 @@ let allStudents = [];
 let allSchedules = [];
 let allGrades = [];
 let filteredRows = [];
+let currentTab = 'pass'; // 'pass' or 'failed'
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
@@ -70,28 +70,16 @@ function populateSectionFilter() {
     });
 }
 
-function getStatusMap(row) {
-    if (!row || !row.statuses) return {};
-    let s = row.statuses;
-    if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { return {}; } }
+window.switchReportTab = (tab) => {
+    currentTab = tab;
 
-    // Flatten for easy checking: if a key's value is an object (multi-panel), 
-    // we consider the "overall" status based on panel consensus.
-    const flat = {};
-    Object.keys(s).forEach(fileKey => {
-        const val = s[fileKey];
-        if (typeof val === 'object' && val !== null) {
-            const values = Object.values(val);
-            if (values.some(v => v.includes('Approved'))) flat[fileKey] = 'Approved';
-            else if (values.some(v => v.includes('Approve with Revisions'))) flat[fileKey] = 'Approve with Revisions';
-            else if (values.some(v => v.includes('Rejected') || v.includes('Redefense'))) flat[fileKey] = 'Rejected';
-            else flat[fileKey] = 'Pending';
-        } else {
-            flat[fileKey] = val || 'Pending';
-        }
+    // Update active tab styles
+    document.querySelectorAll('.role-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.id === `tab-${tab}`);
     });
-    return flat;
-}
+
+    applyFilters();
+};
 
 window.applyFilters = () => {
     const phase = document.getElementById('defenseFilter').value;
@@ -99,13 +87,21 @@ window.applyFilters = () => {
     const section = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
+    // Reset counters
+    let passCount = 0;
+    let failedCount = 0;
+
     filteredRows = [];
+
+    // Helper to normalize defense type matching
+    const normalize = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const phaseNorm = normalize(phase);
 
     allStudents.forEach(student => {
         const group = allGroups.find(g => g.id === student.group_id);
         if (!group) return;
 
-        // Base Filters
+        // Base Filters (Program, Section, Search)
         const progMatch = program === 'ALL' || (group.program && group.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (group.section === section);
         const searchMatch = !searchTerm ||
@@ -114,82 +110,42 @@ window.applyFilters = () => {
 
         if (!(progMatch && sectMatch && searchMatch)) return;
 
-        // Determine project title from defense statuses
-        const titleRow = allDefenseStatuses.find(ds => ds.group_id === group.id && ds.defense_type === 'Title Defense');
-        const tMap = getStatusMap(titleRow);
-        const projectTitle = Object.keys(tMap).find(k => tMap[k].toLowerCase().includes('approved')) || group.group_name || '-';
+        // Check if student has a grade for THIS phase
+        const gradeRecord = allGrades.find(gr =>
+            gr.student_id === student.id &&
+            normalize(gr.grade_type || '') === phaseNorm
+        );
+        const hasPerformanceGrade = gradeRecord && (gradeRecord.grade !== null && gradeRecord.grade !== undefined);
 
-        // Find schedule for specific phase
-        const phaseSchedule = allSchedules.find(s => s.group_id === group.id && s.schedule_type === phase);
-
-        // Find individual grade for this student in this phase (match by student_id and grade_type)
-        const gradeRecord = allGrades.find(gr => gr.student_id === student.id && gr.grade_type === phase);
-        const studentGrade = (gradeRecord && (gradeRecord.grade || gradeRecord.grade === 0)) ? parseFloat(gradeRecord.grade) : '-';
-
-        // Phase Status Logic
-        let phaseStatus = 'Pending';
-        let statusHtml = '<span class="status-badge pending">Pending</span>';
-
-        if (phase === 'Title Defense') {
-            const isApproved = Object.values(tMap).some(v => v.toLowerCase().includes('approved'));
-            const isRejected = Object.values(tMap).some(v => v.toLowerCase().includes('rejected'));
-            if (studentGrade !== '-') {
-                phaseStatus = 'Passed';
-                statusHtml = '<span class="status-badge approved">Graded</span>';
-            } else if (isApproved) {
-                phaseStatus = 'Passed';
-                statusHtml = '<span class="status-badge approved">Passed</span>';
-            } else if (isRejected) {
-                phaseStatus = 'Rejected';
-                statusHtml = '<span class="status-badge rejected">Rejected</span>';
-            }
+        // Calculate counts based on global filters (before tab filter)
+        if (hasPerformanceGrade) {
+            passCount++;
         } else {
-            // Pre-Oral or Final Defense
-            const phaseSchedule = allSchedules.find(s => s.group_id === group.id && s.schedule_type === phase);
-            if (studentGrade !== '-') {
-                phaseStatus = 'Passed';
-                statusHtml = '<span class="status-badge approved">Graded</span>';
-            } else if (phaseSchedule) {
-                if (phaseSchedule.status === 'Completed') {
-                    phaseStatus = 'Incomplete';
-                    statusHtml = '<span class="status-badge rejected">No Grade</span>';
-                } else {
-                    phaseStatus = 'Scheduled';
-                    statusHtml = '<span class="status-badge pending" style="background:#e0f2fe; color:#0369a1;">Scheduled</span>';
-                }
-            }
+            failedCount++;
         }
 
-        filteredRows.push({
-            student_name: student.full_name,
-            group_name: group.group_name || '-',
-            project_title: projectTitle,
-            program: group.program || '-',
-            section: group.section || '-',
-            year: group.year_level || '-',
-            phase: phase,
-            statusHtml: statusHtml,
-            grade: studentGrade,
-            isPassed: phaseStatus === 'Passed',
-            isFailed: phaseStatus === 'Rejected' || phaseStatus === 'Incomplete'
-        });
+        // Apply Tab Filter (Only add to displayed list if matches currentTab)
+        const matchesTab = (currentTab === 'pass') ? hasPerformanceGrade : !hasPerformanceGrade;
+
+        if (matchesTab) {
+            filteredRows.push({
+                student_name: student.full_name,
+                group_name: group.group_name || '-',
+                program: group.program || '-',
+                year: group.year_level || '-',
+                section: group.section || '-',
+                grade: hasPerformanceGrade ? gradeRecord.grade : 'N/A'
+            });
+        }
     });
 
-    updateCounters();
+    // Update Counter Cards
+    document.getElementById('countPass').innerText = passCount;
+    document.getElementById('countFailed').innerText = failedCount;
+    document.getElementById('countTotal').innerText = passCount + failedCount;
+
     renderTable();
 };
-
-function updateCounters() {
-    const counts = {
-        passed: filteredRows.filter(r => r.isPassed).length,
-        failed: filteredRows.filter(r => r.isFailed).length,
-        total: filteredRows.length
-    };
-
-    document.getElementById('countTitle').innerText = counts.passed;
-    document.getElementById('countRejected').innerText = counts.failed;
-    document.getElementById('countCompleted').innerText = counts.total;
-}
 
 function renderTable() {
     const tableBody = document.getElementById('tableBody');
@@ -216,8 +172,6 @@ function renderTable() {
         tableBody.appendChild(tr);
     });
 }
-
-
 
 function logout() {
     localStorage.removeItem('loginUser');
