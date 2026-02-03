@@ -41,28 +41,48 @@ async function loadArchives() {
 
 async function autoSyncMissingArchives() {
     try {
-        // Get all group IDs that have at least one "Completed" status
-        const { data: feedbacks, error: fError } = await supabaseClient
-            .from('capstone_feedback')
-            .select('group_id')
-            .eq('status', 'Completed');
+        // 1. Fetch all student groups
+        const { data: groups, error: gError } = await supabaseClient
+            .from('student_groups')
+            .select('id');
 
-        if (fError || !feedbacks || feedbacks.length === 0) return;
+        if (gError || !groups) return;
 
-        const uniqueGroupIds = [...new Set(feedbacks.map(f => f.group_id))];
+        // 2. Fetch all students and their grades
+        const { data: students, error: sError } = await supabaseClient
+            .from('students')
+            .select('id, group_id, grades(grade_type)');
 
-        // Get currently archived IDs to avoid duplicate processing
+        if (sError || !students) return;
+
+        // 3. Get currently archived IDs to avoid duplicate processing
         const { data: archived, error: aError } = await supabaseClient
             .from('archived_projects')
             .select('group_id');
 
         const archivedIds = new Set((archived || []).map(a => a.group_id));
 
-        // Process missing ones
-        for (const groupId of uniqueGroupIds) {
-            if (!archivedIds.has(groupId)) {
-                console.log("Found missing archive for Group:", groupId);
-                await archiveProject(groupId);
+        // 4. Group students by group_id and check for completeness
+        const groupStudentsMap = {};
+        students.forEach(s => {
+            if (!groupStudentsMap[s.group_id]) groupStudentsMap[s.group_id] = [];
+            groupStudentsMap[s.group_id].push(s);
+        });
+
+        for (const groupId of Object.keys(groupStudentsMap)) {
+            if (archivedIds.has(parseInt(groupId))) continue;
+
+            const groupStudents = groupStudentsMap[groupId];
+            const isComplete = groupStudents.every(s => {
+                const types = (s.grades || []).map(g => g.grade_type);
+                return types.includes('Title Defense') &&
+                    types.includes('Pre-Oral Defense') &&
+                    types.includes('Final Defense');
+            });
+
+            if (isComplete) {
+                console.log("Archiving Group due to grade completion:", groupId);
+                await archiveProject(parseInt(groupId));
             }
         }
     } catch (e) {
@@ -81,11 +101,17 @@ async function archiveProject(groupId) {
 
         if (gError || !group) return false;
 
-        // 2. Fetch Members
-        const { data: members } = await supabaseClient
+        // 2. Fetch Members and their Grades
+        const { data: membersData } = await supabaseClient
             .from('students')
-            .select('name')
+            .select('id, full_name, grades(grade, grade_type)')
             .eq('group_id', groupId);
+
+        const members = (membersData || []).map(m => m.full_name);
+        const gradesSnapshot = (membersData || []).map(m => ({
+            name: m.full_name,
+            grades: m.grades || []
+        }));
 
         // 3. Fetch Panelists from Schedules
         const { data: schedules } = await supabaseClient
@@ -136,10 +162,11 @@ async function archiveProject(groupId) {
                 group_id: groupId,
                 group_name: group.group_name,
                 project_title: group.project_title,
-                members: (members || []).map(m => m.name),
+                members: members,
                 panelists: Array.from(panelSet),
                 submissions: submissions,
                 annotations: annotationsMap,
+                grades: gradesSnapshot, // Assuming this column exists or can be stored in JSON
                 completed_at: new Date().toISOString()
             }, { onConflict: 'group_id' });
 
@@ -155,24 +182,90 @@ function renderArchiveTable(data) {
 
     data.forEach(item => {
         const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
         const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
         const panels = Array.isArray(item.panelists) ? item.panelists : JSON.parse(item.panelists || '[]');
+        const collapseId = `collapse-${item.id}`;
 
+        row.onclick = () => toggleRow(collapseId);
         row.innerHTML = `
-            <td style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem;">${item.project_title || 'Untitled Project'}</td>
+            <td style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="material-icons-round" style="font-size: 18px; color:#94a3b8; transition: transform 0.2s;" id="icon-${collapseId}">chevron_right</span>
+                    ${item.project_title || 'Untitled Project'}
+                </div>
+            </td>
             <td><span class="group-badge">${item.group_name}</span></td>
             <td><div class="member-names" title="${members.join(', ')}">${members.slice(0, 2).join(', ')}${members.length > 2 ? '...' : ''}</div></td>
             <td><div class="panel-names" title="${panels.join(', ')}">${panels.slice(0, 2).join(', ')}${panels.length > 2 ? '...' : ''}</div></td>
             <td style="color: #64748b;">${new Date(item.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
             <td style="text-align: right;">
-                <button class="action-btn view" onclick="viewArchiveDetails('${item.id}')" style="padding: 8px; border-radius: 8px;">
-                    <span class="material-icons-round" style="font-size: 20px;">visibility</span>
+                <button class="action-btn view" onclick="event.stopPropagation(); viewArchiveDetails('${item.id}')" style="padding: 8px; border-radius: 8px;">
+                    <span class="material-icons-round" style="font-size: 20px;">folder</span>
                 </button>
             </td>
         `;
         tableBody.appendChild(row);
+
+        // Child row for grades
+        const detailRow = document.createElement('tr');
+        detailRow.id = collapseId;
+        detailRow.style.display = 'none';
+        detailRow.style.background = '#f8fafc';
+
+        let gradesHtml = '';
+        const gradesData = Array.isArray(item.grades) ? item.grades : JSON.parse(item.grades || '[]');
+
+        if (gradesData.length > 0) {
+            gradesHtml = gradesData.map(m => {
+                const titleGrade = (m.grades.find(g => g.grade_type === 'Title Defense') || {}).grade || '-';
+                const preoralGrade = (m.grades.find(g => (g.grade_type || '').includes('Pre-Oral')) || {}).grade || '-';
+                const finalGrade = (m.grades.find(g => g.grade_type === 'Final Defense') || {}).grade || '-';
+
+                return `
+                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; padding:12px; border-bottom:1px solid #edf2f7; align-items:center;">
+                        <span style="font-weight:600; color:#334155;">${m.name}</span>
+                        <div style="text-align:center;"><div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Title</div><div style="font-weight:700; color:var(--primary-color);">${titleGrade}</div></div>
+                        <div style="text-align:center;"><div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Pre-Oral</div><div style="font-weight:700; color:var(--primary-color);">${preoralGrade}</div></div>
+                        <div style="text-align:center;"><div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Final</div><div style="font-weight:700; color:var(--primary-color);">${finalGrade}</div></div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            gradesHtml = '<div style="padding:20px; text-align:center; color:#94a3b8;">No grade records found in archive.</div>';
+        }
+
+        detailRow.innerHTML = `
+            <td colspan="6" style="padding: 0;">
+                <div style="padding: 20px 40px; border-left: 4px solid var(--primary-color);">
+                    <div style="max-width: 700px; background:white; padding:20px; border-radius:15px; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px; color:var(--primary-dark);">
+                            <span class="material-icons-round">emoji_events</span>
+                            <strong style="font-size:0.95rem;">Graduated Members & Final Grades</strong>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            ${gradesHtml}
+                        </div>
+                    </div>
+                </div>
+            </td>
+        `;
+        tableBody.appendChild(detailRow);
     });
 }
+
+function toggleRow(id) {
+    const row = document.getElementById(id);
+    const icon = document.getElementById('icon-' + id);
+    if (row.style.display === 'none') {
+        row.style.display = 'table-row';
+        if (icon) icon.style.transform = 'rotate(90deg)';
+    } else {
+        row.style.display = 'none';
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+}
+
 
 function viewArchiveDetails(id) {
     const item = archiveData.find(a => a.id === id);
