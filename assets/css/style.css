@@ -347,8 +347,32 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 20px;
-    flex-wrap: wrap;
-    /* Allow wrapping on small screens */
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.header-center {
+    flex: 2;
+    display: flex;
+    justify-content: center;
+}
+
+.header-right {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.centered-filters {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 25px;
 }
 
 @media (max-width: 768px) {

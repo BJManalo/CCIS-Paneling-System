@@ -158,23 +158,26 @@
 
         <!-- Header -->
         <header class="dashboard-header">
-            <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="header-left">
                 <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
                 <a href="archive_studies" class="archive-nav-btn" title="View Archives">
                     <span class="material-icons-round">inventory_2</span>
                 </a>
             </div>
 
-
-
-            <div class="search-bar">
-                <span class="material-icons-round">search</span>
-                <input type="text" placeholder="Search Reports..." id="searchInput">
+            <div class="header-center">
+                <div class="search-bar">
+                    <span class="material-icons-round">search</span>
+                    <input type="text" placeholder="Search Reports..." id="searchInput">
+                </div>
             </div>
-            <button class="logout-btn" onclick="logout()">
-                <span class="material-icons-round">logout</span>
-                <span>Log Out</span>
-            </button>
+
+            <div class="header-right">
+                <button class="logout-btn" onclick="logout()">
+                    <span class="material-icons-round">logout</span>
+                    <span>Log Out</span>
+                </button>
+            </div>
         </header>
 
         <!-- Metrics Row (Dashboard Style) -->
@@ -203,9 +206,9 @@
                 Failed/Incomplete</button>
         </div>
 
-        <!-- Controls -->
-        <div class="report-controls">
-            <div class="filter-group">
+        <div class="report-controls"
+            style="display: flex; justify-content: center; background: none; box-shadow: none; padding: 0;">
+            <div class="filter-group centered-filters">
                 <select id="defenseFilter" class="filter-select" onchange="applyFilters()">
                     <option value="Title Defense">Title Defense</option>
                     <option value="Pre-Oral Defense">Pre-Oral Defense</option>
