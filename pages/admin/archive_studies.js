@@ -8,9 +8,13 @@ async function loadArchives() {
     const tableBody = document.getElementById('archiveTableBody');
     const emptyState = document.getElementById('emptyState');
 
-    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px;">Fetching archives...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px;">Checking for completed records and initializing archives...</td></tr>';
 
     try {
+        // 1. First, check if there are any "Completed" groups in feedback that ARE NOT archived yet
+        await autoSyncMissingArchives();
+
+        // 2. Now fetch and display from the official archive table
         const { data, error } = await supabaseClient
             .from('archived_projects')
             .select('*')
@@ -35,14 +39,122 @@ async function loadArchives() {
     }
 }
 
+async function autoSyncMissingArchives() {
+    try {
+        // Get all group IDs that have at least one "Completed" status
+        const { data: feedbacks, error: fError } = await supabaseClient
+            .from('capstone_feedback')
+            .select('group_id')
+            .eq('status', 'Completed');
+
+        if (fError || !feedbacks || feedbacks.length === 0) return;
+
+        const uniqueGroupIds = [...new Set(feedbacks.map(f => f.group_id))];
+
+        // Get currently archived IDs to avoid duplicate processing
+        const { data: archived, error: aError } = await supabaseClient
+            .from('archived_projects')
+            .select('group_id');
+
+        const archivedIds = new Set((archived || []).map(a => a.group_id));
+
+        // Process missing ones
+        for (const groupId of uniqueGroupIds) {
+            if (!archivedIds.has(groupId)) {
+                console.log("Found missing archive for Group:", groupId);
+                await archiveProject(groupId);
+            }
+        }
+    } catch (e) {
+        console.warn("Auto-sync skipped:", e);
+    }
+}
+
+async function archiveProject(groupId) {
+    try {
+        // 1. Fetch Group Details
+        const { data: group, error: gError } = await supabaseClient
+            .from('student_groups')
+            .select('*')
+            .eq('id', groupId)
+            .single();
+
+        if (gError || !group) return false;
+
+        // 2. Fetch Members
+        const { data: members } = await supabaseClient
+            .from('students')
+            .select('name')
+            .eq('group_id', groupId);
+
+        // 3. Fetch Panelists from Schedules
+        const { data: schedules } = await supabaseClient
+            .from('schedules')
+            .select('panel1, panel2, panel3, panel4, panel5')
+            .eq('group_id', groupId);
+
+        const panelSet = new Set();
+        if (schedules) {
+            schedules.forEach(s => {
+                if (s.panel1) panelSet.add(s.panel1);
+                if (s.panel2) panelSet.add(s.panel2);
+                if (s.panel3) panelSet.add(s.panel3);
+                if (s.panel4) panelSet.add(s.panel4);
+                if (s.panel5) panelSet.add(s.panel5);
+            });
+        }
+
+        // 4. Fetch All Annotations
+        const { data: annotations } = await supabaseClient
+            .from('capstone_annotations')
+            .select('*')
+            .eq('group_id', groupId);
+
+        // 5. Build Submissions Map
+        const submissions = {
+            title_link: group.title_link,
+            pre_oral_link: group.pre_oral_link,
+            final_link: group.final_link,
+            project_title: group.project_title
+        };
+
+        // 6. Build Annotations Map
+        const annotationsMap = {};
+        if (annotations) {
+            annotations.forEach(a => {
+                const type = (a.defense_type || 'unknown').toLowerCase();
+                if (!annotationsMap[type]) annotationsMap[type] = {};
+                if (!annotationsMap[type][a.file_key]) annotationsMap[type][a.file_key] = {};
+                annotationsMap[type][a.file_key][a.user_name] = a.annotated_file_url;
+            });
+        }
+
+        // 7. Insert into archived_projects
+        const { error: archError } = await supabaseClient
+            .from('archived_projects')
+            .upsert({
+                group_id: groupId,
+                group_name: group.group_name,
+                project_title: group.project_title,
+                members: (members || []).map(m => m.name),
+                panelists: Array.from(panelSet),
+                submissions: submissions,
+                annotations: annotationsMap,
+                completed_at: new Date().toISOString()
+            }, { onConflict: 'group_id' });
+
+        return !archError;
+    } catch (err) {
+        return false;
+    }
+}
+
 function renderArchiveTable(data) {
     const tableBody = document.getElementById('archiveTableBody');
     tableBody.innerHTML = '';
 
     data.forEach(item => {
         const row = document.createElement('tr');
-
-        // Members & Panels
         const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
         const panels = Array.isArray(item.panelists) ? item.panelists : JSON.parse(item.panelists || '[]');
 
@@ -81,7 +193,6 @@ function viewArchiveDetails(id) {
     const fileGrid = document.getElementById('modalFiles');
     fileGrid.innerHTML = '';
 
-    // 1. Original Submissions
     const fileLabels = {
         'title_link': { label: 'Title Defense', icon: 'description', color: '#3b82f6' },
         'pre_oral_link': { label: 'Pre-Oral Defense', icon: 'article', color: '#f59e0b' },
@@ -106,13 +217,11 @@ function viewArchiveDetails(id) {
         }
     });
 
-    // 2. Panelist Annotations/Feedback
     Object.entries(annotations).forEach(([defType, fileMap]) => {
         Object.entries(fileMap).forEach(([fKey, panelMap]) => {
             Object.entries(panelMap).forEach(([panelName, url]) => {
                 const label = `${panelName}'s Feedback`;
-                const category = defType.toUpperCase();
-                addFileCard(fileGrid, label, url, 'history_edu', category, '#8b5cf6');
+                addFileCard(fileGrid, label, url, 'history_edu', defType.toUpperCase(), '#8b5cf6');
             });
         });
     });
@@ -145,7 +254,6 @@ function closeModal() {
     document.getElementById('archiveModal').style.display = 'none';
 }
 
-// Search Functionality
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     const filtered = archiveData.filter(item => {
