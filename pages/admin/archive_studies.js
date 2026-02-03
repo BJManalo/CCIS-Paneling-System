@@ -25,7 +25,7 @@ async function loadArchives() {
         // Optimize: select specific columns where possible
         const dsRes = await fetchSafe(supabase.from('defense_statuses').select('*'));
         const cfRes = await fetchSafe(supabase.from('capstone_feedback').select('group_id, defense_type, status, user_name'));
-        const studentsRes = await fetchSafe(supabase.from('students').select('id, group_id, first_name, last_name, full_name'));
+        const studentsRes = await fetchSafe(supabase.from('students').select('id, group_id, full_name'));
         const schedRes = await fetchSafe(supabase.from('schedules').select('group_id, schedule_type, panel1, panel2, panel3, panel4, panel5'));
         // Corrected: grades table uses student_id and grade_type/defense_type
         const gradesRes = await fetchSafe(supabase.from('grades').select('student_id, grade_type, defense_type'));
@@ -41,7 +41,7 @@ async function loadArchives() {
         // 3. Process Groups
         const archivedGroups = groups.map(g => {
             // Attach Members
-            const members = students.filter(s => String(s.group_id) === String(g.id)).map(s => s.full_name || `${s.first_name} ${s.last_name}`);
+            const members = students.filter(s => String(s.group_id) === String(g.id)).map(s => s.full_name || 'Unknown Student');
 
             // Attach Panels
             const finalSched = schedules.find(s =>
