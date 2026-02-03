@@ -341,8 +341,7 @@ function viewArchiveDetails(id) {
 
     const modal = document.getElementById('archiveModal');
     // CLEAN TITLE FOR MODAL
-    const resolvedTitle = cleanTitle(item.project_title || item.group_name);
-    document.getElementById('modalProjectTitle').innerText = resolvedTitle;
+    document.getElementById('modalProjectTitle').innerText = cleanTitle(item.project_title || item.group_name);
     document.getElementById('modalGroupName').innerText = item.group_name;
 
     const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
@@ -350,9 +349,9 @@ function viewArchiveDetails(id) {
     const subData = typeof item.submissions === 'string' ? JSON.parse(item.submissions || '{}') : item.submissions || {};
     const annotations = typeof item.annotations === 'string' ? JSON.parse(item.annotations || '{}') : item.annotations || {};
 
-    // DISPLAY ALL NAMES FULLY SINCE THERE IS SPACE
-    document.getElementById('modalMembers').innerText = members.join(', ');
-    document.getElementById('modalPanels').innerText = panels.join(', ');
+    // Modal names should be displayed as a clear list
+    document.getElementById('modalMembers').innerHTML = members.map(m => `<div style="margin-bottom:4px;">• ${m}</div>`).join('');
+    document.getElementById('modalPanels').innerHTML = panels.map(p => `<div style="margin-bottom:4px;">• ${p}</div>`).join('');
 
     const fileGrid = document.getElementById('modalFiles');
     fileGrid.innerHTML = '';
@@ -365,7 +364,7 @@ function viewArchiveDetails(id) {
 
     // Helper to get pretty label for titles and chapters
     const getPrettyLabel = (key, rawJSONTitles) => {
-        if (!key || key === "null") return "Document";
+        if (!key) return "Document";
 
         // Clean key if it's a revision
         const cleanKey = key.replace('_revised', '');
@@ -373,7 +372,7 @@ function viewArchiveDetails(id) {
         if (cleanKey.startsWith('title')) {
             try {
                 const titles = typeof rawJSONTitles === 'string' ? JSON.parse(rawJSONTitles) : rawJSONTitles;
-                return (titles && titles[cleanKey]) ? titles[cleanKey] : `Project Title (${cleanKey})`;
+                return (titles && titles[cleanKey]) ? titles[cleanKey] : "Project Title";
             } catch (e) { return "Project Title"; }
         }
         if (cleanKey.match(/^ch\d+$/)) return `Manuscript - Chapter ${cleanKey.replace('ch', '')}`;
@@ -393,7 +392,9 @@ function viewArchiveDetails(id) {
             Object.entries(links).forEach(([fileKey, url]) => {
                 if (url && url.toString().trim() !== '' && url !== "null") {
                     // STRICTLY ONLY FETCH REVISIONS AS REQUESTED 
-                    const isRevision = fileKey.toLowerCase().includes('revised') || catKey === 'final_link';
+                    // (Unless it is the final manuscript which is inherently the 'final' version, 
+                    // but we will stick to 'revised' pattern for safety if that is how they are tagged)
+                    const isRevision = fileKey.toLowerCase().includes('revised');
 
                     if (isRevision) {
                         const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
@@ -407,7 +408,7 @@ function viewArchiveDetails(id) {
     // Panel feedback (annotations) removed as requested
 
     if (fileGrid.innerHTML === '') {
-        fileGrid.innerHTML = '<p style="color: #94a3b8; font-style: italic;">No student revision documents found stored in archive.</p>';
+        fileGrid.innerHTML = '<p style="color: #94a3b8; font-style: italic;">No documentation links preserved for this project.</p>';
     }
 
     modal.style.display = 'flex';
