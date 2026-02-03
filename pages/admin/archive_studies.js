@@ -246,9 +246,8 @@ function renderArchiveTable(data) {
 
         const displaysTitle = cleanTitle(item.project_title || item.group_name);
 
-        // FORMAT LIST FOR TOOLTIP
-        const tooltipMembers = members.map(m => `• ${m}`).join('\n');
-        const tooltipPanels = panels.map(p => `• ${p}`).join('\n');
+        const fullMembers = members.join(', ');
+        const fullPanels = panels.join(', ');
 
         row.onclick = () => toggleRow(collapseId);
         row.innerHTML = `
@@ -259,8 +258,8 @@ function renderArchiveTable(data) {
                 </div>
             </td>
             <td><span class="group-badge">${item.group_name}</span></td>
-            <td><div class="member-names" data-fulltext="${tooltipMembers}">${members.slice(0, 2).join(', ')}${members.length > 2 ? '...' : ''}</div></td>
-            <td><div class="panel-names" data-fulltext="${tooltipPanels}">${panels.slice(0, 2).join(', ')}${panels.length > 2 ? '...' : ''}</div></td>
+            <td title="${fullMembers}"><div class="member-names">${members.slice(0, 2).join(', ')}${members.length > 2 ? '...' : ''}</div></td>
+            <td title="${fullPanels}"><div class="panel-names">${panels.slice(0, 2).join(', ')}${panels.length > 2 ? '...' : ''}</div></td>
             <td style="color: #64748b; font-size: 0.85rem;">${new Date(item.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
             <td style="text-align: right;">
                 <button class="action-btn view" onclick="event.stopPropagation(); viewArchiveDetails('${item.id}')" style="padding: 10px; border-radius: 12px; background: #f1f5f9; color: #475569;">
