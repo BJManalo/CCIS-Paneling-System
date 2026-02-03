@@ -75,8 +75,9 @@ async function autoSyncMissingArchives() {
                 const sGrades = allGrades.filter(g => g.student_id === student.id && g.grade !== null);
                 const types = sGrades.map(g => (g.grade_type || '').toLowerCase());
 
+                // Fuzzy matching to handle "Pre-Oral", "Pre Oral", "Preoral", etc.
                 const hasTitle = types.some(t => t.includes('title'));
-                const hasPreOral = types.some(t => t.includes('pre-oral') || t.includes('preoral'));
+                const hasPreOral = types.some(t => t.includes('pre') && t.includes('oral')) || types.some(t => t.includes('preoral'));
                 const hasFinal = types.some(t => t.includes('final'));
 
                 if (!hasTitle || !hasPreOral || !hasFinal) {
