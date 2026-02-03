@@ -139,7 +139,6 @@ function applyFilters() {
     });
 
     renderTable();
-    updateCharts();
 }
 
 function renderTable() {
@@ -176,30 +175,6 @@ function renderTable() {
     });
 }
 
-function updateCharts() {
-    const counts = { BSIS: 0, BSIT: 0, BSCS: 0 };
-    displayRows.forEach(row => {
-        const p = (row.program || '').toUpperCase();
-        if (p.includes('BSIS')) counts.BSIS++;
-        else if (p.includes('BSIT')) counts.BSIT++;
-        else if (p.includes('BSCS')) counts.BSCS++;
-    });
-
-    const total = displayRows.length || 1;
-
-    const bsisChart = document.querySelector('.bsis-chart');
-    const bsitChart = document.querySelector('.bsit-chart');
-    const bscsChart = document.querySelector('.bscs-chart');
-
-    if (bsisChart) bsisChart.style.setProperty('--percentage', (counts.BSIS / total) * 100);
-    if (bsitChart) bsitChart.style.setProperty('--percentage', (counts.BSIT / total) * 100);
-    if (bscsChart) bscsChart.style.setProperty('--percentage', (counts.BSCS / total) * 100);
-
-    // Add labels
-    if (bsisChart) bsisChart.innerHTML = `<span class="chart-label">${Math.round((counts.BSIS / total) * 100)}%</span>`;
-    if (bsitChart) bsitChart.innerHTML = `<span class="chart-label">${Math.round((counts.BSIT / total) * 100)}%</span>`;
-    if (bscsChart) bscsChart.innerHTML = `<span class="chart-label">${Math.round((counts.BSCS / total) * 100)}%</span>`;
-}
 
 // Helper: Get Title
 function getTitleText(pTitle, keyHint) {
