@@ -91,9 +91,22 @@
         <!-- Header -->
         <header class="dashboard-header">
             <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
-            <div class="search-bar" style="max-width: 500px; flex: 1;">
-                <span class="material-icons-round">search</span>
-                <input type="text" placeholder="Search Group, Panel, or Venue..." id="searchInput">
+            <div style="display: flex; gap: 15px; flex: 1; max-width: 700px; align-items: center;">
+                <div class="search-bar" style="flex: 2;">
+                    <span class="material-icons-round">search</span>
+                    <input type="text" placeholder="Search Group, Panel, or Venue..." id="searchInput">
+                </div>
+                <div class="custom-select-wrapper" style="flex: 1; min-width: 150px; position: relative;">
+                    <select id="phaseFilter"
+                        style="padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: #f8fafc; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
+                        <option value="All">All Phases</option>
+                        <option value="Title Defense">Title</option>
+                        <option value="Pre Oral Defense">Pre-Oral</option>
+                        <option value="Final Defense">Final</option>
+                    </select>
+                    <span class="material-icons-round"
+                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-size: 18px;">filter_list</span>
+                </div>
             </div>
             <button class="logout-btn" onclick="logout()">
                 <span class="material-icons-round">logout</span>
@@ -101,64 +114,14 @@
             </button>
         </header>
 
-        <!-- View Toggle & Toolbar -->
-        <div
-            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
-            <div class="view-toggle"
-                style="background: #f1f5f9; padding: 6px; border-radius: 14px; display: flex; gap: 5px; border: 1px solid #e2e8f0;">
-                <button id="listViewBtn" class="toggle-btn active" onclick="switchView('list')"
-                    style="padding: 8px 16px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; transition: all 0.2s;">
-                    <span class="material-icons-round">list</span> Table
-                </button>
-                <button id="calendarViewBtn" class="toggle-btn" onclick="switchView('calendar')"
-                    style="padding: 8px 16px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; transition: all 0.2s;">
-                    <span class="material-icons-round">calendar_month</span> Calendar
-                </button>
-            </div>
-
-            <div style="display: flex; gap: 12px; align-items: center;">
-                <div class="custom-select-wrapper" style="width: 180px; position: relative;" id="phaseFilterContainer">
-                    <select id="phaseFilter"
-                        style="padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
-                        <option value="All">All Phases</option>
-                        <option value="Title Defense">Title</option>
-                        <option value="Pre Oral Defense">Pre-Oral</option>
-                        <option value="Final Defense">Final</option>
-                    </select>
-                    <span class="material-icons-round select-arrow"
-                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b; font-size: 18px;">filter_list</span>
-                </div>
-            </div>
-        </div>
-
         <!-- Title -->
         <h2 class="page-title" style="margin-bottom: 10px;">Defense Schedule</h2>
-        <p style="color: #64748b; margin-bottom: 30px; font-size: 0.95rem;" id="viewSubtitle">View and manage group
-            defense schedules.</p>
+        <p style="color: #64748b; margin-bottom: 30px; font-size: 0.95rem;">Click on a date to set or manage defense
+            schedules.</p>
 
-        <!-- List View (Table) -->
-        <div id="listView" class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th style="padding-left: 25px;">Type</th>
-                        <th>Group Name</th>
-                        <th>Program</th>
-                        <th>Date & Time</th>
-                        <th>Venue</th>
-                        <th>Panels</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="scheduleTableBody">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Calendar View -->
+        <!-- Calendar View (Primary) -->
         <div id="calendarView" class="calendar-container"
-            style="display: none; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; animation: fadeIn 0.3s ease;">
+            style="background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; animation: fadeIn 0.3s ease;">
             <div class="calendar-header"
                 style="padding: 25px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
                 <h3 id="calendarMonth" style="margin: 0; color: #1e293b; font-weight: 700; font-size: 1.4rem;">Month
