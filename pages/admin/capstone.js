@@ -20,8 +20,8 @@ let displayRows = [];
 let currentAdobeView = null;
 let currentViewerFileKey = null;
 
-// ADOBE CLIENT ID - Verified for CCIS Paneling System
-const ADOBE_CLIENT_ID = "c5bda2ae638944589d1469e71f4dfdee";
+// ADOBE CLIENT ID - Verified for Vercel Domain
+const ADOBE_CLIENT_ID = "5edc19dfde9349e3acb7ecc73bfa4848";
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login

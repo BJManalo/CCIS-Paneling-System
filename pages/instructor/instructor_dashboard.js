@@ -635,7 +635,7 @@ window.loadPDF = (url, title, fileKey) => {
 
     if (window.AdobeDC) {
         currentAdobeView = new AdobeDC.View({
-            clientId: "c5bda2ae638944589d1469e71f4dfdee", // Updated for better localhost/public compatibility
+            clientId: "5edc19dfde9349e3acb7ecc73bfa4848", // Reverted to Vercel-authorized ID
             divId: "adobe-dc-view"
         });
         currentAdobeView.previewFile({
