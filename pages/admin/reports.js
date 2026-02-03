@@ -25,25 +25,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchReportData() {
     try {
-        // Fetch all data
-        const [groupsRes, statusesRes, studentsRes, schedulesRes, gradesRes] = await Promise.all([
+        // Fetch only used data
+        const [groupsRes, studentsRes, gradesRes] = await Promise.all([
             supabaseClient.from('student_groups').select('*'),
-            supabaseClient.from('defense_statuses').select('*'),
             supabaseClient.from('students').select('*'),
-            supabaseClient.from('schedules').select('*'),
             supabaseClient.from('grades').select('*')
         ]);
 
         if (groupsRes.error) throw groupsRes.error;
-        if (statusesRes.error) throw statusesRes.error;
         if (studentsRes.error) throw studentsRes.error;
-        if (schedulesRes.error) throw schedulesRes.error;
         if (gradesRes.error) throw gradesRes.error;
 
         allGroups = groupsRes.data || [];
-        allDefenseStatuses = statusesRes.data || [];
         allStudents = studentsRes.data || [];
-        allSchedules = schedulesRes.data || [];
         allGrades = gradesRes.data || [];
 
         // Populate Section Filter
