@@ -138,13 +138,15 @@ async function loadSubmissionData() {
             let pLinks = safeParse(group.pre_oral_link);
             let fLinks = safeParse(group.final_link);
 
-            const [dsRes, cfRes] = await Promise.all([
+            const [dsRes, cfRes, caRes] = await Promise.all([
                 supabaseClient.from('defense_statuses').select('*').eq('group_id', groupId),
-                supabaseClient.from('capstone_feedback').select('*').eq('group_id', groupId)
+                supabaseClient.from('capstone_feedback').select('*').eq('group_id', groupId),
+                supabaseClient.from('capstone_annotations').select('*').eq('group_id', groupId)
             ]);
 
             const defStatuses = dsRes.data || [];
             const capstoneFeedback = cfRes.data || [];
+            const capstoneAnnotations = caRes.data || [];
 
             const getFeedbackMaps = (type) => {
                 const norm = type.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -166,6 +168,12 @@ async function loadSubmissionData() {
                     if (cf.status) statuses[cf.file_key][cf.user_name] = cf.status;
                     if (cf.remarks) remarks[cf.file_key][cf.user_name] = cf.remarks;
                     if (cf.annotated_file_url) annotations[cf.file_key][cf.user_name] = cf.annotated_file_url;
+                });
+
+                // Merge with New Annotations Table
+                capstoneAnnotations.filter(ca => ca.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(ca => {
+                    if (!annotations[ca.file_key] || typeof annotations[ca.file_key] !== 'object') annotations[ca.file_key] = {};
+                    if (ca.annotated_file_url) annotations[ca.file_key][ca.user_name] = ca.annotated_file_url;
                 });
 
                 return { statuses, remarks, annotations };
