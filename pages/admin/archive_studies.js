@@ -41,63 +41,68 @@ async function loadArchives() {
 
 async function autoSyncMissingArchives() {
     try {
-        // 1. Fetch all student groups
-        const { data: groups, error: gError } = await supabaseClient
-            .from('student_groups')
-            .select('id');
+        console.log("%c[ArchiveSync] Starting automatic synchronization...", "color: #3b82f6; font-weight: bold;");
 
-        if (gError || !groups) return;
+        // 1. Fetch data independently for reliability
+        const [gRes, sRes, grRes, aRes] = await Promise.all([
+            supabaseClient.from('student_groups').select('id, group_name'),
+            supabaseClient.from('students').select('id, group_id, full_name'),
+            supabaseClient.from('grades').select('student_id, grade_type, grade'),
+            supabaseClient.from('archived_projects').select('group_id')
+        ]);
 
-        // 2. Fetch all students and their grades
-        const { data: students, error: sError } = await supabaseClient
-            .from('students')
-            .select('id, group_id, grades(grade_type)');
+        if (gRes.error || sRes.error || grRes.error) {
+            console.error("[ArchiveSync] Error fetching data:", gRes.error || sRes.error || grRes.error);
+            return;
+        }
 
-        if (sError || !students) return;
+        const groups = gRes.data || [];
+        const students = sRes.data || [];
+        const allGrades = grRes.data || [];
+        const archivedIds = new Set((aRes.data || []).map(a => a.group_id));
 
-        // 3. Get currently archived IDs to avoid duplicate processing
-        const { data: archived, error: aError } = await supabaseClient
-            .from('archived_projects')
-            .select('group_id');
+        for (const group of groups) {
+            if (archivedIds.has(group.id)) continue;
 
-        const archivedIds = new Set((archived || []).map(a => a.group_id));
+            const groupStudents = students.filter(s => s.group_id === group.id);
+            if (groupStudents.length === 0) continue;
 
-        // 4. Group students by group_id and check for completeness
-        const groupStudentsMap = {};
-        students.forEach(s => {
-            if (!groupStudentsMap[s.group_id]) groupStudentsMap[s.group_id] = [];
-            groupStudentsMap[s.group_id].push(s);
-        });
+            console.log(`%c[ArchiveSync] Checking Group: ${group.group_name}`, "color: #6366f1;");
 
-        for (const groupId of Object.keys(groupStudentsMap)) {
-            if (archivedIds.has(parseInt(groupId))) continue;
+            let isGroupComplete = true;
 
-            const groupStudents = groupStudentsMap[groupId];
-            const isComplete = groupStudents.every(s => {
-                const types = (s.grades || []).map(g => (g.grade_type || '').toLowerCase());
+            groupStudents.forEach(student => {
+                const sGrades = allGrades.filter(g => g.student_id === student.id && g.grade !== null);
+                const types = sGrades.map(g => (g.grade_type || '').toLowerCase());
 
                 const hasTitle = types.some(t => t.includes('title'));
                 const hasPreOral = types.some(t => t.includes('pre-oral') || t.includes('preoral'));
                 const hasFinal = types.some(t => t.includes('final'));
 
-                return hasTitle && hasPreOral && hasFinal;
+                if (!hasTitle || !hasPreOral || !hasFinal) {
+                    isGroupComplete = false;
+                    const missing = [];
+                    if (!hasTitle) missing.push("Title");
+                    if (!hasPreOral) missing.push("Pre-Oral");
+                    if (!hasFinal) missing.push("Final");
+                    console.log(`%c   -> Student: ${student.full_name} is missing: ${missing.join(', ')}`, "color: #f59e0b;");
+                }
             });
 
-            if (isComplete) {
-                console.log(`%c[ArchiveSync] Group ${groupId} is complete. Archiving...`, "color: #22c55e; font-weight: bold;");
-                await archiveProject(parseInt(groupId));
-            } else {
-                console.log(`%c[ArchiveSync] Group ${groupId} is not yet complete. Skipping.`, "color: #94a3b8;");
+            if (isGroupComplete) {
+                console.log(`%c[ArchiveSync] Group ${group.group_name} is complete! Archiving...`, "color: #22c55e; font-weight: bold;");
+                const success = await archiveProject(group.id);
+                if (success) console.log(`%c[ArchiveSync] Successfully archived ${group.group_name}`, "color: #22c55e;");
+                else console.error(`[ArchiveSync] Failed to archive ${group.group_name}. Check database columns.`);
             }
         }
     } catch (e) {
-        console.warn("Auto-sync skipped:", e);
+        console.warn("[ArchiveSync] Unexpected error:", e);
     }
 }
 
 async function archiveProject(groupId) {
     try {
-        // 1. Fetch Group Details
         const { data: group, error: gError } = await supabaseClient
             .from('student_groups')
             .select('*')
@@ -106,19 +111,22 @@ async function archiveProject(groupId) {
 
         if (gError || !group) return false;
 
-        // 2. Fetch Members and their Grades
-        const { data: membersData } = await supabaseClient
+        const { data: studentsData } = await supabaseClient
             .from('students')
-            .select('id, full_name, grades(grade, grade_type)')
+            .select('id, full_name')
             .eq('group_id', groupId);
 
-        const members = (membersData || []).map(m => m.full_name);
-        const gradesSnapshot = (membersData || []).map(m => ({
-            name: m.full_name,
-            grades: m.grades || []
+        const studentIds = (studentsData || []).map(s => s.id);
+        const { data: gradesData } = await supabaseClient
+            .from('grades')
+            .select('*')
+            .in('student_id', studentIds);
+
+        const gradesSnapshot = (studentsData || []).map(s => ({
+            name: s.full_name,
+            grades: (gradesData || []).filter(g => g.student_id === s.id)
         }));
 
-        // 3. Fetch Panelists from Schedules
         const { data: schedules } = await supabaseClient
             .from('schedules')
             .select('panel1, panel2, panel3, panel4, panel5')
@@ -127,29 +135,25 @@ async function archiveProject(groupId) {
         const panelSet = new Set();
         if (schedules) {
             schedules.forEach(s => {
-                if (s.panel1) panelSet.add(s.panel1);
-                if (s.panel2) panelSet.add(s.panel2);
-                if (s.panel3) panelSet.add(s.panel3);
-                if (s.panel4) panelSet.add(s.panel4);
-                if (s.panel5) panelSet.add(s.panel5);
+                ['panel1', 'panel2', 'panel3', 'panel4', 'panel5'].forEach(p => {
+                    if (s[p]) panelSet.add(s[p]);
+                });
             });
         }
 
-        // 4. Fetch All Annotations
         const { data: annotations } = await supabaseClient
             .from('capstone_annotations')
             .select('*')
             .eq('group_id', groupId);
 
-        // 5. Build Submissions Map
         const submissions = {
             title_link: group.title_link,
             pre_oral_link: group.pre_oral_link,
             final_link: group.final_link,
-            project_title: group.project_title
+            project_title: group.project_title,
+            grades_snapshot: gradesSnapshot // STORE INSIDE SUBMISSIONS TO BE SAFE
         };
 
-        // 6. Build Annotations Map
         const annotationsMap = {};
         if (annotations) {
             annotations.forEach(a => {
@@ -160,23 +164,23 @@ async function archiveProject(groupId) {
             });
         }
 
-        // 7. Insert into archived_projects
         const { error: archError } = await supabaseClient
             .from('archived_projects')
             .upsert({
                 group_id: groupId,
                 group_name: group.group_name,
                 project_title: group.project_title,
-                members: members,
+                members: (studentsData || []).map(s => s.full_name),
                 panelists: Array.from(panelSet),
                 submissions: submissions,
                 annotations: annotationsMap,
-                grades: gradesSnapshot, // Assuming this column exists or can be stored in JSON
                 completed_at: new Date().toISOString()
             }, { onConflict: 'group_id' });
 
+        if (archError) console.error("[ArchiveProject] DB Error:", archError);
         return !archError;
     } catch (err) {
+        console.error("[ArchiveProject] Exception:", err);
         return false;
     }
 }
@@ -218,14 +222,16 @@ function renderArchiveTable(data) {
         detailRow.style.display = 'none';
         detailRow.style.background = '#f8fafc';
 
-        let gradesHtml = '';
-        const gradesData = Array.isArray(item.grades) ? item.grades : JSON.parse(item.grades || '[]');
+        // Support both old location (item.grades) and new location (item.submissions.grades_snapshot)
+        const subData = typeof item.submissions === 'string' ? JSON.parse(item.submissions || '{}') : item.submissions || {};
+        const gradesData = item.grades || subData.grades_snapshot || [];
 
-        if (gradesData.length > 0) {
+        let gradesHtml = '';
+        if (Array.isArray(gradesData) && gradesData.length > 0) {
             gradesHtml = gradesData.map(m => {
-                const titleGrade = (m.grades.find(g => g.grade_type === 'Title Defense') || {}).grade || '-';
-                const preoralGrade = (m.grades.find(g => (g.grade_type || '').includes('Pre-Oral')) || {}).grade || '-';
-                const finalGrade = (m.grades.find(g => g.grade_type === 'Final Defense') || {}).grade || '-';
+                const titleGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('title')) || {}).grade || '-';
+                const preoralGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('pre-oral') || (g.grade_type || '').toLowerCase().includes('preoral')) || {}).grade || '-';
+                const finalGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('final')) || {}).grade || '-';
 
                 return `
                     <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; padding:12px; border-bottom:1px solid #edf2f7; align-items:center;">
