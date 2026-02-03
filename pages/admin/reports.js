@@ -98,10 +98,11 @@ window.applyFilters = () => {
     const phaseNorm = normalize(phase);
 
     allStudents.forEach(student => {
-        const group = allGroups.find(g => g.id === student.group_id);
+        // Use String() for robust ID matching
+        const group = allGroups.find(g => String(g.id) === String(student.group_id));
         if (!group) return;
 
-        // Base Filters (Program, Section, Search)
+        // Base Filters
         const progMatch = program === 'ALL' || (group.program && group.program.toUpperCase() === program);
         const sectMatch = section === 'ALL' || (group.section === section);
         const searchMatch = !searchTerm ||
@@ -110,22 +111,24 @@ window.applyFilters = () => {
 
         if (!(progMatch && sectMatch && searchMatch)) return;
 
-        // Check if student has a grade for THIS phase
+        // Robust Grade Matching
         const gradeRecord = allGrades.find(gr =>
-            gr.student_id === student.id &&
+            String(gr.student_id) === String(student.id) &&
             normalize(gr.grade_type || '') === phaseNorm
         );
-        const hasPerformanceGrade = gradeRecord && (gradeRecord.grade !== null && gradeRecord.grade !== undefined);
 
-        // Calculate counts based on global filters (before tab filter)
-        if (hasPerformanceGrade) {
+        const isGradeValid = gradeRecord &&
+            gradeRecord.grade !== null &&
+            gradeRecord.grade !== undefined &&
+            String(gradeRecord.grade).toLowerCase() !== 'null';
+
+        if (isGradeValid) {
             passCount++;
         } else {
             failedCount++;
         }
 
-        // Apply Tab Filter (Only add to displayed list if matches currentTab)
-        const matchesTab = (currentTab === 'pass') ? hasPerformanceGrade : !hasPerformanceGrade;
+        const matchesTab = (currentTab === 'pass') ? isGradeValid : !isGradeValid;
 
         if (matchesTab) {
             filteredRows.push({
@@ -134,7 +137,7 @@ window.applyFilters = () => {
                 program: group.program || '-',
                 year: group.year_level || '-',
                 section: group.section || '-',
-                grade: hasPerformanceGrade ? gradeRecord.grade : 'N/A'
+                grade: isGradeValid ? gradeRecord.grade : 'N/A'
             });
         }
     });
