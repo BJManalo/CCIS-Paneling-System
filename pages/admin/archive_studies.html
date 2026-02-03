@@ -128,8 +128,15 @@
 <body class="dashboard-body">
     <div class="dashboard-container">
         <header class="dashboard-header">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <img src="../../assets/images/logo.png" alt="Logo" class="admin-logo"
+                        onclick="window.location.href='admin'" style="cursor:pointer;">
+                    <a href="archive_studies" class="archive-nav-btn active" title="Archives"
+                        style="background: #eff6ff; border-color: var(--primary-color); color: var(--primary-color);">
+                        <span class="material-icons-round">inventory_2</span>
+                    </a>
+                </div>
                 <div class="search-bar" style="width: 300px;">
                     <span class="material-icons-round">search</span>
                     <input type="text" placeholder="Search Archives..." id="searchInput">
@@ -228,10 +235,6 @@
         <a href="schedule" class="nav-item">
             <span class="material-icons-round">calendar_today</span>
             <span class="nav-label">Schedule</span>
-        </a>
-        <a href="archive_studies" class="nav-item active">
-            <span class="material-icons-round">inventory_2</span>
-            <span class="nav-label">Archives</span>
         </a>
         <a href="accounts" class="nav-item">
             <span class="material-icons-round">people</span>
