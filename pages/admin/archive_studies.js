@@ -370,17 +370,24 @@ function viewArchiveDetails(id) {
                 else links = { [catInfo[catKey].label]: linkVal };
             } catch (e) { links = { [catInfo[catKey].label]: linkVal }; }
 
+            const allKeys = Object.keys(links);
+
             Object.entries(links).forEach(([fileKey, url]) => {
                 if (url && url.toString().trim() !== '' && url !== "null") {
-                    // RESOLVE CORRECT DOCUMENTATION:
-                    // 1. Strictly anything with 'revised' in the key
-                    // 2. Everything from 'final_link' (since it is the final version)
-                    // 3. Chapters 1-3 for Pre Oral (often uploaded without '_revised' but are the target)
-                    const isRevision = fileKey.toLowerCase().includes('revised') ||
-                        catKey === 'final_link' ||
-                        (catKey === 'pre_oral_link' && fileKey.match(/^ch[1-3]$/));
+                    const isRevisionKey = fileKey.toLowerCase().includes('revised');
+                    const baseKey = fileKey.replace('_revised', '');
+                    const hasRevisedVersion = allKeys.includes(`${baseKey}_revised`);
 
-                    if (isRevision) {
+                    // RESOLVE CORRECT DOCUMENTATION:
+                    // 1. If it is a revised key, ALWAYS show it.
+                    // 2. If it is NOT a revised key, ONLY show it if there is NO revised version of it.
+                    // 3. AND it must be a relevant chapter/title for that phase.
+                    let isRelevant = false;
+                    if (catKey === 'title_link') isRelevant = fileKey.startsWith('title');
+                    if (catKey === 'pre_oral_link') isRelevant = fileKey.match(/^ch[1-3]/);
+                    if (catKey === 'final_link') isRelevant = fileKey.match(/^ch[4-5]/) || fileKey.startsWith('title');
+
+                    if (isRelevant && (isRevisionKey || !hasRevisedVersion)) {
                         const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
                         addFileCard(fileGrid, prettyLabel, url, catInfo[catKey].icon, catInfo[catKey].label, catInfo[catKey].color);
                     }
