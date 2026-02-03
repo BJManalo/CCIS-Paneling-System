@@ -112,6 +112,42 @@
         color: var(--primary-dark);
         background: #f8fafc;
     }
+
+    .prog-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .prog-bsis {
+        background: #eff6ff;
+        color: #1e40af;
+    }
+
+    .prog-bsit {
+        background: #ecfdf5;
+        color: #065f46;
+    }
+
+    .prog-bscs {
+        background: #fff7ed;
+        color: #9a3412;
+    }
+
+    .prog-unknown {
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    .group-row:hover {
+        background-color: #f8fafc !important;
+    }
+
+    .student-details-row {
+        transition: all 0.3s ease;
+    }
 </style>
 </head>
 
@@ -193,11 +229,11 @@
                 <thead>
                     <tr>
                         <th>Group Name</th>
-                        <th>Student Name</th>
+                        <th>Members Count</th>
                         <th>Program</th>
                         <th>Year</th>
                         <th>Section</th>
-                        <th>Grade</th>
+                        <th style="width: 50px;">Status</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">

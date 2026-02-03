@@ -126,7 +126,9 @@ window.applyFilters = () => {
 
         if (matchesTab) {
             filteredRows.push({
+                student_id: student.id,
                 student_name: student.full_name,
+                group_id: group.id,
                 group_name: group.group_name || '-',
                 program: group.program || '-',
                 year: group.year_level || '-',
@@ -137,9 +139,9 @@ window.applyFilters = () => {
     });
 
     // Update Counter Cards
-    document.getElementById('countPass').innerText = passCount;
-    document.getElementById('countFailed').innerText = failedCount;
-    document.getElementById('countTotal').innerText = passCount + failedCount;
+    if (document.getElementById('countPass')) document.getElementById('countPass').innerText = passCount;
+    if (document.getElementById('countFailed')) document.getElementById('countFailed').innerText = failedCount;
+    if (document.getElementById('countTotal')) document.getElementById('countTotal').innerText = passCount + failedCount;
 
     renderTable();
 };
@@ -156,19 +158,97 @@ function renderTable() {
     }
     if (emptyState) emptyState.style.display = 'none';
 
+    // Grouping logic for cleaner UI
+    const groups = {};
     filteredRows.forEach(row => {
+        if (!groups[row.group_id]) {
+            groups[row.group_id] = {
+                group_name: row.group_name,
+                program: row.program,
+                year: row.year,
+                section: row.section,
+                students: []
+            };
+        }
+        groups[row.group_id].students.push(row);
+    });
+
+    Object.keys(groups).forEach(groupId => {
+        const group = groups[groupId];
+        const collapseId = `collapse-${groupId}`;
+
+        // Parent Row
         const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.className = 'group-row';
+        tr.onclick = () => toggleRow(collapseId);
+
+        const program = group.program.toUpperCase();
+        let progClass = 'prog-unknown';
+        if (program.includes('BSIS')) progClass = 'prog-bsis';
+        else if (program.includes('BSIT')) progClass = 'prog-bsit';
+        else if (program.includes('BSCS')) progClass = 'prog-bscs';
+
         tr.innerHTML = `
-            <td style="font-weight: 500;">${row.group_name}</td>
-            <td style="font-weight: 600;">${row.student_name}</td>
-            <td>${row.program}</td>
-            <td>${row.year}</td>
-            <td>${row.section}</td>
-            <td style="font-weight: 700; color: var(--primary-color);">${row.grade}</td>
+            <td style="font-weight: 700; color: var(--primary-dark);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="material-icons-round" style="font-size: 18px; color: #64748b; transition: transform 0.2s;" id="icon-${collapseId}">chevron_right</span>
+                    ${group.group_name}
+                </div>
+            </td>
+            <td style="color: #64748b; font-size: 0.85rem;">${group.students.length} Student(s)</td>
+            <td><span class="prog-badge ${progClass}">${program}</span></td>
+            <td>${group.year}</td>
+            <td>${group.section}</td>
+            <td><span class="material-icons-round" style="color: var(--primary-color);">expand_circle_down</span></td>
         `;
         tableBody.appendChild(tr);
+
+        // Child Row (Collapse)
+        const childTr = document.createElement('tr');
+        childTr.id = collapseId;
+        childTr.style.display = 'none';
+        childTr.className = 'student-details-row';
+
+        childTr.innerHTML = `
+            <td colspan="6" style="padding: 0; background: #f8fafc;">
+                <div style="padding: 15px 40px;">
+                    <table style="width: 100%; border-spacing: 0; border-collapse: separate;">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th style="padding: 8px 12px; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; border-radius: 6px 0 0 6px;">Student Name</th>
+                                <th style="padding: 8px 12px; text-align: right; font-size: 0.75rem; text-transform: uppercase; color: #64748b; border-radius: 0 6px 6px 0;">Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${group.students.map(s => `
+                                <tr>
+                                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #334155;">${s.student_name}</td>
+                                    <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 700; color: var(--primary-color);">${s.grade}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </td>
+        `;
+        tableBody.appendChild(childTr);
     });
 }
+
+window.toggleRow = (id) => {
+    const el = document.getElementById(id);
+    const icon = document.getElementById('icon-' + id);
+    if (!el) return;
+
+    if (el.style.display === 'none') {
+        el.style.display = 'table-row';
+        if (icon) icon.style.transform = 'rotate(90deg)';
+    } else {
+        el.style.display = 'none';
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+};
 
 function logout() {
     localStorage.removeItem('loginUser');
