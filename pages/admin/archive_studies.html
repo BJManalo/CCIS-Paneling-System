@@ -32,20 +32,39 @@
         .member-names:hover::after,
         .panel-names:hover::after {
             content: attr(data-fulltext);
-            position: fixed;
-            /* Use fixed for tooltip to avoid clipping */
-            transform: translate(0, 10px);
-            background: #1e293b;
-            color: white;
-            padding: 10px 14px;
-            border-radius: 8px;
-            z-index: 9999;
-            white-space: normal;
+            position: absolute;
+            left: 50%;
+            bottom: 120%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 12px;
+            z-index: 10000;
+            white-space: pre-line;
+            /* Support newlines for list view */
             width: max-content;
-            max-width: 300px;
-            font-size: 0.8rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            min-width: 200px;
+            max-width: 350px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
             pointer-events: none;
+            text-align: left;
+            border: 1px solid #334155;
+            animation: tooltipFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes tooltipFade {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
         }
 
         @keyframes fadeIn {
