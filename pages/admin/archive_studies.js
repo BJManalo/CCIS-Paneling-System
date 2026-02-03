@@ -371,23 +371,40 @@ function viewArchiveDetails(id) {
             } catch (e) { links = { [catInfo[catKey].label]: linkVal }; }
 
             const allKeys = Object.keys(links);
+            const hasAnyTitleRevision = allKeys.some(k => k.toLowerCase().includes('title') && k.toLowerCase().includes('revised'));
 
             Object.entries(links).forEach(([fileKey, url]) => {
                 if (url && url.toString().trim() !== '' && url !== "null") {
-                    const isRevisionKey = fileKey.toLowerCase().includes('revised');
+                    const lowKey = fileKey.toLowerCase();
+                    const isRevisionKey = lowKey.includes('revised');
                     const baseKey = fileKey.replace('_revised', '');
                     const hasRevisedVersion = allKeys.includes(`${baseKey}_revised`);
 
-                    // RESOLVE CORRECT DOCUMENTATION:
-                    // 1. If it is a revised key, ALWAYS show it.
-                    // 2. If it is NOT a revised key, ONLY show it if there is NO revised version of it.
-                    // 3. AND it must be a relevant chapter/title for that phase.
                     let isRelevant = false;
-                    if (catKey === 'title_link') isRelevant = fileKey.startsWith('title');
-                    if (catKey === 'pre_oral_link') isRelevant = fileKey.match(/^ch[1-3]/);
-                    if (catKey === 'final_link') isRelevant = fileKey.match(/^ch[4-5]/) || fileKey.startsWith('title');
 
-                    if (isRelevant && (isRevisionKey || !hasRevisedVersion)) {
+                    if (catKey === 'title_link') {
+                        // For Title Defense: 
+                        // If any revised title exists, ONLY show revised titles.
+                        // Otherwise (fallback) show original titles.
+                        if (lowKey.startsWith('title')) {
+                            if (hasAnyTitleRevision) {
+                                if (isRevisionKey) isRelevant = true;
+                            } else {
+                                isRelevant = true;
+                            }
+                        }
+                    } else if (catKey === 'pre_oral_link' || catKey === 'final_link') {
+                        // For Chapters:
+                        // Show the revised version if it exists, otherwise show the original.
+                        const isChapter = fileKey.match(/^ch[1-5]/);
+                        if (isChapter) {
+                            if (isRevisionKey || !hasRevisedVersion) {
+                                isRelevant = true;
+                            }
+                        }
+                    }
+
+                    if (isRelevant) {
                         const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
                         addFileCard(fileGrid, prettyLabel, url, catInfo[catKey].icon, catInfo[catKey].label, catInfo[catKey].color);
                     }
