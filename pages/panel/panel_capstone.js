@@ -1358,37 +1358,48 @@ async function archiveProject(groupId) {
             .select('*')
             .eq('id', groupId)
             .single();
-        if (gError) throw gError;
+
+        if (gError || !group) {
+            console.error("Archival Error: Group not found", gError);
+            return;
+        }
 
         // 2. Fetch Members
         const { data: members, error: mError } = await supabaseClient
             .from('students')
             .select('name')
             .eq('group_id', groupId);
-        if (mError) throw mError;
+
+        if (mError) {
+            console.warn("Archival Warning: Could not fetch members", mError);
+        }
 
         // 3. Fetch Panelists from Schedules
         const { data: schedules, error: sError } = await supabaseClient
             .from('schedules')
             .select('panel1, panel2, panel3, panel4, panel5')
             .eq('group_id', groupId);
-        if (sError) throw sError;
 
         const panelSet = new Set();
-        schedules.forEach(s => {
-            if (s.panel1) panelSet.add(s.panel1);
-            if (s.panel2) panelSet.add(s.panel2);
-            if (s.panel3) panelSet.add(s.panel3);
-            if (s.panel4) panelSet.add(s.panel4);
-            if (s.panel5) panelSet.add(s.panel5);
-        });
+        if (schedules) {
+            schedules.forEach(s => {
+                if (s.panel1) panelSet.add(s.panel1);
+                if (s.panel2) panelSet.add(s.panel2);
+                if (s.panel3) panelSet.add(s.panel3);
+                if (s.panel4) panelSet.add(s.panel4);
+                if (s.panel5) panelSet.add(s.panel5);
+            });
+        }
 
         // 4. Fetch All Annotations
         const { data: annotations, error: aError } = await supabaseClient
             .from('capstone_annotations')
             .select('*')
             .eq('group_id', groupId);
-        if (aError) throw aError;
+
+        if (aError) {
+            console.warn("Archival Warning: Could not fetch annotations", aError);
+        }
 
         // 5. Build Submissions Map
         const submissions = {
@@ -1400,12 +1411,16 @@ async function archiveProject(groupId) {
 
         // 6. Build Annotations Map
         const annotationsMap = {};
-        annotations.forEach(a => {
-            const type = a.defense_type.toLowerCase();
-            if (!annotationsMap[type]) annotationsMap[type] = {};
-            if (!annotationsMap[type][a.file_key]) annotationsMap[type][a.file_key] = {};
-            annotationsMap[type][a.file_key][a.user_name] = a.annotated_file_url;
-        });
+        if (annotations) {
+            annotations.forEach(a => {
+                if (a.defense_type && a.file_key && a.user_name) {
+                    const type = a.defense_type.toLowerCase();
+                    if (!annotationsMap[type]) annotationsMap[type] = {};
+                    if (!annotationsMap[type][a.file_key]) annotationsMap[type][a.file_key] = {};
+                    annotationsMap[type][a.file_key][a.user_name] = a.annotated_file_url;
+                }
+            });
+        }
 
         // 7. Insert into archived_projects
         const { error: archError } = await supabaseClient
@@ -1414,18 +1429,21 @@ async function archiveProject(groupId) {
                 group_id: groupId,
                 group_name: group.group_name,
                 project_title: group.project_title,
-                members: members.map(m => m.name),
+                members: (members || []).map(m => m.name),
                 panelists: Array.from(panelSet),
                 submissions: submissions,
                 annotations: annotationsMap,
-                completed_at: new Date()
+                completed_at: new Date().toISOString()
             }, { onConflict: 'group_id' });
 
-        if (archError) throw archError;
+        if (archError) {
+            console.error("Archival Upsert Failed:", archError);
+            throw archError;
+        }
 
-        console.log("Project successfully archived!");
+        console.log("Archive for Group " + groupId + " saved successfully!");
     } catch (err) {
-        console.error("Archival Error:", err);
+        console.error("Critical Archival Failure:", err);
     }
 }
 
