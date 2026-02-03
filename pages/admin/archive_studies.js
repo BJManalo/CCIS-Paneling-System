@@ -147,12 +147,35 @@ async function archiveProject(groupId) {
             .select('*')
             .eq('group_id', groupId);
 
+        // --- NEW: RESOLVE APPROVED TITLE ---
+        let resolvedTitle = group.group_name;
+        try {
+            const pTitles = typeof group.project_title === 'string' ? JSON.parse(group.project_title || '{}') : group.project_title || {};
+
+            const { data: fb } = await supabaseClient
+                .from('capstone_feedback')
+                .select('file_key, status')
+                .eq('group_id', groupId)
+                .eq('defense_type', 'Title Defense');
+
+            const approvedEntry = (fb || []).find(f => (f.status || '').includes('Approved') || f.status === 'Completed');
+            if (approvedEntry && pTitles[approvedEntry.file_key]) {
+                resolvedTitle = pTitles[approvedEntry.file_key];
+            } else {
+                // Fallback to first available title if no feedback yet
+                resolvedTitle = Object.values(pTitles)[0] || group.group_name;
+            }
+        } catch (e) {
+            resolvedTitle = typeof group.project_title === 'string' ? group.project_title : group.group_name;
+        }
+
         const submissions = {
             title_link: group.title_link,
             pre_oral_link: group.pre_oral_link,
             final_link: group.final_link,
             project_title: group.project_title,
-            grades_snapshot: gradesSnapshot // STORE INSIDE SUBMISSIONS TO BE SAFE
+            resolved_title: resolvedTitle, // Store for easy rendering
+            grades_snapshot: gradesSnapshot
         };
 
         const annotationsMap = {};
@@ -164,7 +187,8 @@ async function archiveProject(groupId) {
                 annotationsMap[type][a.file_key][a.user_name] = a.annotated_file_url;
             });
         }
-        // 7. Manual Upsert (Check if exists first to avoid constraint errors)
+
+        // 7. Manual Upsert
         const { data: existing } = await supabaseClient
             .from('archived_projects')
             .select('id')
@@ -174,7 +198,7 @@ async function archiveProject(groupId) {
         const archivePayload = {
             group_id: groupId,
             group_name: group.group_name,
-            project_title: group.project_title,
+            project_title: resolvedTitle, // Saved as the actual string now
             members: (studentsData || []).map(s => s.full_name),
             panelists: Array.from(panelSet),
             submissions: submissions,
@@ -184,15 +208,10 @@ async function archiveProject(groupId) {
 
         let archError;
         if (existing) {
-            const { error } = await supabaseClient
-                .from('archived_projects')
-                .update(archivePayload)
-                .eq('id', existing.id);
+            const { error } = await supabaseClient.from('archived_projects').update(archivePayload).eq('id', existing.id);
             archError = error;
         } else {
-            const { error } = await supabaseClient
-                .from('archived_projects')
-                .insert(archivePayload);
+            const { error } = await supabaseClient.from('archived_projects').insert(archivePayload);
             archError = error;
         }
 
@@ -210,6 +229,7 @@ function renderArchiveTable(data) {
 
     data.forEach(item => {
         const row = document.createElement('tr');
+        row.className = 'archive-row';
         row.style.cursor = 'pointer';
         const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
         const panels = Array.isArray(item.panelists) ? item.panelists : JSON.parse(item.panelists || '[]');
@@ -217,31 +237,29 @@ function renderArchiveTable(data) {
 
         row.onclick = () => toggleRow(collapseId);
         row.innerHTML = `
-            <td style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="material-icons-round" style="font-size: 18px; color:#94a3b8; transition: transform 0.2s;" id="icon-${collapseId}">chevron_right</span>
-                    ${item.project_title || 'Untitled Project'}
+            <td style="font-weight: 700; color: #1e293b; font-size: 0.9rem; max-width: 300px;">
+                <div style="display:flex; align-items:flex-start; gap:10px;">
+                    <span class="material-icons-round" style="font-size: 20px; color:#cbd5e1; transition: transform 0.25s;" id="icon-${collapseId}">chevron_right</span>
+                    <span style="line-height: 1.4;">${item.project_title || 'Untitled Project'}</span>
                 </div>
             </td>
             <td><span class="group-badge">${item.group_name}</span></td>
             <td><div class="member-names" title="${members.join(', ')}">${members.slice(0, 2).join(', ')}${members.length > 2 ? '...' : ''}</div></td>
             <td><div class="panel-names" title="${panels.join(', ')}">${panels.slice(0, 2).join(', ')}${panels.length > 2 ? '...' : ''}</div></td>
-            <td style="color: #64748b;">${new Date(item.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+            <td style="color: #64748b; font-size: 0.85rem;">${new Date(item.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
             <td style="text-align: right;">
-                <button class="action-btn view" onclick="event.stopPropagation(); viewArchiveDetails('${item.id}')" style="padding: 8px; border-radius: 8px;">
-                    <span class="material-icons-round" style="font-size: 20px;">folder</span>
+                <button class="action-btn view" onclick="event.stopPropagation(); viewArchiveDetails('${item.id}')" style="padding: 10px; border-radius: 12px; background: #f1f5f9; color: #475569;">
+                    <span class="material-icons-round" style="font-size: 20px;">folder_open</span>
                 </button>
             </td>
         `;
         tableBody.appendChild(row);
 
-        // Child row for grades
         const detailRow = document.createElement('tr');
         detailRow.id = collapseId;
         detailRow.style.display = 'none';
-        detailRow.style.background = '#f8fafc';
+        detailRow.style.background = '#fcfdfe';
 
-        // Support both old location (item.grades) and new location (item.submissions.grades_snapshot)
         const subData = typeof item.submissions === 'string' ? JSON.parse(item.submissions || '{}') : item.submissions || {};
         const gradesData = item.grades || subData.grades_snapshot || [];
 
@@ -253,11 +271,11 @@ function renderArchiveTable(data) {
                 const finalGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('final')) || {}).grade || '-';
 
                 return `
-                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:10px; padding:12px; border-bottom:1px solid #edf2f7; align-items:center;">
-                        <span style="font-weight:600; color:#334155;">${m.name}</span>
-                        <div style="text-align:center;"><div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Title</div><div style="font-weight:700; color:var(--primary-color);">${titleGrade}</div></div>
-                        <div style="text-align:center;"><div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Pre-Oral</div><div style="font-weight:700; color:var(--primary-color);">${preoralGrade}</div></div>
-                        <div style="text-align:center;"><div style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Final</div><div style="font-weight:700; color:var(--primary-color);">${finalGrade}</div></div>
+                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:15px; padding:12px 0; border-bottom:1px solid #f1f5f9; align-items:center;">
+                        <span style="font-weight:600; color:#334155; font-size: 0.9rem;">${m.name}</span>
+                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Title</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${titleGrade}</div></div>
+                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Pre-Oral</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${preoralGrade}</div></div>
+                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Final</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${finalGrade}</div></div>
                     </div>
                 `;
             }).join('');
@@ -267,11 +285,13 @@ function renderArchiveTable(data) {
 
         detailRow.innerHTML = `
             <td colspan="6" style="padding: 0;">
-                <div style="padding: 20px 40px; border-left: 4px solid var(--primary-color);">
-                    <div style="max-width: 700px; background:white; padding:20px; border-radius:15px; border:1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:15px; color:var(--primary-dark);">
-                            <span class="material-icons-round">emoji_events</span>
-                            <strong style="font-size:0.95rem;">Graduated Members & Final Grades</strong>
+                <div style="padding: 20px 40px; border-left: 4px solid var(--primary-color); animation: fadeIn 0.3s ease-out;">
+                    <div style="max-width: 750px; background:white; padding:25px; border-radius:16px; border:1px solid #e2e8f0; box-shadow: 0 4px 20px -5px rgba(0,0,0,0.05);">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px; color:var(--primary-dark);">
+                            <div style="width: 36px; height: 36px; background: #eff6ff; border-radius: 10px; display: flex; align-items:center; justify-content:center; color: var(--primary-color);">
+                                <span class="material-icons-round" style="font-size: 20px;">military_tech</span>
+                            </div>
+                            <strong style="font-size:1rem; letter-spacing: -0.2px;">Graduated Members Academic Achievement</strong>
                         </div>
                         <div style="display: flex; flex-direction: column;">
                             ${gradesHtml}
@@ -307,7 +327,7 @@ function viewArchiveDetails(id) {
 
     const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
     const panels = Array.isArray(item.panelists) ? item.panelists : JSON.parse(item.panelists || '[]');
-    const submissions = typeof item.submissions === 'string' ? JSON.parse(item.submissions || '{}') : item.submissions || {};
+    const subData = typeof item.submissions === 'string' ? JSON.parse(item.submissions || '{}') : item.submissions || {};
     const annotations = typeof item.annotations === 'string' ? JSON.parse(item.annotations || '{}') : item.annotations || {};
 
     document.getElementById('modalMembers').innerText = members.join(', ');
@@ -316,25 +336,39 @@ function viewArchiveDetails(id) {
     const fileGrid = document.getElementById('modalFiles');
     fileGrid.innerHTML = '';
 
-    const fileLabels = {
+    const catInfo = {
         'title_link': { label: 'Title Defense', icon: 'description', color: '#3b82f6' },
         'pre_oral_link': { label: 'Pre-Oral Defense', icon: 'article', color: '#f59e0b' },
         'final_link': { label: 'Final Manuscript', icon: 'military_tech', color: '#10b981' }
     };
 
-    Object.keys(fileLabels).forEach(key => {
-        const linkVal = submissions[key];
+    // Helper to get pretty label for titles and chapters
+    const getPrettyLabel = (key, rawJSONTitles) => {
+        if (!key) return "Document";
+        if (key.startsWith('title')) {
+            try {
+                const titles = typeof rawJSONTitles === 'string' ? JSON.parse(rawJSONTitles) : rawJSONTitles;
+                return (titles && titles[key]) ? titles[key] : "Project Title";
+            } catch (e) { return "Project Title"; }
+        }
+        if (key.match(/^ch\d+$/)) return `Manuscript - Chapter ${key.replace('ch', '')}`;
+        return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    };
+
+    Object.keys(catInfo).forEach(catKey => {
+        const linkVal = subData[catKey];
         if (linkVal) {
             let links = {};
             try {
                 if (typeof linkVal === 'string' && linkVal.trim().startsWith('{')) links = JSON.parse(linkVal);
                 else if (typeof linkVal === 'object') links = linkVal;
-                else links = { [fileLabels[key].label]: linkVal };
-            } catch (e) { links = { [fileLabels[key].label]: linkVal }; }
+                else links = { [catInfo[catKey].label]: linkVal };
+            } catch (e) { links = { [catInfo[catKey].label]: linkVal }; }
 
-            Object.entries(links).forEach(([label, url]) => {
-                if (url && url.trim() !== '') {
-                    addFileCard(fileGrid, label, url, fileLabels[key].icon, fileLabels[key].label, fileLabels[key].color);
+            Object.entries(links).forEach(([fileKey, url]) => {
+                if (url && url.toString().trim() !== '' && url !== "null") {
+                    const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
+                    addFileCard(fileGrid, prettyLabel, url, catInfo[catKey].icon, catInfo[catKey].label, catInfo[catKey].color);
                 }
             });
         }
