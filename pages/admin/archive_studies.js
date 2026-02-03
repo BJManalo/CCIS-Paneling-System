@@ -337,7 +337,8 @@ function viewArchiveDetails(id) {
     if (!item) return;
 
     const modal = document.getElementById('archiveModal');
-    document.getElementById('modalProjectTitle').innerText = item.project_title || 'Untitled Project';
+    // CLEAN TITLE FOR MODAL
+    document.getElementById('modalProjectTitle').innerText = cleanTitle(item.project_title || item.group_name);
     document.getElementById('modalGroupName').innerText = item.group_name;
 
     const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
@@ -345,6 +346,7 @@ function viewArchiveDetails(id) {
     const subData = typeof item.submissions === 'string' ? JSON.parse(item.submissions || '{}') : item.submissions || {};
     const annotations = typeof item.annotations === 'string' ? JSON.parse(item.annotations || '{}') : item.annotations || {};
 
+    // Modal names should wrap, not truncate
     document.getElementById('modalMembers').innerText = members.join(', ');
     document.getElementById('modalPanels').innerText = panels.join(', ');
 
@@ -353,21 +355,25 @@ function viewArchiveDetails(id) {
 
     const catInfo = {
         'title_link': { label: 'Title Defense', icon: 'description', color: '#3b82f6' },
-        'pre_oral_link': { label: 'Pre-Oral Defense', icon: 'article', color: '#f59e0b' },
+        'pre_oral_link': { label: 'Pre Oral Defense', icon: 'article', color: '#f59e0b' },
         'final_link': { label: 'Final Manuscript', icon: 'military_tech', color: '#10b981' }
     };
 
     // Helper to get pretty label for titles and chapters
     const getPrettyLabel = (key, rawJSONTitles) => {
         if (!key) return "Document";
-        if (key.startsWith('title')) {
+
+        // Clean key if it's a revision
+        const cleanKey = key.replace('_revised', '');
+
+        if (cleanKey.startsWith('title')) {
             try {
                 const titles = typeof rawJSONTitles === 'string' ? JSON.parse(rawJSONTitles) : rawJSONTitles;
-                return (titles && titles[key]) ? titles[key] : "Project Title";
+                return (titles && titles[cleanKey]) ? titles[cleanKey] : "Project Title";
             } catch (e) { return "Project Title"; }
         }
-        if (key.match(/^ch\d+$/)) return `Manuscript - Chapter ${key.replace('ch', '')}`;
-        return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        if (cleanKey.match(/^ch\d+$/)) return `Manuscript - Chapter ${cleanKey.replace('ch', '')}`;
+        return cleanKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     };
 
     Object.keys(catInfo).forEach(catKey => {
@@ -382,8 +388,13 @@ function viewArchiveDetails(id) {
 
             Object.entries(links).forEach(([fileKey, url]) => {
                 if (url && url.toString().trim() !== '' && url !== "null") {
-                    const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
-                    addFileCard(fileGrid, prettyLabel, url, catInfo[catKey].icon, catInfo[catKey].label, catInfo[catKey].color);
+                    // ONLY FETCH REVISIONS AS REQUESTED
+                    const isRevision = fileKey.toLowerCase().includes('revised') || catKey === 'final_link';
+
+                    if (isRevision) {
+                        const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
+                        addFileCard(fileGrid, prettyLabel, url, catInfo[catKey].icon, catInfo[catKey].label, catInfo[catKey].color);
+                    }
                 }
             });
         }

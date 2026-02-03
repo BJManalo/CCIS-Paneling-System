@@ -26,24 +26,26 @@
             overflow: hidden;
             text-overflow: ellipsis;
             position: relative;
+            cursor: help;
         }
 
         .member-names:hover::after,
         .panel-names:hover::after {
             content: attr(data-fulltext);
-            position: absolute;
-            left: 0;
-            top: 100%;
+            position: fixed;
+            /* Use fixed for tooltip to avoid clipping */
+            transform: translate(0, 10px);
             background: #1e293b;
             color: white;
             padding: 10px 14px;
             border-radius: 8px;
-            z-index: 1000;
+            z-index: 9999;
             white-space: normal;
-            width: 250px;
+            width: max-content;
+            max-width: 300px;
             font-size: 0.8rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            animation: fadeIn 0.2s ease-out;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
         }
 
         @keyframes fadeIn {
