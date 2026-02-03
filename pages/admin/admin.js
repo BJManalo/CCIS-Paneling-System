@@ -529,7 +529,7 @@ window.loadPDF = (url, title, fileKey) => {
     viewerDiv.innerHTML = '';
     if (window.AdobeDC) {
         currentAdobeView = new AdobeDC.View({
-            clientId: "8ebcb61f76d649989f2ae52da7014605",
+            clientId: "c5bda2ae638944589d1469e71f4dfdee", // Updated for better localhost/public compatibility
             divId: "adobe-dc-view"
         });
         currentAdobeView.previewFile({
