@@ -28,12 +28,24 @@
                 </a>
             </div>
 
-
-
-            <div class="search-bar">
-                <span class="material-icons-round">search</span>
-                <input type="text" placeholder="Search Schedule..." id="searchInput">
+            <div style="display: flex; gap: 15px; flex: 1; max-width: 700px; align-items: center;">
+                <div class="search-bar" style="flex: 2;">
+                    <span class="material-icons-round">search</span>
+                    <input type="text" placeholder="Search Group, Panel, or Venue..." id="searchInput">
+                </div>
+                <div class="custom-select-wrapper" style="flex: 1; min-width: 150px; position: relative;">
+                    <select id="phaseFilter"
+                        style="padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: #f8fafc; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
+                        <option value="All">All Phases</option>
+                        <option value="Title Defense">Title</option>
+                        <option value="Pre Oral Defense">Pre-Oral</option>
+                        <option value="Final Defense">Final</option>
+                    </select>
+                    <span class="material-icons-round"
+                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-size: 18px;">filter_list</span>
+                </div>
             </div>
+
             <button class="logout-btn" onclick="logout()">
                 <span class="material-icons-round">logout</span>
                 <span>Log Out</span>
@@ -41,26 +53,112 @@
         </header>
 
         <!-- Title -->
-        <h2 class="page-title">Defense Schedule (View Only)</h2>
+        <h2 class="page-title" style="margin-bottom: 10px;">Defense Schedule (View Only)</h2>
+        <p style="color: #64748b; margin-bottom: 30px; font-size: 0.95rem;">Monitor scheduled defenses across all
+            programs.</p>
 
-        <!-- Schedule Table -->
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Group Name</th>
-                        <th>Program</th>
-                        <th>Date & Time</th>
-                        <th>Venue</th>
-                        <th>Panels</th>
-                    </tr>
-                </thead>
-                <tbody id="scheduleTableBody">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
+        <!-- Calendar View (Primary) -->
+        <div id="calendarView" class="calendar-container"
+            style="background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; animation: fadeIn 0.3s ease;">
+            <div class="calendar-header"
+                style="padding: 25px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="calendarMonth" style="margin: 0; color: #1e293b; font-weight: 700; font-size: 1.4rem;">Month
+                    Year</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="prevMonth()"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; cursor: pointer; color: #475569; transition: all 0.2s;">
+                        <span class="material-icons-round">chevron_left</span>
+                    </button>
+                    <button onclick="nextMonth()"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; cursor: pointer; color: #475569; transition: all 0.2s;">
+                        <span class="material-icons-round">chevron_right</span>
+                    </button>
+                </div>
+            </div>
+            <div class="calendar-grid-header"
+                style="display: grid; grid-template-columns: repeat(7, 1fr); background: #f8fafc; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Sun</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Mon</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Tue</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Wed</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Thu</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Fri</div>
+                <div
+                    style="text-align: center; color: #94a3b8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+                    Sat</div>
+            </div>
+            <div id="calendarDays" class="calendar-grid"
+                style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #f1f5f9;">
+                <!-- Days injected by JS -->
+            </div>
         </div>
+
+    </div>
+
+    <!-- Details View Modal (Read-Only) -->
+    <div id="detailsModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 550px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                <div>
+                    <h2 id="viewGroupHeader" style="margin: 0; color: var(--primary-dark);">Group Name</h2>
+                    <span id="viewTypeBadge" class="type-badge">Defense Type</span>
+                </div>
+                <button onclick="closeDetailsModal()"
+                    style="background: none; border: none; cursor: pointer; color: #94a3b8;">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px;">
+                <div>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Date
+                        & Time</label>
+                    <div id="viewDateTime" style="font-weight: 600; color: #1e293b;">-</div>
+                </div>
+                <div>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Venue</label>
+                    <div id="viewVenue" style="font-weight: 600; color: #1e293b;">-</div>
+                </div>
+                <div>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Program</label>
+                    <div id="viewProgram" style="font-weight: 600; color: #1e293b;">-</div>
+                </div>
+                <div>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Adviser</label>
+                    <div id="viewAdviser" style="font-weight: 600; color: #1e293b;">-</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 25px;">
+                <label
+                    style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px;">Panel
+                    Members</label>
+                <div id="viewPanels" class="chips-container" style="gap: 8px;">
+                    <!-- Panels -->
+                </div>
+            </div>
+
+            <div class="modal-actions" style="justify-content: flex-end;">
+                <button class="btn-cancel" onclick="closeDetailsModal()">Close</button>
+            </div>
+        </div>
+    </div>
 
     </div>
 
