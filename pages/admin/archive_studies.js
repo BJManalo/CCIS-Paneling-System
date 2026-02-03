@@ -74,15 +74,20 @@ async function autoSyncMissingArchives() {
 
             const groupStudents = groupStudentsMap[groupId];
             const isComplete = groupStudents.every(s => {
-                const types = (s.grades || []).map(g => g.grade_type);
-                return types.includes('Title Defense') &&
-                    types.includes('Pre-Oral Defense') &&
-                    types.includes('Final Defense');
+                const types = (s.grades || []).map(g => (g.grade_type || '').toLowerCase());
+
+                const hasTitle = types.some(t => t.includes('title'));
+                const hasPreOral = types.some(t => t.includes('pre-oral') || t.includes('preoral'));
+                const hasFinal = types.some(t => t.includes('final'));
+
+                return hasTitle && hasPreOral && hasFinal;
             });
 
             if (isComplete) {
-                console.log("Archiving Group due to grade completion:", groupId);
+                console.log(`%c[ArchiveSync] Group ${groupId} is complete. Archiving...`, "color: #22c55e; font-weight: bold;");
                 await archiveProject(parseInt(groupId));
+            } else {
+                console.log(`%c[ArchiveSync] Group ${groupId} is not yet complete. Skipping.`, "color: #94a3b8;");
             }
         }
     } catch (e) {
