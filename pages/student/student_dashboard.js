@@ -786,10 +786,6 @@ window.prepareViewer = (encodedData, fileKey) => {
 
     // Default to first option or specific logic
     if (selector && selector.options.length > 0) {
-        // Show revision container
-        const revContainer = document.getElementById('revisionContainer');
-        if (revContainer) revContainer.style.display = 'flex';
-
         selector.selectedIndex = 0;
         window.handlePanelSwitch(selector.value);
     }
@@ -871,7 +867,7 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
             currentBlobUrl = URL.createObjectURL(blob);
 
             const viewerPath = "../../assets/library/web/viewer.html";
-            iframe.src = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+            iframe.src = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}&readonly=true`;
         } else if (isDrive) {
             console.log("Loading Google Drive link...");
             const fileIdMatch = absoluteUrl.match(/\/d\/([^\/]+)/) || absoluteUrl.match(/id=([^\&]+)/);
@@ -912,129 +908,7 @@ window.closeFileModal = () => {
     }
 
     currentViewerFileKey = null;
-
-    // Stop Auto-save
-    if (revisionAutoSaveTimer) {
-        clearInterval(revisionAutoSaveTimer);
-        revisionAutoSaveTimer = null;
-    }
-    const revBtn = document.getElementById('startRevisionBtn');
-    if (revBtn) {
-        revBtn.innerHTML = '<span class="material-icons-round">edit_note</span> Start Revision';
-        revBtn.style.background = '#eff6ff';
-        revBtn.style.color = '#1e40af';
-    }
-    const status = document.getElementById('saveStatus');
-    if (status) status.style.display = 'none';
 };
-
-// --- REVISION SYSTEM: Let students edit/annotate PDF ---
-let revisionAutoSaveTimer = null;
-let isSavingRevision = false;
-
-window.startRevisionMode = () => {
-    const selector = document.getElementById('feedbackSelector');
-    const btn = document.getElementById('startRevisionBtn');
-    const status = document.getElementById('saveStatus');
-    const statusText = document.getElementById('saveStatusText');
-
-    // CRITICAL: Ensure we are editing the DRAFT, not someone's comments
-    if (selector && selector.value !== 'draft') {
-        const confirmSwitch = confirm("To begin revisions, we need to switch you to your 'Original Draft'. You can use the panelist's comments as a reference, but your edits must be applied to your own document. Switch now?");
-
-        if (confirmSwitch) {
-            selector.value = 'draft';
-            window.handlePanelSwitch('draft');
-            showToast("Switched to Draft. Click 'Start Revision' again to begin editing.", "info");
-            return;
-        } else {
-            return;
-        }
-    }
-
-    if (revisionAutoSaveTimer) return;
-
-    btn.innerHTML = '<span class="material-icons-round">check_circle</span> Revision Active';
-    btn.style.background = '#dcfce7';
-    btn.style.color = '#15803d';
-    btn.style.borderColor = '#bbf7d0';
-
-    status.style.display = 'flex';
-    statusText.innerText = "Viewer Syncing...";
-
-    revisionAutoSaveTimer = setInterval(saveStudentRevision, 2000);
-    showToast("Revision Mode Active! Use the drawing tools to mark your fixes.", "success");
-};
-
-async function saveStudentRevision() {
-    if (isSavingRevision) return;
-
-    const iframe = document.getElementById('fileViewer');
-    const viewerApp = iframe?.contentWindow?.PDFViewerApplication;
-
-    if (!viewerApp || !viewerApp.pdfDocument) return;
-
-    const statusText = document.getElementById('saveStatusText');
-    const statusIcon = document.querySelector('#saveStatus span');
-
-    isSavingRevision = true;
-
-    try {
-        if (statusText) statusText.innerText = "Auto-saving...";
-        // Note: No spin animation here as CSS isn't easily added to span in JS without class
-
-        const data = await viewerApp.pdfDocument.saveDocument();
-        const loginUser = JSON.parse(localStorage.getItem('loginUser') || '{}');
-        const fileName = `revised_${loginUser.id}_${currentViewerFileKey}.pdf`;
-
-        // 1. Upload to Supabase
-        const { error: uploadError } = await supabaseClient.storage
-            .from('project-submissions')
-            .upload(`submissions/revisions/${fileName}`, data, {
-                contentType: 'application/pdf',
-                upsert: true
-            });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabaseClient.storage
-            .from('project-submissions')
-            .getPublicUrl(`submissions/revisions/${fileName}`);
-
-        // 2. Update student submission record
-        const activeTab = document.querySelector('.submission-tabs .tab-btn.active');
-        const tabName = activeTab ? activeTab.innerText.toLowerCase() : "";
-
-        let column = "title_link";
-        if (tabName.includes("pre")) column = "pre_oral_link";
-        else if (tabName.includes("final")) column = "final_link";
-
-        const { data: groupData } = await supabaseClient
-            .from('student_groups')
-            .select(column)
-            .eq('id', loginUser.id)
-            .single();
-
-        let links = {};
-        try { links = JSON.parse(groupData[column] || '{}'); } catch (e) { }
-        links[currentViewerFileKey] = publicUrl;
-
-        const { error: updateError } = await supabaseClient
-            .from('student_groups')
-            .update({ [column]: JSON.stringify(links) })
-            .eq('id', loginUser.id);
-
-        if (updateError) throw updateError;
-
-        if (statusText) statusText.innerText = "Revision Saved";
-
-    } catch (err) {
-        console.error("Revision Error:", err);
-        if (statusText) statusText.innerText = "Save Failed";
-    } finally {
-        isSavingRevision = false;
-    }
-}
 
 // --- SIDEBAR COMMENT SYSTEM (Student Side) ---
 window.handleFileUpload = async (input, targetId) => {
