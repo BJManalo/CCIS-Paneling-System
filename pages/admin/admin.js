@@ -479,7 +479,11 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
                 const projectTitles = typeof group.project_title === 'string' && group.project_title.startsWith('{')
                     ? JSON.parse(group.project_title)
                     : { title1: group.project_title };
-                if (projectTitles[label]) displayLabel = projectTitles[label];
+                if (projectTitles[label] && projectTitles[label].toLowerCase() !== "null") {
+                    displayLabel = projectTitles[label];
+                } else if (projectTitles[label] && projectTitles[label].toLowerCase() === "null") {
+                    return; // Skip if title text itself is "null" (case-insensitive)
+                }
             } catch (e) { }
         }
 

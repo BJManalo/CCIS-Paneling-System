@@ -360,8 +360,8 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
                     : { title1: group.project_title };
                 if (projectTitles[label] && projectTitles[label].toLowerCase() !== "null") {
                     displayLabel = projectTitles[label];
-                } else if (projectTitles[label] === "null") {
-                    return; // Skip if title text itself is "null"
+                } else if (projectTitles[label] && projectTitles[label].toLowerCase() === "null") {
+                    return; // Skip if title text itself is "null" (case-insensitive)
                 }
             } catch (e) { }
         }
