@@ -391,8 +391,10 @@ function viewArchiveDetails(id) {
 
             Object.entries(links).forEach(([fileKey, url]) => {
                 if (url && url.toString().trim() !== '' && url !== "null") {
-                    // ONLY FETCH REVISIONS AS REQUESTED
-                    const isRevision = fileKey.toLowerCase().includes('revised') || catKey === 'final_link';
+                    // STRICTLY ONLY FETCH REVISIONS AS REQUESTED 
+                    // (Unless it is the final manuscript which is inherently the 'final' version, 
+                    // but we will stick to 'revised' pattern for safety if that is how they are tagged)
+                    const isRevision = fileKey.toLowerCase().includes('revised');
 
                     if (isRevision) {
                         const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
@@ -403,14 +405,7 @@ function viewArchiveDetails(id) {
         }
     });
 
-    Object.entries(annotations).forEach(([defType, fileMap]) => {
-        Object.entries(fileMap).forEach(([fKey, panelMap]) => {
-            Object.entries(panelMap).forEach(([panelName, url]) => {
-                const label = `${panelName}'s Feedback`;
-                addFileCard(fileGrid, label, url, 'history_edu', defType.toUpperCase(), '#8b5cf6');
-            });
-        });
-    });
+    // Panel feedback (annotations) removed as requested
 
     if (fileGrid.innerHTML === '') {
         fileGrid.innerHTML = '<p style="color: #94a3b8; font-style: italic;">No documentation links preserved for this project.</p>';
