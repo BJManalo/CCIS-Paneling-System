@@ -175,13 +175,13 @@ async function loadSubmissionData() {
             const preOralData = getFeedbackMaps('Pre-Oral Defense');
             const finalData = getFeedbackMaps('Final Defense');
 
-            window.feedbackStatus = {
-                titles: titleData.statuses,
-                preoral: preOralData.statuses,
-                final: finalData.statuses
+            window.fullDefenseData = {
+                titles: { links: tLinks, ...titleData },
+                preoral: { links: pLinks, ...preOralData },
+                final: { links: fLinks, ...finalData }
             };
 
-            const renderField = (linkMap, statusMap, remarksMap, annotationsMap, key, elementId) => {
+            const renderField = (linkMap, statusMap, remarksMap, annotationsMap, key, elementId, stageId) => {
                 const el = document.getElementById(elementId);
                 if (!el) return;
                 const formGroup = el.closest('.form-group');
@@ -240,7 +240,7 @@ async function loadSubmissionData() {
                                 ${badgesHtml}
                             </div>
                             ${hasActualFeedback ? `
-                                <button onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: linkMap[key], annotations: annotationsMap[key] || {} }))}', '${key}')" 
+                                <button onclick="window.prepareViewer('${stageId}', '${key}')" 
                                         style="background: #eff6ff; color: #1e40af; border: none; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; border: 1px solid #bfdbfe;">
                                     <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
                                     View Feedback
@@ -334,14 +334,14 @@ async function loadSubmissionData() {
                 }
             };
 
-            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title1', 'titleLink1');
-            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title2', 'titleLink2');
-            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title3', 'titleLink3');
-            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch1', 'preOralCh1');
-            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch2', 'preOralCh2');
-            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch3', 'preOralCh3');
-            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch4', 'finalCh4');
-            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch5', 'finalCh5');
+            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title1', 'titleLink1', 'titles');
+            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title2', 'titleLink2', 'titles');
+            renderField(tLinks, titleData.statuses, titleData.remarks, titleData.annotations, 'title3', 'titleLink3', 'titles');
+            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch1', 'preOralCh1', 'preoral');
+            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch2', 'preOralCh2', 'preoral');
+            renderField(pLinks, preOralData.statuses, preOralData.remarks, preOralData.annotations, 'ch3', 'preOralCh3', 'preoral');
+            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch4', 'finalCh4', 'final');
+            renderField(fLinks, finalData.statuses, finalData.remarks, finalData.annotations, 'ch5', 'finalCh5', 'final');
 
             injectActionButtons(document.getElementById('titleLink1'), tLinks.title1);
             injectActionButtons(document.getElementById('titleLink1_revised'), tLinks.title1_revised);
@@ -750,61 +750,157 @@ window.saveSubmissions = async function (specificField) {
 }
 
 let currentViewerFileKey = null;
-let currentViewerData = null; // Stores all URLs for the dropdown
+let currentViewerStageId = null;
 
-window.prepareViewer = (encodedData, fileKey) => {
-    const data = JSON.parse(decodeURIComponent(encodedData));
-    currentViewerData = data;
+window.prepareViewer = (stageId, fileKey) => {
+    const stageData = window.fullDefenseData[stageId];
+    if (!stageData) return;
+
+    currentViewerStageId = stageId;
     currentViewerFileKey = fileKey;
 
+    // Update Stage Name in UI
+    const stageLabel = document.getElementById('modalStageName');
+    if (stageLabel) stageLabel.innerText = stageId.toUpperCase();
+
+    // 1. Populate Sidebar with all files in this stage
+    const sidebar = document.getElementById('modalSidebarContent');
+    if (sidebar) {
+        sidebar.innerHTML = "";
+
+        // Determine which keys to show based on stage
+        let keys = [];
+        if (stageId === 'titles') keys = ['title1', 'title2', 'title3'];
+        else if (stageId === 'preoral') keys = ['ch1', 'ch2', 'ch3'];
+        else if (stageId === 'final') keys = ['ch4', 'ch5'];
+
+        keys.forEach(key => {
+            const link = stageData.links[key];
+            if (!link) return;
+
+            const statusMap = stageData.statuses[key] || 'Pending';
+            const remarksMap = stageData.remarks[key] || {};
+            const annotationsMap = stageData.annotations[key] || {};
+
+            let displayTitle = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            // Check for project title if stage is titles
+            if (stageId === 'titles') {
+                const inputId = 'project' + key.charAt(0).toUpperCase() + key.slice(1);
+                const actualTitleInput = document.getElementById(inputId);
+                if (actualTitleInput && actualTitleInput.value.trim()) {
+                    displayTitle = actualTitleInput.value.trim();
+                }
+            }
+
+            const isActive = (key === fileKey);
+
+            // Create Sidebar Item
+            const item = document.createElement('div');
+            item.style.cssText = `
+                padding: 12px; border-radius: 10px; border: 1.5px solid ${isActive ? 'var(--primary-color)' : '#f1f5f9'};
+                background: ${isActive ? '#eff6ff' : 'white'}; margin-bottom: 12px; cursor: pointer;
+                transition: all 0.2s; box-shadow: ${isActive ? '0 4px 12px rgba(37, 99, 235, 0.1)' : 'none'};
+            `;
+            item.onclick = () => window.prepareViewer(stageId, key);
+
+            // Build Item Content (Header + Badge)
+            item.innerHTML = `
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: 700; color: ${isActive ? 'var(--primary-dark)' : '#334155'}; line-height: 1.3;">${displayTitle}</span>
+                    <span class="material-icons-round" style="font-size: 16px; color: ${isActive ? 'var(--primary-color)' : '#94a3b8'}; transition: transform 0.2s;">
+                        ${isActive ? 'arrow_circle_right' : 'arrow_forward_ios'}
+                    </span>
+                </div>
+            `;
+
+            // Build Panel Statuses
+            let feedbackItems = [];
+            if (typeof statusMap === 'object') {
+                Object.keys(statusMap).forEach(panel => {
+                    feedbackItems.push({ panel, status: statusMap[panel], remark: remarksMap[panel] || '', hasAnnot: !!annotationsMap[panel] });
+                });
+            } else {
+                feedbackItems.push({ panel: 'Panel', status: statusMap, remark: (typeof remarksMap === 'string' ? remarksMap : ''), hasAnnot: Object.keys(annotationsMap).length > 0 });
+            }
+
+            feedbackItems.forEach(f => {
+                let color = '#64748b'; let bg = '#f1f5f9';
+                const s = (f.status || 'Pending').toLowerCase();
+                if (s.includes('approved')) { color = '#059669'; bg = '#ecfdf5'; }
+                else if (s.includes('revision')) { color = '#d97706'; bg = '#fffbeb'; }
+                else if (s.includes('reject')) { color = '#dc2626'; bg = '#fef2f2'; }
+
+                const badge = document.createElement('div');
+                badge.style.cssText = `
+                    display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px;
+                    background: ${bg}; border: 1px solid ${color}33; color: ${color}; font-size: 0.65rem; font-weight: 800;
+                    text-transform: uppercase; margin-top: 4px;
+                `;
+                badge.innerHTML = `<span class="material-icons-round" style="font-size: 10px;">${s.includes('approved') ? 'check_circle' : s.includes('revision') ? 'warning' : 'hourglass_empty'}</span> ${f.status} ${feedbackItems.length > 1 ? `<span style="opacity:0.6; font-weight:600;">(${f.panel})</span>` : ''}`;
+                item.appendChild(badge);
+
+                // If active, also show remarks in sidebar card
+                if (isActive && f.remark) {
+                    const rem = document.createElement('div');
+                    rem.style.cssText = `
+                        margin-top: 8px; padding-top: 8px; border-top: 1px dashed ${color}44;
+                        font-size: 0.75rem; color: #475569; line-height: 1.4; font-weight: 500;
+                    `;
+                    rem.innerText = f.remark.includes(':') ? f.remark.split(':').slice(1).join(':').trim() : f.remark;
+                    item.appendChild(rem);
+                }
+            });
+
+            sidebar.appendChild(item);
+        });
+    }
+
+    // 2. Prepare Feedback Selector (Toolbar)
     const selector = document.getElementById('feedbackSelector');
     if (selector) {
         selector.innerHTML = "";
+        const links = stageData.links[fileKey] || "";
+        const annotations = stageData.annotations[fileKey] || {};
 
-        // 1. Add Draft Option if exists
-        if (data.draft) {
+        if (links) {
             const opt = document.createElement('option');
             opt.value = "draft";
             opt.innerText = "Original Draft";
             selector.appendChild(opt);
         }
 
-        // 2. Add Annotation Options
-        Object.keys(data.annotations).forEach(panel => {
+        Object.keys(annotations).forEach(panel => {
             const opt = document.createElement('option');
             opt.value = panel;
             opt.innerText = `Feedback (${panel})`;
             selector.appendChild(opt);
         });
 
-        // 3. Selection visibility
         const container = document.getElementById('feedbackSelectorContainer');
         if (container) {
             container.style.display = (selector.options.length > 1) ? "flex" : "none";
         }
-    }
 
-    // Default to first option or specific logic
-    if (selector && selector.options.length > 0) {
-        selector.selectedIndex = 0;
-        window.handlePanelSwitch(selector.value);
+        if (selector.options.length > 0) {
+            selector.selectedIndex = 0;
+            window.handlePanelSwitch(selector.value);
+        }
     }
 };
 
 window.handlePanelSwitch = async (value) => {
-    if (!currentViewerData || !currentViewerFileKey) return;
+    if (!currentViewerStageId || !currentViewerFileKey) return;
+    const stageData = window.fullDefenseData[currentViewerStageId];
+    if (!stageData) return;
 
     let targetUrl = "";
-    let panelName = null;
-
     if (value === "draft") {
-        targetUrl = currentViewerData.draft;
+        targetUrl = stageData.links[currentViewerFileKey];
     } else {
-        targetUrl = currentViewerData.annotations[value];
-        panelName = value;
+        targetUrl = stageData.annotations[currentViewerFileKey][value];
     }
 
-    window.openFileViewer(targetUrl, currentViewerFileKey, panelName);
+    window.openFileViewer(targetUrl, currentViewerFileKey);
 };
 
 window.openFileViewer = async (url, fileKey, panelName = null) => {
