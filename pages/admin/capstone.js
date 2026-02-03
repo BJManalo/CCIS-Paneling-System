@@ -20,7 +20,7 @@ let displayRows = [];
 let currentAdobeView = null;
 let currentViewerFileKey = null;
 
-// ADOBE CLIENT ID - Updated for better localhost/public compatibility
+// ADOBE CLIENT ID - Verified for CCIS Paneling System
 const ADOBE_CLIENT_ID = "c5bda2ae638944589d1469e71f4dfdee";
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -50,7 +50,7 @@ async function fetchCapstoneData() {
         allStudents = stdRes.data || [];
         allCapstoneFeedback = fRes.data || [];
 
-        // Build Indices
+        // Build Index for fast lookup
         feedbackIndex = {};
         allCapstoneFeedback.forEach(cf => {
             if (!feedbackIndex[cf.group_id]) feedbackIndex[cf.group_id] = [];
@@ -65,13 +65,12 @@ async function fetchCapstoneData() {
 
         updateUI();
     } catch (err) {
-        console.error('Error fetching capstone data:', err);
+        console.error('Error fetching data:', err);
     }
 }
 
 function updateUI() {
     applyFilters();
-    updateCharts();
 }
 
 window.filterTable = (program) => {
@@ -90,33 +89,35 @@ window.filterTable = (program) => {
 
 function applyFilters() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    displayRows = [];
 
-    // Filter only groups that have an approved/completed status in Title Defense
-    const approvedGroups = allGroups.filter(g => {
-        const tMap = resolveStatusMap(g.id, 'Title Defense');
-        const statuses = Object.values(tMap);
-        const isApproved = statuses.some(v => v === 'Approved' || v === 'Approved with Revisions' || v === 'Completed');
-
-        const matchesProgram = currentProgramFilter === 'ALL' || (g.program && g.program.toUpperCase() === currentProgramFilter);
-        const matchesSearch = !searchTerm ||
-            (g.group_name && g.group_name.toLowerCase().includes(searchTerm)) ||
-            (g.project_title && JSON.stringify(g.project_title).toLowerCase().includes(searchTerm));
-
-        return isApproved && matchesProgram && matchesSearch;
-    });
-
-    displayRows = approvedGroups.map(g => {
+    allGroups.forEach(g => {
         const tMap = resolveStatusMap(g.id, 'Title Defense');
         const pMap = resolveStatusMap(g.id, 'Pre-Oral Defense');
         const fMap = resolveStatusMap(g.id, 'Final Defense');
 
-        const approvedKey = Object.keys(tMap).find(k => (tMap[k] || '').includes('Approved') || (tMap[k] || '').includes('Completed'));
+        // Check if ANY title is approved or completed
+        const approvedKey = Object.keys(tMap).find(k =>
+            (tMap[k] || '').includes('Approved') || (tMap[k] || '').includes('Completed')
+        );
+
+        if (!approvedKey) return; // Skip if not approved
+
         const projectTitle = getTitleText(g.project_title, approvedKey);
 
+        // Filtering
+        const matchesProgram = currentProgramFilter === 'ALL' || (g.program && g.program.toUpperCase() === currentProgramFilter);
+        const matchesSearch = !searchTerm ||
+            (g.group_name && g.group_name.toLowerCase().includes(searchTerm)) ||
+            (projectTitle && projectTitle.toLowerCase().includes(searchTerm));
+
+        if (!matchesProgram || !matchesSearch) return;
+
+        // Members
         const membersList = allStudents.filter(s => s.group_id == g.id).map(s => s.full_name);
         const membersHtml = membersList.map(m => `<span class="chip">${m}</span>`).join('');
 
-        // Determine Overall Status
+        // Status Logic (Identical to Dashboard)
         let statusBadge = '<span class="status-badge approved">Title Approved</span>';
         if (Object.values(fMap).some(v => v === 'Completed')) {
             statusBadge = '<span class="status-badge approved">Completed</span>';
@@ -126,19 +127,19 @@ function applyFilters() {
             statusBadge = '<span class="status-badge approved" style="background:#e0f2fe; color:#0369a1;">Pre-Oral Passed</span>';
         }
 
-        return {
+        displayRows.push({
             id: g.id,
             title: projectTitle,
             group_name: g.group_name,
             membersHtml: membersHtml,
             program: g.program || '-',
             year: g.year_level || '-',
-            statusHtml: statusBadge,
-            original: g
-        };
+            statusHtml: statusBadge
+        });
     });
 
     renderTable();
+    updateCharts();
 }
 
 function renderTable() {
@@ -177,20 +178,15 @@ function renderTable() {
 
 function updateCharts() {
     const counts = { BSIS: 0, BSIT: 0, BSCS: 0 };
-    const totalApproved = allGroups.filter(g => {
-        const tMap = resolveStatusMap(g.id, 'Title Defense');
-        return Object.values(tMap).some(v => v === 'Approved' || v === 'Approved with Revisions' || v === 'Completed');
+    displayRows.forEach(row => {
+        const p = (row.program || '').toUpperCase();
+        if (p.includes('BSIS')) counts.BSIS++;
+        else if (p.includes('BSIT')) counts.BSIT++;
+        else if (p.includes('BSCS')) counts.BSCS++;
     });
 
-    totalApproved.forEach(g => {
-        if (g.program && counts[g.program.toUpperCase()] !== undefined) {
-            counts[g.program.toUpperCase()]++;
-        }
-    });
+    const total = displayRows.length || 1;
 
-    const total = totalApproved.length || 1;
-
-    // Update CSS variables for charts
     const bsisChart = document.querySelector('.bsis-chart');
     const bsitChart = document.querySelector('.bsit-chart');
     const bscsChart = document.querySelector('.bscs-chart');
@@ -199,31 +195,27 @@ function updateCharts() {
     if (bsitChart) bsitChart.style.setProperty('--percentage', (counts.BSIT / total) * 100);
     if (bscsChart) bscsChart.style.setProperty('--percentage', (counts.BSCS / total) * 100);
 
-    // Add tooltips or labels if needed
-    [bsisChart, bsitChart, bscsChart].forEach((chart, i) => {
-        const prog = ['BSIS', 'BSIT', 'BSCS'][i];
-        chart.setAttribute('title', `${prog}: ${counts[prog]} approved`);
-        chart.innerHTML = `<span style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-weight:700; color:white; font-size:0.8rem;">${Math.round((counts[prog] / total) * 100)}%</span>`;
-    });
+    // Add labels
+    if (bsisChart) bsisChart.innerHTML = `<span class="chart-label">${Math.round((counts.BSIS / total) * 100)}%</span>`;
+    if (bsitChart) bsitChart.innerHTML = `<span class="chart-label">${Math.round((counts.BSIT / total) * 100)}%</span>`;
+    if (bscsChart) bscsChart.innerHTML = `<span class="chart-label">${Math.round((counts.BSCS / total) * 100)}%</span>`;
 }
 
-// Reuse helper functions from admin.js
+// Helper: Get Title
 function getTitleText(pTitle, keyHint) {
-    if (!pTitle) return keyHint || 'Untitled Project';
+    if (!pTitle) return 'Untitled Project';
     let parsed = pTitle;
     if (typeof parsed === 'string') {
         try {
-            if (parsed.trim().startsWith('{')) {
-                parsed = JSON.parse(parsed);
-            } else {
-                return parsed;
-            }
+            if (parsed.trim().startsWith('{')) parsed = JSON.parse(parsed);
+            else return parsed;
         } catch (e) { return parsed; }
     }
     if (keyHint && parsed[keyHint]) return parsed[keyHint];
     return parsed.title1 || parsed.title2 || parsed.title3 || Object.values(parsed)[0] || 'Untitled Project';
 }
 
+// Helper: Resolve Status Map
 function resolveStatusMap(groupId, defenseType) {
     const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const reqNorm = normalize(defenseType);
@@ -265,7 +257,7 @@ function resolveStatusMap(groupId, defenseType) {
     return resolved;
 }
 
-// Modal functions
+// File Viewer Modal
 window.openFileModal = (groupId) => {
     const group = allGroups.find(g => g.id === groupId);
     if (!group) return;
@@ -332,6 +324,7 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         };
         itemContainer.appendChild(item);
 
+        // Revised Version Check
         if (fileObj[label + '_revised']) {
             const revisedUrl = fileObj[label + '_revised'];
             const revItem = document.createElement('div');
@@ -387,10 +380,9 @@ window.loadPDF = (url, title, fileKey) => {
     }
 };
 
-// Add Adobe SDK
-const script = document.createElement('script');
-script.src = "https://documentservices.adobe.com/view-sdk/viewer.js";
-document.head.appendChild(script);
+const adobeScript = document.createElement('script');
+adobeScript.src = "https://documentservices.adobe.com/view-sdk/viewer.js";
+document.head.appendChild(adobeScript);
 
 window.logout = () => {
     localStorage.removeItem('loginUser');
