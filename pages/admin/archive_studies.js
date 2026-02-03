@@ -39,6 +39,18 @@ async function loadArchives() {
     }
 }
 
+// Helper to extract a single title string from JSON/Object if needed
+function cleanTitle(title, groupName) {
+    if (!title) return groupName || 'Untitled Project';
+    if (typeof title === 'string' && title.trim().startsWith('{')) {
+        try {
+            const parsed = JSON.parse(title);
+            return parsed.title1 || parsed.title2 || parsed.title3 || Object.values(parsed)[0] || title;
+        } catch (e) { return title; }
+    }
+    return title;
+}
+
 async function autoSyncMissingArchives() {
     try {
         console.log("%c[ArchiveSync] Starting automatic synchronization...", "color: #3b82f6; font-weight: bold;");
@@ -77,6 +89,7 @@ async function autoSyncMissingArchives() {
 
                 // Fuzzy matching to handle "Pre-Oral", "Pre Oral", "Preoral", etc.
                 const hasTitle = types.some(t => t.includes('title'));
+                // DATABASE FIX: Looking for "Pre Oral" or "Preoral"
                 const hasPreOral = types.some(t => t.includes('pre') && t.includes('oral')) || types.some(t => t.includes('preoral'));
                 const hasFinal = types.some(t => t.includes('final'));
 
@@ -84,7 +97,7 @@ async function autoSyncMissingArchives() {
                     isGroupComplete = false;
                     const missing = [];
                     if (!hasTitle) missing.push("Title");
-                    if (!hasPreOral) missing.push("Pre-Oral");
+                    if (!hasPreOral) missing.push("Pre Oral");
                     if (!hasFinal) missing.push("Final");
                     console.log(`%c   -> Student: ${student.full_name} is missing: ${missing.join(', ')}`, "color: #f59e0b;");
                 }
@@ -94,7 +107,7 @@ async function autoSyncMissingArchives() {
                 console.log(`%c[ArchiveSync] Group ${group.group_name} is complete! Archiving...`, "color: #22c55e; font-weight: bold;");
                 const success = await archiveProject(group.id);
                 if (success) console.log(`%c[ArchiveSync] Successfully archived ${group.group_name}`, "color: #22c55e;");
-                else console.error(`[ArchiveSync] Failed to archive ${group.group_name}. Check database columns.`);
+                else console.error(`[ArchiveSync] Failed to archive ${group.group_name}.`);
             }
         }
     } catch (e) {
@@ -147,11 +160,10 @@ async function archiveProject(groupId) {
             .select('*')
             .eq('group_id', groupId);
 
-        // --- NEW: RESOLVE APPROVED TITLE ---
+        // --- IMPROVED: RESOLVE APPROVED TITLE ---
         let resolvedTitle = group.group_name;
         try {
             const pTitles = typeof group.project_title === 'string' ? JSON.parse(group.project_title || '{}') : group.project_title || {};
-
             const { data: fb } = await supabaseClient
                 .from('capstone_feedback')
                 .select('file_key, status')
@@ -162,11 +174,10 @@ async function archiveProject(groupId) {
             if (approvedEntry && pTitles[approvedEntry.file_key]) {
                 resolvedTitle = pTitles[approvedEntry.file_key];
             } else {
-                // Fallback to first available title if no feedback yet
-                resolvedTitle = Object.values(pTitles)[0] || group.group_name;
+                resolvedTitle = cleanTitle(group.project_title, group.group_name);
             }
         } catch (e) {
-            resolvedTitle = typeof group.project_title === 'string' ? group.project_title : group.group_name;
+            resolvedTitle = cleanTitle(group.project_title, group.group_name);
         }
 
         const submissions = {
@@ -206,17 +217,15 @@ async function archiveProject(groupId) {
             completed_at: new Date().toISOString()
         };
 
-        let archError;
         if (existing) {
             const { error } = await supabaseClient.from('archived_projects').update(archivePayload).eq('id', existing.id);
-            archError = error;
+            if (error) throw error;
         } else {
             const { error } = await supabaseClient.from('archived_projects').insert(archivePayload);
-            archError = error;
+            if (error) throw error;
         }
 
-        if (archError) console.error("[ArchiveProject] DB Error:", archError);
-        return !archError;
+        return true;
     } catch (err) {
         console.error("[ArchiveProject] Exception:", err);
         return false;
@@ -235,17 +244,19 @@ function renderArchiveTable(data) {
         const panels = Array.isArray(item.panelists) ? item.panelists : JSON.parse(item.panelists || '[]');
         const collapseId = `collapse-${item.id}`;
 
+        const displaysTitle = cleanTitle(item.project_title || item.group_name);
+
         row.onclick = () => toggleRow(collapseId);
         row.innerHTML = `
             <td style="font-weight: 700; color: #1e293b; font-size: 0.9rem; max-width: 300px;">
                 <div style="display:flex; align-items:flex-start; gap:10px;">
                     <span class="material-icons-round" style="font-size: 20px; color:#cbd5e1; transition: transform 0.25s;" id="icon-${collapseId}">chevron_right</span>
-                    <span style="line-height: 1.4;">${item.project_title || 'Untitled Project'}</span>
+                    <span style="line-height: 1.4;">${displaysTitle}</span>
                 </div>
             </td>
             <td><span class="group-badge">${item.group_name}</span></td>
-            <td><div class="member-names" title="${members.join(', ')}">${members.slice(0, 2).join(', ')}${members.length > 2 ? '...' : ''}</div></td>
-            <td><div class="panel-names" title="${panels.join(', ')}">${panels.slice(0, 2).join(', ')}${panels.length > 2 ? '...' : ''}</div></td>
+            <td><div class="member-names" data-fulltext="${members.join(', ')}">${members.slice(0, 2).join(', ')}${members.length > 2 ? '...' : ''}</div></td>
+            <td><div class="panel-names" data-fulltext="${panels.join(', ')}">${panels.slice(0, 2).join(', ')}${panels.length > 2 ? '...' : ''}</div></td>
             <td style="color: #64748b; font-size: 0.85rem;">${new Date(item.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
             <td style="text-align: right;">
                 <button class="action-btn view" onclick="event.stopPropagation(); viewArchiveDetails('${item.id}')" style="padding: 10px; border-radius: 12px; background: #f1f5f9; color: #475569;">
@@ -267,14 +278,18 @@ function renderArchiveTable(data) {
         if (Array.isArray(gradesData) && gradesData.length > 0) {
             gradesHtml = gradesData.map(m => {
                 const titleGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('title')) || {}).grade || '-';
-                const preoralGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('pre-oral') || (g.grade_type || '').toLowerCase().includes('preoral')) || {}).grade || '-';
+                // DATABASE FIX: Checking for "Pre Oral" or "Preoral"
+                const preoralGrade = (m.grades.find(g => {
+                    const t = (g.grade_type || '').toLowerCase();
+                    return t.includes('pre') && t.includes('oral');
+                }) || {}).grade || '-';
                 const finalGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('final')) || {}).grade || '-';
 
                 return `
                     <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:15px; padding:12px 0; border-bottom:1px solid #f1f5f9; align-items:center;">
                         <span style="font-weight:600; color:#334155; font-size: 0.9rem;">${m.name}</span>
                         <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Title</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${titleGrade}</div></div>
-                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Pre-Oral</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${preoralGrade}</div></div>
+                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Pre Oral</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${preoralGrade}</div></div>
                         <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Final</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${finalGrade}</div></div>
                     </div>
                 `;

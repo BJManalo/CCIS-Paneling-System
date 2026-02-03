@@ -15,24 +15,51 @@
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="icon" type="image/png" href="../../assets/images/favicon.png">
     <style>
-        .archive-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid #e2e8f0;
-            transition: all 0.3s ease;
-        }
-
-        .archive-card:hover {
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
-        }
-
+        /* Tooltip Style for Long Lists */
         .member-names,
         .panel-names {
             font-size: 0.85rem;
             color: #64748b;
             line-height: 1.4;
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: relative;
+        }
+
+        .member-names:hover::after,
+        .panel-names:hover::after {
+            content: attr(data-fulltext);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            background: #1e293b;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            z-index: 1000;
+            white-space: normal;
+            width: 250px;
+            font-size: 0.8rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .archive-row:hover {
+            background-color: #f8fafc;
         }
 
         .group-badge {
@@ -42,6 +69,7 @@
             border-radius: 6px;
             font-size: 0.75rem;
             font-weight: 700;
+            display: inline-block;
         }
 
         .action-btn.view {
