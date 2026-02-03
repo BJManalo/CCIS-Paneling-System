@@ -9,6 +9,9 @@ let allGroups = [];
 let allDefenseStatuses = [];
 let allStudents = [];
 let allCapstoneFeedback = [];
+let allSchedules = [];
+let allSystemEvaluations = [];
+let allIndividualEvaluations = [];
 let feedbackIndex = {}; // Optimization: Map<GroupId, Array>
 let legacyStatusIndex = {}; // Optimization: Map<GroupId, Array>
 let filteredGroups = [];
@@ -34,11 +37,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchDashboardData() {
     try {
-        const [gRes, sRes, stdRes, fRes] = await Promise.all([
+        const [gRes, sRes, stdRes, fRes, schedRes, sysRes, indRes] = await Promise.all([
             supabaseClient.from('student_groups').select('*'),
             supabaseClient.from('defense_statuses').select('*'),
             supabaseClient.from('students').select('*'),
-            supabaseClient.from('capstone_feedback').select('*')
+            supabaseClient.from('capstone_feedback').select('*'),
+            supabaseClient.from('schedules').select('*'),
+            supabaseClient.from('system_evaluations').select('*'),
+            supabaseClient.from('individual_evaluations').select('*')
         ]);
 
         if (gRes.error) throw gRes.error;
@@ -52,6 +58,15 @@ async function fetchDashboardData() {
 
         if (fRes.error) console.error('Error fetching feedback:', fRes.error);
         allCapstoneFeedback = fRes.data || [];
+
+        if (schedRes.error) console.error('Error fetching schedules:', schedRes.error);
+        allSchedules = schedRes.data || [];
+
+        if (sysRes.error) console.error('Error fetching system evaluations:', sysRes.error);
+        allSystemEvaluations = sysRes.data || [];
+
+        if (indRes.error) console.error('Error fetching individual evaluations:', indRes.error);
+        allIndividualEvaluations = indRes.data || [];
 
         // BUILD INDICES for Fast Lookup (O(1))
         feedbackIndex = {};
@@ -367,7 +382,7 @@ window.openFileModal = async (groupId) => {
 
     document.getElementById('modalGroupName').innerText = `${group.group_name} - Submissions`;
     const fileList = document.getElementById('fileList');
-    fileList.innerHTML = '';
+    fileList.innerHTML = ''; // Ensure clear
 
     document.getElementById('adobe-dc-view').style.display = 'none';
     document.getElementById('pdfPlaceholder').style.display = 'flex';
@@ -396,6 +411,7 @@ window.openFileModal = async (groupId) => {
 };
 
 function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
+    const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const section = document.createElement('div');
     section.style.marginBottom = '20px';
 
@@ -404,21 +420,46 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
     header.style.cssText = 'font-size: 0.85rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 10px;';
     section.appendChild(header);
 
-    const statusesForGroup = allDefenseStatuses.filter(ds => ds.group_id === group.id);
-    const statusRow = statusesForGroup.find(s => {
-        const type = (s.defense_type || '').toLowerCase();
-        if (categoryKey === 'titles' && type.includes('title')) return true;
-        if (categoryKey === 'pre_oral' && type.includes('pre-oral')) return true;
-        if (categoryKey === 'final' && type.includes('final')) return true;
-        return false;
-    });
+    // MERGE FEEDBACK (Legacy + New)
+    const norm = categoryKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let typeFilter = '';
+    if (norm.includes('title')) typeFilter = 'title';
+    else if (norm.includes('preoral')) typeFilter = 'preoral';
+    else if (norm.includes('final')) typeFilter = 'final';
 
-    let overallRemarks = {};
-    let overallStatuses = {};
-    if (statusRow) {
-        try { overallRemarks = typeof statusRow.remarks === 'string' ? JSON.parse(statusRow.remarks) : statusRow.remarks || {}; } catch (e) { }
-        try { overallStatuses = typeof statusRow.statuses === 'string' ? JSON.parse(statusRow.statuses) : statusRow.statuses || {}; } catch (e) { }
+    const mergedStatuses = {};
+    const mergedRemarks = {};
+
+    // 1. From Legacy (defense_statuses table)
+    const legRow = allDefenseStatuses.find(ds => ds.group_id === group.id && normalize(ds.defense_type).includes(typeFilter));
+    if (legRow) {
+        let legStatuses = {};
+        let legRemarks = {};
+        try { legStatuses = typeof legRow.statuses === 'string' ? JSON.parse(legRow.statuses) : legRow.statuses || {}; } catch (e) { }
+        try { legRemarks = typeof legRow.remarks === 'string' ? JSON.parse(legRow.remarks) : legRow.remarks || {}; } catch (e) { }
+
+        Object.entries(legStatuses).forEach(([fKey, val]) => {
+            if (!mergedStatuses[fKey]) mergedStatuses[fKey] = {};
+            if (typeof val === 'object' && val !== null) Object.assign(mergedStatuses[fKey], val);
+            else mergedStatuses[fKey]['Legacy'] = val;
+        });
+        Object.entries(legRemarks).forEach(([fKey, val]) => {
+            if (!mergedRemarks[fKey]) mergedRemarks[fKey] = {};
+            if (typeof val === 'object' && val !== null) Object.assign(mergedRemarks[fKey], val);
+            else mergedRemarks[fKey]['Legacy'] = val;
+        });
     }
+
+    // 2. From New (capstone_feedback table)
+    const feedbacks = (allCapstoneFeedback || []).filter(fb => fb.group_id == group.id && normalize(fb.defense_type).includes(typeFilter));
+    feedbacks.forEach(fb => {
+        if (!mergedStatuses[fb.file_key]) mergedStatuses[fb.file_key] = {};
+        if (!mergedRemarks[fb.file_key]) mergedRemarks[fb.file_key] = {};
+
+        const pName = fb.user_name || 'Panel';
+        mergedStatuses[fb.file_key][pName] = fb.status;
+        mergedRemarks[fb.file_key][pName] = fb.remarks;
+    });
 
     Object.entries(fileObj).forEach(([label, url]) => {
         const isRevised = label.endsWith('_revised');
@@ -476,8 +517,8 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         const feedbackArea = document.createElement('div');
         feedbackArea.style.cssText = 'padding: 12px; background: #f8fafc; border-top: 1px solid #e2e8f0;';
 
-        const fileStatuses = typeof overallStatuses[label] === 'object' ? overallStatuses[label] : {};
-        const fileRemarks = typeof overallRemarks[label] === 'object' ? overallRemarks[label] : {};
+        const fileStatuses = mergedStatuses[label] || {};
+        const fileRemarks = mergedRemarks[label] || {};
         const panelsList = Object.keys(fileStatuses);
 
         let evaluationsHtml = '';
@@ -514,6 +555,56 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         itemContainer.appendChild(feedbackArea);
         section.appendChild(itemContainer);
     });
+
+    // SCORING SUMMARY
+    const scheds = allSchedules.filter(s => s.group_id === group.id && normalize(s.schedule_type).includes(typeFilter));
+    scheds.forEach(s => {
+        const sysEvs = allSystemEvaluations.filter(ev => ev.schedule_id === s.id);
+        const indEvs = allIndividualEvaluations.filter(ev => ev.schedule_id === s.id);
+
+        if (sysEvs.length > 0 || indEvs.length > 0) {
+            const scoresDiv = document.createElement('div');
+            scoresDiv.style.cssText = 'margin-top: 15px; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px;';
+
+            let scoresHtml = `<div style="font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Scoring Summary (${s.schedule_type})</div>`;
+
+            if (sysEvs.length > 0) {
+                scoresHtml += `<div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #cbd5e1;">
+                    <div style="font-size: 10px; color: var(--primary-color); font-weight: 700; margin-bottom: 4px;">System Evaluation (Total: 32)</div>`;
+                sysEvs.forEach(ev => {
+                    scoresHtml += `<div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 2px;">
+                        <span>${ev.panelist_name}</span>
+                        <span style="font-weight:700; color:#059669;">${ev.total_score}/32</span>
+                    </div>`;
+                });
+                scoresHtml += `</div>`;
+            }
+
+            if (indEvs.length > 0) {
+                scoresHtml += `<div>
+                    <div style="font-size: 10px; color: var(--primary-color); font-weight: 700; margin-bottom: 4px;">Individual Avg (Total: 28)</div>`;
+                const studentSums = {};
+                indEvs.forEach(ev => {
+                    if (!studentSums[ev.student_id]) studentSums[ev.student_id] = { scores: [] };
+                    studentSums[ev.student_id].scores.push(ev.total_score);
+                });
+
+                Object.keys(studentSums).forEach(sid => {
+                    const std = allStudents.find(st => st.id == sid);
+                    const scores = studentSums[sid].scores;
+                    const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                    scoresHtml += `<div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 2px;">
+                        <span>${std ? std.full_name : 'Student'}</span>
+                        <span style="font-weight:700; color:#2563eb;">${avg}/28</span>
+                    </div>`;
+                });
+                scoresHtml += `</div>`;
+            }
+            scoresDiv.innerHTML = scoresHtml;
+            section.appendChild(scoresDiv);
+        }
+    });
+
     document.getElementById('fileList').appendChild(section);
 }
 
