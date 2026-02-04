@@ -485,7 +485,7 @@ function renderTable() {
             <td><span class="type-badge ${typeClass}">${g.type}</span></td>
             <td>
                 <div style="font-weight: 600;">${g.groupName}</div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${g.isAdviser ? 'Adviser View' : 'Panel View'}</div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${g.isAdviser ? 'Adviser View' : (g.isPanelist ? 'Panel View' : '')}</div>
             </td>
             <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>
@@ -737,13 +737,15 @@ window.openFileModal = (groupId) => {
                     </button>
                 </div>
                 `;
-            } else {
+            } else if (group.isAdviser) {
                 interactiveControls = `
                     <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
                         <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
                         Viewing as Adviser (Read Only)
                     </div>
                 `;
+            } else {
+                interactiveControls = '';
             }
 
             // Other Panel Feedback
