@@ -256,3 +256,20 @@ function logout() {
 }
 
 document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+// --- Debug Utilities ---
+window.debugReportData = async () => {
+    console.log("--- DEBUG: GRADES DATA ---");
+    const { data: grades, error: gError } = await supabaseClient.from('grades').select('*').limit(5);
+    if (gError) console.error(gError);
+    else console.log(JSON.stringify(grades, null, 2));
+
+    console.log("\n--- DEBUG: STUDENTS DATA ---");
+    const { data: students, error: sError } = await supabaseClient.from('students').select('*').limit(5);
+    if (sError) console.error(sError);
+    else console.log(JSON.stringify(students, null, 2));
+
+    console.log("\n--- DEBUG: GROUPS DATA ---");
+    const { data: groups, error: grError } = await supabaseClient.from('student_groups').select('*').limit(5);
+    if (grError) console.error(grError);
+    else console.log(JSON.stringify(groups, null, 2));
+};

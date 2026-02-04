@@ -657,3 +657,37 @@ window.filterTable = (program) => {
 };
 
 document.getElementById('searchInput')?.addEventListener('input', applyDashboardFilters);
+// --- Debug Utilities ---
+window.debugCheckDB = async () => {
+    console.log("Checking for 'Completed' feedback...");
+    const { data, error } = await supabaseClient
+        .from('capstone_feedback')
+        .select('*')
+        .eq('status', 'Completed');
+
+    if (error) { console.error("Error:", error); return; }
+
+    if (!data || data.length === 0) {
+        console.log("No feedback with 'Completed' status found.");
+    } else {
+        console.log(`Found ${data.length} records with 'Completed' status.`);
+        data.forEach(item => { console.log(`- Group ID: ${item.group_id}, File: ${item.file_key}, Panel: ${item.user_name}`); });
+
+        const groupIds = [...new Set(data.map(i => i.group_id))];
+        const { data: archived } = await supabaseClient
+            .from('archived_projects')
+            .select('group_id')
+            .in('group_id', groupIds);
+        const archivedIds = (archived || []).map(a => a.group_id);
+        console.log(`Archived Group IDs: ${archivedIds.join(', ') || 'None'}`);
+    }
+};
+
+window.debugCheckDebugger = async () => {
+    const { data: groups } = await supabaseClient.from('student_groups').select('id, group_name, pre_oral_link, title_link, final_link').ilike('group_name', '%Debugger%');
+    console.log('Groups found:', JSON.stringify(groups, null, 2));
+    if (!groups || groups.length === 0) return;
+    const gId = groups[0].id;
+    const { data: archived } = await supabaseClient.from('archived_projects').select('submissions').eq('group_id', gId);
+    console.log('Archived Submissions:', JSON.stringify(archived, null, 2));
+};
