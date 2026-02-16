@@ -407,14 +407,14 @@ window.openFileModal = async (groupId) => {
         }
     });
 
-});
 
-document.getElementById('fileModal').style.display = 'flex';
 
-// Reset Mobile State (Show List)
-if (window.toggleMobileFiles) {
-    toggleMobileFiles(true);
-}
+    document.getElementById('fileModal').style.display = 'flex';
+
+    // Reset Mobile State (Show List)
+    if (window.toggleMobileFiles) {
+        toggleMobileFiles(true);
+    }
 };
 
 function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
