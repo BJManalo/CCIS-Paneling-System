@@ -796,8 +796,10 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+
     gap: 10px;
 }
+
 
 .empty-state .material-icons-round {
     font-size: 48px;
@@ -1695,5 +1697,201 @@ button {
     to {
         transform: scale(1);
         opacity: 1;
+    }
+}
+
+/* -------------------------------------------
+   FILE VIEWER MODAL STYLES (Mobile Responsive)
+   ------------------------------------------- */
+
+.file-viewer-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+}
+
+.file-viewer-content {
+    background: white;
+    width: 90vw;
+    max-width: 1400px;
+    height: 85vh;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    position: relative;
+    /* Default view mode */
+}
+
+/* New: Utility class for view modes */
+.file-viewer-content.view-mode-list {
+    /* List visible, viewer hidden on mobile */
+}
+
+.file-viewer-content.view-mode-file {
+    /* Viewer visible, list hidden on mobile */
+}
+
+.file-viewer-header {
+    padding: 15px 25px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    flex-shrink: 0;
+}
+
+.file-viewer-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    background: #f8fafc;
+    position: relative;
+}
+
+/* Sidebar (File List) */
+.file-sidebar {
+    width: 300px;
+    background: #fff;
+    border-right: 1px solid #eef2f6;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+.file-list-container {
+    padding: 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Viewer Area */
+.file-viewer-area {
+    flex: 1;
+    background: #565b5f;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Controls inside Viewer */
+.viewer-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #94a3b8;
+    background: #f8fafc;
+    z-index: 10;
+}
+
+.pdf-container {
+    flex: 1;
+    overflow: hidden;
+    display: none;
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Mobile Specifics */
+.mobile-back-btn {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: none;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 5px 0;
+    margin-right: 10px;
+}
+
+/* Responsive Logic */
+@media (max-width: 768px) {
+    .file-viewer-content {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .file-viewer-header {
+        padding: 10px 15px;
+    }
+
+    .file-viewer-body {
+        position: relative;
+    }
+
+    .file-sidebar {
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        z-index: 20;
+        transform: translateX(0);
+    }
+
+    .file-viewer-area {
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        z-index: 10;
+    }
+
+    /* State: Viewing List (Default) */
+    .file-viewer-content.view-mode-list .file-sidebar {
+        transform: translateX(0);
+        z-index: 20;
+    }
+
+    .file-viewer-content.view-mode-list .file-viewer-area {
+        display: none;
+    }
+
+    .file-viewer-content.view-mode-list .mobile-back-btn {
+        display: none;
+    }
+
+    /* State: Viewing File */
+    .file-viewer-content.view-mode-file .file-sidebar {
+        transform: translateX(-100%);
+        display: none;
+    }
+
+    .file-viewer-content.view-mode-file .file-viewer-area {
+        display: flex;
+        z-index: 20;
+    }
+
+    .file-viewer-content.view-mode-file .mobile-back-btn {
+        display: flex;
+    }
+
+    .file-viewer-content.view-mode-file .viewer-placeholder {
+        display: none;
     }
 }

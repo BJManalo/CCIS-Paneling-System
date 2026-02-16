@@ -407,14 +407,7 @@ window.openFileModal = async (groupId) => {
         }
     });
 
-
-
     document.getElementById('fileModal').style.display = 'flex';
-
-    // Reset Mobile State (Show List)
-    if (window.toggleMobileFiles) {
-        toggleMobileFiles(true);
-    }
 };
 
 function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
@@ -619,30 +612,6 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
     document.getElementById('fileList').appendChild(section);
 }
 
-
-window.toggleMobileFiles = (showList) => {
-    const sidebar = document.getElementById('fileListSidebar');
-    const viewer = document.getElementById('pdfViewerArea');
-    const closeBtn = document.getElementById('mobileCloseFileBtn');
-    const header = document.querySelector('.modal-header');
-
-    if (!sidebar || !viewer || !closeBtn || !header) return;
-
-    if (showList) {
-        // Show List, Return from Full Screen
-        sidebar.classList.remove('mobile-hidden');
-        header.classList.remove('mobile-hidden');
-        viewer.classList.remove('maximized');
-        closeBtn.classList.remove('visible');
-    } else {
-        // Hide List, Enter Full Screen Viewer
-        sidebar.classList.add('mobile-hidden');
-        header.classList.add('mobile-hidden');
-        viewer.classList.add('maximized');
-        closeBtn.classList.add('visible');
-    }
-};
-
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
 };
@@ -652,12 +621,6 @@ window.loadPDF = (url, title, fileKey) => {
     document.getElementById('pdfPlaceholder').style.display = 'none';
     const viewerDiv = document.getElementById('adobe-dc-view');
     viewerDiv.style.display = 'block';
-
-    // Mobile: Auto-collapse sidebar when file is loaded
-    if (window.innerWidth <= 768) {
-        toggleMobileFiles(false);
-    }
-
     viewerDiv.innerHTML = '';
     if (window.AdobeDC) {
         currentAdobeView = new AdobeDC.View({

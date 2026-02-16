@@ -607,6 +607,14 @@ window.openFileModal = (groupId) => {
                 });
                 item.style.background = '#f0f9ff';
                 itemContainer.style.borderColor = 'var(--primary-color)';
+
+                // Mobile View Switch
+                const content = document.getElementById('fileModalContent');
+                if (content) {
+                    content.classList.remove('view-mode-list');
+                    content.classList.add('view-mode-file');
+                }
+
                 loadViewer(url, groupId, label);
             };
 
@@ -637,6 +645,14 @@ window.openFileModal = (groupId) => {
                 revItem.onclick = () => {
                     document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
                     revItem.style.background = '#fcd34d';
+
+                    // Mobile View Switch
+                    const content = document.getElementById('fileModalContent');
+                    if (content) {
+                        content.classList.remove('view-mode-list');
+                        content.classList.add('view-mode-file');
+                    }
+
                     loadViewer(revisedUrl, groupId, label + '_revised');
                 };
 
@@ -796,7 +812,33 @@ window.openFileModal = (groupId) => {
         createSection('Final Defense', group.files.final, 'menu_book', 'final');
     }
 
+    // Reset Mobile View State
+    const content = document.getElementById('fileModalContent');
+    if (content) {
+        content.classList.remove('view-mode-file');
+        content.classList.add('view-mode-list');
+    }
+
     document.getElementById('fileModal').style.display = 'flex';
+};
+
+// Mobile: Back to List
+window.closeFileViewer = () => {
+    const content = document.getElementById('fileModalContent');
+    if (content) {
+        content.classList.remove('view-mode-file');
+        content.classList.add('view-mode-list');
+    }
+
+    // Pause/Reset PDF if needed
+    const frame = document.getElementById('pdfFrame');
+    if (frame) frame.src = '';
+};
+
+window.closeFileModal = () => {
+    document.getElementById('fileModal').style.display = 'none';
+    const frame = document.getElementById('pdfFrame');
+    if (frame) frame.src = '';
 };
 
 window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {

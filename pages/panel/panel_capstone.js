@@ -626,10 +626,18 @@ window.openFileModal = (groupId) => {
             item.onclick = () => {
                 document.querySelectorAll('.file-item').forEach(el => {
                     el.style.background = 'white';
-                    el.parentElement.style.borderColor = '#e2e8f0';
+                    if (el.parentElement) el.parentElement.style.borderColor = '#e2e8f0';
                 });
                 item.style.background = '#f0f9ff';
                 itemContainer.style.borderColor = 'var(--primary-color)';
+
+                // Mobile View Switch
+                const content = document.getElementById('fileModalContent');
+                if (content) {
+                    content.classList.remove('view-mode-list');
+                    content.classList.add('view-mode-file');
+                }
+
                 loadViewer(url, groupId, label);
             };
 
@@ -660,6 +668,14 @@ window.openFileModal = (groupId) => {
                 revItem.onclick = () => {
                     document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
                     revItem.style.background = '#fcd34d'; // Amber-300 active
+
+                    // Mobile View Switch
+                    const content = document.getElementById('fileModalContent');
+                    if (content) {
+                        content.classList.remove('view-mode-list');
+                        content.classList.add('view-mode-file');
+                    }
+
                     loadViewer(revisedUrl, groupId, label + '_revised');
                 };
 
@@ -836,7 +852,33 @@ window.openFileModal = (groupId) => {
         createSection('Final Defense', group.files.final, 'menu_book', 'final');
     }
 
+    // Reset Mobile View State
+    const content = document.getElementById('fileModalContent');
+    if (content) {
+        content.classList.remove('view-mode-file');
+        content.classList.add('view-mode-list');
+    }
+
     document.getElementById('fileModal').style.display = 'flex';
+};
+
+// Mobile: Back to List
+window.closeFileViewer = () => {
+    const content = document.getElementById('fileModalContent');
+    if (content) {
+        content.classList.remove('view-mode-file');
+        content.classList.add('view-mode-list');
+    }
+
+    // Pause/Reset PDF if needed
+    const frame = document.getElementById('pdfFrame');
+    if (frame) frame.src = '';
+};
+
+window.closeFileModal = () => {
+    document.getElementById('fileModal').style.display = 'none';
+    const frame = document.getElementById('pdfFrame');
+    if (frame) frame.src = '';
 };
 
 // Re-attach other globals (updateStatus, saveRemarks, loadViewer, etc.)
