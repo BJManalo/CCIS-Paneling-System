@@ -289,6 +289,13 @@ window.openFileModal = (groupId) => {
         }
     });
 
+    // Reset Mobile View State
+    const content = document.getElementById('fileModalContent');
+    if (content) {
+        content.classList.remove('view-mode-file');
+        content.classList.add('view-mode-list');
+    }
+
     document.getElementById('fileModal').style.display = 'flex';
 };
 
@@ -380,6 +387,14 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         item.onclick = () => {
             document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
             item.style.background = '#f0f9ff';
+
+            // Mobile View Switch
+            const content = document.getElementById('fileModalContent');
+            if (content) {
+                content.classList.remove('view-mode-list');
+                content.classList.add('view-mode-file');
+            }
+
             loadPDF(url, displayLabel, label);
         };
         itemContainer.appendChild(item);
@@ -400,6 +415,14 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
             revItem.onclick = () => {
                 document.querySelectorAll('.file-item').forEach(el => el.style.background = 'white');
                 revItem.style.background = '#fcd34d';
+
+                // Mobile View Switch
+                const content = document.getElementById('fileModalContent');
+                if (content) {
+                    content.classList.remove('view-mode-list');
+                    content.classList.add('view-mode-file');
+                }
+
                 loadPDF(revisedUrl, `Revised - ${displayLabel}`, label + '_revised');
             };
             itemContainer.appendChild(revItem);
@@ -503,6 +526,15 @@ window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
 };
 
+// Mobile: Back to List
+window.closeFileViewer = () => {
+    const content = document.getElementById('fileModalContent');
+    if (content) {
+        content.classList.remove('view-mode-file');
+        content.classList.add('view-mode-list');
+    }
+};
+
 window.loadPDF = (url, title, fileKey) => {
     currentViewerFileKey = fileKey;
     document.getElementById('pdfPlaceholder').style.display = 'none';
@@ -520,6 +552,7 @@ window.loadPDF = (url, title, fileKey) => {
             metaData: { fileName: title }
         }, {
             embedMode: "FULL_WINDOW",
+            defaultViewMode: "FIT_PAGE",
             showAnnotationTools: false,
             showLeftHandPanel: true,
             showDownloadPDF: true,
