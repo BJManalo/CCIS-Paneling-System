@@ -664,6 +664,7 @@ window.loadPDF = (url, title, fileKey) => {
             metaData: { fileName: title }
         }, {
             embedMode: "FULL_WINDOW",
+            defaultViewMode: "FIT_PAGE",
             showAnnotationTools: false,
             showLeftHandPanel: true,
             showDownloadPDF: true,

@@ -1094,7 +1094,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             currentBlobUrl = URL.createObjectURL(blob);
 
             const viewerPath = "../../assets/library/web/viewer.html";
-            const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}`;
+            const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}#zoom=page-fit`;
 
             if (container) container.style.display = 'block';
             if (placeholder) placeholder.style.display = 'none';
