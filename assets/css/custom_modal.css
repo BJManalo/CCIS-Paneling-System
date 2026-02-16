@@ -122,17 +122,30 @@
 
 .back-to-files-btn {
     display: none;
-    /* Hidden on desktop */
-    background: transparent;
-    border: 1px solid #e2e8f0;
-    color: var(--primary-color);
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
+}
+
+/* Floating Close Button (Mobile Only) */
+.floating-close-btn {
+    display: none;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    z-index: 2000;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    margin-right: 15px;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.floating-close-btn:active {
+    transform: scale(0.95);
 }
 
 /* Mobile Adjustments for File Viewer */
@@ -142,20 +155,22 @@
         height: 100%;
         max-width: 100%;
         border-radius: 0;
-        /* Full screen on mobile */
     }
 
     .modal-body {
         flex-direction: column;
         overflow: hidden;
-        /* Prevent body scroll, let children scroll */
     }
 
-    /* Sidebar State: Default (Visible) */
+    /* Hide Header when viewing file */
+    .modal-header.mobile-hidden {
+        display: none;
+    }
+
+    /* Sidebar State */
     .sidebar {
         width: 100%;
         height: 40%;
-        /* Initial split */
         max-height: 40%;
         border-right: none;
         border-bottom: 1px solid #e2e8f0;
@@ -165,34 +180,22 @@
 
     .sidebar.mobile-hidden {
         display: none;
-        /* Collapse completely */
     }
 
     /* Viewer State */
     .viewer-area {
         width: 100%;
         flex: 1;
-        /* Takes remaining space */
         min-height: 0;
-        /* Important for flex child scroll */
+        position: relative;
     }
 
     .viewer-area.maximized {
         height: 100%;
-        /* Full modal height excluding header */
     }
 
-    .modal-header {
-        padding: 10px 15px;
-        border-radius: 0;
-    }
-
-    .title-area {
-        flex: 1;
-    }
-
-    /* Show back button ONLY when toggled */
-    .back-to-files-btn.visible {
+    /* Show floating button ONLY when maximized */
+    .floating-close-btn.visible {
         display: flex;
     }
 }

@@ -623,20 +623,23 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
 window.toggleMobileFiles = (showList) => {
     const sidebar = document.getElementById('fileListSidebar');
     const viewer = document.getElementById('pdfViewerArea');
-    const backBtn = document.getElementById('mobileBackBtn');
+    const closeBtn = document.getElementById('mobileCloseFileBtn');
+    const header = document.querySelector('.modal-header');
 
-    if (!sidebar || !viewer || !backBtn) return;
+    if (!sidebar || !viewer || !closeBtn || !header) return;
 
     if (showList) {
-        // Show List, Hide Viewer (Mobile Logic)
+        // Show List, Return from Full Screen
         sidebar.classList.remove('mobile-hidden');
+        header.classList.remove('mobile-hidden');
         viewer.classList.remove('maximized');
-        backBtn.classList.remove('visible');
+        closeBtn.classList.remove('visible');
     } else {
-        // Hide List, Maximize Viewer
+        // Hide List, Enter Full Screen Viewer
         sidebar.classList.add('mobile-hidden');
+        header.classList.add('mobile-hidden');
         viewer.classList.add('maximized');
-        backBtn.classList.add('visible');
+        closeBtn.classList.add('visible');
     }
 };
 
