@@ -798,7 +798,8 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
             currentBlobUrl = URL.createObjectURL(blob);
 
             const viewerPath = "../../assets/library/web/viewer.html";
-            iframe.src = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}&readonly=true`;
+            const viewerUrl = `${viewerPath}?file=${encodeURIComponent(currentBlobUrl)}#zoom=page-fit`;
+            iframe.src = viewerUrl;
         } else if (isDrive) {
             console.log("Loading Google Drive link...");
             const fileIdMatch = absoluteUrl.match(/\/d\/([^\/]+)/) || absoluteUrl.match(/id=([^\&]+)/);
