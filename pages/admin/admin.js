@@ -407,7 +407,14 @@ window.openFileModal = async (groupId) => {
         }
     });
 
-    document.getElementById('fileModal').style.display = 'flex';
+});
+
+document.getElementById('fileModal').style.display = 'flex';
+
+// Reset Mobile State (Show List)
+if (window.toggleMobileFiles) {
+    toggleMobileFiles(true);
+}
 };
 
 function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
@@ -612,6 +619,27 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
     document.getElementById('fileList').appendChild(section);
 }
 
+
+window.toggleMobileFiles = (showList) => {
+    const sidebar = document.getElementById('fileListSidebar');
+    const viewer = document.getElementById('pdfViewerArea');
+    const backBtn = document.getElementById('mobileBackBtn');
+
+    if (!sidebar || !viewer || !backBtn) return;
+
+    if (showList) {
+        // Show List, Hide Viewer (Mobile Logic)
+        sidebar.classList.remove('mobile-hidden');
+        viewer.classList.remove('maximized');
+        backBtn.classList.remove('visible');
+    } else {
+        // Hide List, Maximize Viewer
+        sidebar.classList.add('mobile-hidden');
+        viewer.classList.add('maximized');
+        backBtn.classList.add('visible');
+    }
+};
+
 window.closeFileModal = () => {
     document.getElementById('fileModal').style.display = 'none';
 };
@@ -621,6 +649,12 @@ window.loadPDF = (url, title, fileKey) => {
     document.getElementById('pdfPlaceholder').style.display = 'none';
     const viewerDiv = document.getElementById('adobe-dc-view');
     viewerDiv.style.display = 'block';
+
+    // Mobile: Auto-collapse sidebar when file is loaded
+    if (window.innerWidth <= 768) {
+        toggleMobileFiles(false);
+    }
+
     viewerDiv.innerHTML = '';
     if (window.AdobeDC) {
         currentAdobeView = new AdobeDC.View({

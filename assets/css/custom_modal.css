@@ -1,4 +1,3 @@
-
 /* ===========================================
    FILE VIEWER MODAL REFRACTOR
    =========================================== */
@@ -121,6 +120,21 @@
     font-weight: 500;
 }
 
+.back-to-files-btn {
+    display: none;
+    /* Hidden on desktop */
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    color: var(--primary-color);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-right: 15px;
+}
+
 /* Mobile Adjustments for File Viewer */
 @media (max-width: 768px) {
     .file-viewer-modal {
@@ -133,25 +147,52 @@
 
     .modal-body {
         flex-direction: column;
-        overflow-y: auto;
+        overflow: hidden;
+        /* Prevent body scroll, let children scroll */
     }
 
+    /* Sidebar State: Default (Visible) */
     .sidebar {
         width: 100%;
-        height: auto;
-        max-height: 250px;
+        height: 40%;
+        /* Initial split */
+        max-height: 40%;
         border-right: none;
         border-bottom: 1px solid #e2e8f0;
+        overflow-y: auto;
+        transition: all 0.3s ease;
     }
 
+    .sidebar.mobile-hidden {
+        display: none;
+        /* Collapse completely */
+    }
+
+    /* Viewer State */
     .viewer-area {
-        height: 500px;
-        /* Give it fixed height so it doesn't collapse */
-        min-height: 400px;
+        width: 100%;
+        flex: 1;
+        /* Takes remaining space */
+        min-height: 0;
+        /* Important for flex child scroll */
+    }
+
+    .viewer-area.maximized {
+        height: 100%;
+        /* Full modal height excluding header */
     }
 
     .modal-header {
-        padding: 15px;
+        padding: 10px 15px;
         border-radius: 0;
+    }
+
+    .title-area {
+        flex: 1;
+    }
+
+    /* Show back button ONLY when toggled */
+    .back-to-files-btn.visible {
+        display: flex;
     }
 }
