@@ -10,11 +10,17 @@ let currentStatusFilter = 'pending'; // Default view: To Be Evaluated
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
-    const userRole = (loginUser && loginUser.role) ? loginUser.role.trim().toLowerCase() : '';
+    const rawRole = (loginUser && loginUser.role) ? loginUser.role.toString().toLowerCase() : '';
+    const isAdviser = rawRole.includes('adviser') || rawRole.includes('advisor');
+    const hasOtherRole = rawRole.includes('instructor') || rawRole.includes('panel') || rawRole.includes('admin');
 
-    if (userRole === 'adviser') {
-        document.querySelectorAll('a[href*="panel_evaluation"]').forEach(nav => {
-            nav.style.setProperty('display', 'none', 'important');
+    if (isAdviser && !hasOtherRole) {
+        document.querySelectorAll('.nav-item, a').forEach(nav => {
+            const href = (nav.getAttribute('href') || '').toLowerCase();
+            const text = (nav.textContent || '').toLowerCase();
+            if (href.includes('evaluation') || text.includes('evaluation')) {
+                nav.style.setProperty('display', 'none', 'important');
+            }
         });
         window.location.href = 'panel_capstone';
         return;
