@@ -76,9 +76,24 @@ function togglePassVisibility() {
     }
 }
 
-async function saveAccountChanges(e) {
+async function handleAccountUpdate(e) {
     e.preventDefault();
+    const newPassword = document.getElementById('editPassword').value;
 
+    if (newPassword.trim() !== '') {
+        // Show double check modal
+        document.getElementById('confirmPasswordModal').classList.add('active');
+    } else {
+        // No password change, proceed directly
+        finalProcessUpdate();
+    }
+}
+
+function closeConfirmModal() {
+    document.getElementById('confirmPasswordModal').classList.remove('active');
+}
+
+async function finalProcessUpdate() {
     const newName = document.getElementById('editFullName').value;
     const newPassword = document.getElementById('editPassword').value;
 
@@ -104,11 +119,17 @@ async function saveAccountChanges(e) {
         // Update UI
         loadUserProfile();
         closeEditModal();
-        showToast('Account updated successfully!');
+        closeConfirmModal();
+        showToast('Profile updated successfully! ✨');
 
     } catch (err) {
         alert('Error updating profile: ' + err.message);
     }
+}
+
+async function saveAccountChanges(e) {
+    // Legacy function placeholder (already replaced by handleAccountUpdate in HTML)
+    handleAccountUpdate(e);
 }
 
 function showToast(message) {

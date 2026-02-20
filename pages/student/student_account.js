@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadAccountDetails();
 });
 
+let originalPassword = '';
+
 async function loadAccountDetails() {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     if (!loginUser) {
@@ -32,7 +34,10 @@ async function loadAccountDetails() {
         // Populate Form
         document.getElementById('accGroupName').value = group.group_name || '';
         document.getElementById('accEmail').value = group.email || '';
-        document.getElementById('accPassword').value = group.password || '';
+
+        // Security best practice: Don't show current password, leave blank for "no change"
+        document.getElementById('accPassword').value = '';
+        originalPassword = group.password || '';
 
         // Populate Members
         for (let i = 1; i <= 5; i++) {
@@ -55,27 +60,48 @@ async function loadAccountDetails() {
 
 async function saveAccountDetails(e) {
     e.preventDefault();
+    const newPassword = document.getElementById('accPassword').value.trim();
+
+    if (newPassword !== '') {
+        // Password is being changed
+        document.getElementById('confirmPasswordModal').classList.add('active');
+    } else {
+        // No password change, proceed with name/email/members
+        finalProcessUpdate();
+    }
+}
+
+function closeConfirmModal() {
+    document.getElementById('confirmPasswordModal').classList.remove('active');
+}
+
+async function finalProcessUpdate() {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     if (!loginUser) return;
 
     const groupName = document.getElementById('accGroupName').value;
     const email = document.getElementById('accEmail').value;
-    const password = document.getElementById('accPassword').value;
+    const newPassword = document.getElementById('accPassword').value.trim();
 
     const submitBtn = document.querySelector('.save-btn');
     const originalBtnText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Saving...';
+    submitBtn.innerHTML = '<span class="material-icons-round spin" style="animation: spin 1s linear infinite;">sync</span> Saving...';
     submitBtn.disabled = true;
 
     try {
         // 1. Update Group Details
+        const updateData = {
+            group_name: groupName,
+            email: email
+        };
+
+        if (newPassword !== '') {
+            updateData.password = newPassword;
+        }
+
         const { error: groupError } = await supabaseClient
             .from('student_groups')
-            .update({
-                group_name: groupName,
-                email: email,
-                password: password
-            })
+            .update(updateData)
             .eq('id', loginUser.id);
 
         if (groupError) throw groupError;
@@ -88,20 +114,16 @@ async function saveAccountDetails(e) {
 
             if (name) {
                 if (studentId) {
-                    // Update existing member
                     await supabaseClient.from('students').update({ full_name: name }).eq('id', studentId);
                 } else {
-                    // Insert new member
                     const { data: newMember } = await supabaseClient
                         .from('students')
                         .insert([{ full_name: name, group_id: loginUser.id }])
                         .select()
                         .single();
-                    // Update attribute to avoid duplicate inserts on next save
                     if (newMember) input.setAttribute('data-student-id', newMember.id);
                 }
             } else if (studentId) {
-                // Name cleared -> Delete member
                 await supabaseClient.from('students').delete().eq('id', studentId);
                 input.removeAttribute('data-student-id');
             }
@@ -109,9 +131,13 @@ async function saveAccountDetails(e) {
 
         // 3. Update localStorage (Session)
         const updatedUser = { ...loginUser, group_name: groupName };
-        localStorage.setItem('loginUser', JSON.stringify(updatedUser)); // Keep ID for fetches, update name for display if needed
+        localStorage.setItem('loginUser', JSON.stringify(updatedUser));
 
-        showToast('Account details updated successfully!');
+        closeConfirmModal();
+        showToast('Account details updated successfully! ✨');
+
+        // Reset password field to blank after success
+        document.getElementById('accPassword').value = '';
 
     } catch (err) {
         console.error('Error saving account:', err);

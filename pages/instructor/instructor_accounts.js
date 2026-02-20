@@ -37,7 +37,102 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadGroups();
     loadAdviserOptions();
+    loadUserProfile();
 });
+
+let currentUser = null;
+
+function loadUserProfile() {
+    const userJson = localStorage.getItem('loginUser');
+    if (!userJson) return;
+    currentUser = JSON.parse(userJson);
+
+    const profileBody = document.getElementById('profileTableBody');
+    if (!profileBody) return;
+
+    profileBody.innerHTML = `
+        <tr>
+            <td>${currentUser.name || 'No Name Set'}</td>
+            <td>${currentUser.email || 'No Email Set'}</td>
+            <td><span class="status-badge" style="background: var(--primary-light); color: var(--primary-dark); font-weight: 600;">${(currentUser.role || 'User').toUpperCase()}</span></td>
+            <td>${currentUser.designation || 'Not Specified'}</td>
+            <td style="text-align: center;">
+                <button class="action-btn edit" onclick="openEditModal()" style="background:none; border:none; cursor:pointer; color:var(--primary-color);">
+                    <span class="material-icons-round">edit</span>
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+function openEditModal() {
+    document.getElementById('editFullName').value = currentUser.name || '';
+    document.getElementById('editPassword').value = '';
+    document.getElementById('editAccountModal').classList.add('active');
+}
+
+function closeEditModal() {
+    document.getElementById('editAccountModal').classList.remove('active');
+}
+
+function togglePassVisibility() {
+    const passInput = document.getElementById('editPassword');
+    const toggleIcon = document.getElementById('passToggle');
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        toggleIcon.textContent = 'visibility_off';
+    } else {
+        passInput.type = 'password';
+        toggleIcon.textContent = 'visibility';
+    }
+}
+
+async function handleAccountUpdate(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const newPassword = document.getElementById('editPassword').value;
+
+    if (newPassword.trim() !== '') {
+        document.getElementById('confirmPasswordModal').classList.add('active');
+    } else {
+        finalProcessUpdate();
+    }
+}
+
+function closeConfirmModal() {
+    document.getElementById('confirmPasswordModal').classList.remove('active');
+}
+
+async function finalProcessUpdate() {
+    const newName = document.getElementById('editFullName').value;
+    const newPassword = document.getElementById('editPassword').value;
+
+    const updateData = { name: newName };
+    if (newPassword.trim() !== '') {
+        updateData.password = newPassword;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('accounts')
+            .update(updateData)
+            .eq('id', currentUser.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        localStorage.setItem('loginUser', JSON.stringify(data));
+        currentUser = data;
+
+        loadUserProfile();
+        closeEditModal();
+        closeConfirmModal();
+        showToast('Profile updated successfully! ✨');
+
+    } catch (err) {
+        alert('Error updating profile: ' + err.message);
+    }
+}
 
 // --- Fetch Groups from Supabase ---
 async function getGroups() {

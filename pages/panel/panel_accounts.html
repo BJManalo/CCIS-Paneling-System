@@ -58,36 +58,89 @@
 
     <!-- Edit Account Modal -->
     <div id="editAccountModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 450px; border-radius: 24px; padding: 35px;">
-            <h2 class="modal-title" style="text-align: center; margin-bottom: 25px;">Update Account</h2>
-            <form id="editAccountForm" onsubmit="saveAccountChanges(event)">
-                <div class="input-group">
-                    <label for="editFullName">Your Full Name</label>
-                    <input type="text" id="editFullName" required placeholder="Enter your full name">
+        <div class="modal-content profile-modal"
+            style="max-width: 480px; border-radius: 28px; padding: 0; overflow: hidden; border: none; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div
+                style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); padding: 40px 30px; text-align: center; color: white; position: relative;">
+                <div
+                    style="width: 80px; height: 80px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3);">
+                    <span class="material-icons-round" style="font-size: 40px;">person_outline</span>
                 </div>
+                <h2 style="margin: 0; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em;">Account Settings
+                </h2>
+                <p style="margin: 8px 0 0; opacity: 0.8; font-size: 0.95rem;">Keep your profile information up to date
+                </p>
+            </div>
 
-                <div class="input-group" style="margin-top: 20px;">
-                    <label for="editPassword">New Password</label>
-                    <div style="position: relative;">
-                        <input type="password" id="editPassword" placeholder="Enter new password">
-                        <span class="material-icons-round toggle-password" id="passToggle"
-                            onclick="togglePassVisibility()"
-                            style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); bottom: auto; cursor: pointer; color: #94a3b8; font-size: 22px;">
-                            visibility
-                        </span>
+            <div style="padding: 35px; background: white;">
+                <form id="editAccountForm" onsubmit="handleAccountUpdate(event)" autocomplete="off">
+                    <div class="input-group">
+                        <label for="editFullName"
+                            style="font-weight: 600; color: #4b5563; font-size: 0.9rem; margin-bottom: 8px; display: block;">Full
+                            Name</label>
+                        <div style="position: relative;">
+                            <span class="material-icons-round"
+                                style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 20px;">badge</span>
+                            <input type="text" id="editFullName" required placeholder="Enter your full name"
+                                style="width: 100%; padding: 14px 15px 14px 45px; border: 2px solid #f3f4f6; border-radius: 14px; font-size: 1rem; outline: none; transition: all 0.2s; background: #f9fafb;">
+                        </div>
                     </div>
-                    <small style="color: #64748b; font-size: 12px; margin-top: 8px; display: block; line-height: 1.4;">
-                        <span class="material-icons-round"
-                            style="font-size: 14px; vertical-align: middle; margin-right: 2px;">info</span>
-                        Leave blank if you don't want to change your password.
-                    </small>
-                </div>
 
-                <div class="modal-actions" style="margin-top: 35px;">
-                    <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
-                    <button type="submit" class="btn-save">Update Now</button>
-                </div>
-            </form>
+                    <div class="input-group" style="margin-top: 25px;">
+                        <label for="editPassword"
+                            style="font-weight: 600; color: #4b5563; font-size: 0.9rem; margin-bottom: 8px; display: block;">Security</label>
+                        <div style="position: relative;">
+                            <span class="material-icons-round"
+                                style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 20px;">lock_open</span>
+                            <input type="password" id="editPassword" placeholder="Create new password"
+                                style="width: 100%; padding: 14px 45px 14px 45px; border: 2px solid #f3f4f6; border-radius: 14px; font-size: 1rem; outline: none; transition: all 0.2s; background: #f9fafb;">
+                            <span class="material-icons-round toggle-password" id="passToggle"
+                                onclick="togglePassVisibility()"
+                                style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #9ca3af; font-size: 20px;">visibility</span>
+                        </div>
+                        <div
+                            style="display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 12px; background: #eff6ff; border-radius: 12px; border: 1px solid #dbeafe;">
+                            <span class="material-icons-round"
+                                style="color: #3b82f6; font-size: 18px; margin-top: 1px;">info</span>
+                            <span style="color: #1e40af; font-size: 12px; line-height: 1.5; font-weight: 500;">
+                                Leave this field blank if you do not wish to change your current password.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 15px; margin-top: 40px;">
+                        <button type="button" onclick="closeEditModal()"
+                            style="flex: 1; padding: 16px; border-radius: 16px; border: 2px solid #f3f4f6; background: white; color: #6b7280; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit;">
+                            Discard
+                        </button>
+                        <button type="submit"
+                            style="flex: 1.5; padding: 16px; border-radius: 16px; border: none; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: white; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3); font-family: inherit;">
+                            Update Now
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Double Check Password Change Modal -->
+    <div id="confirmPasswordModal" class="modal-overlay" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 400px; border-radius: 24px; padding: 35px; text-align: center;">
+            <div
+                style="width: 70px; height: 70px; background: #fff7ed; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                <span class="material-icons-round" style="color: #f97316; font-size: 40px;">warning_amber</span>
+            </div>
+            <h3 style="margin: 0; font-size: 1.5rem; color: #1f2937;">Confirm Password Change</h3>
+            <p style="color: #6b7280; margin: 15px 0 30px; line-height: 1.6;">Are you sure you want to update your
+                password? You will need to use the new password for your next login.</p>
+            <div style="display: flex; gap: 12px;">
+                <button type="button" onclick="closeConfirmModal()"
+                    style="flex: 1; padding: 14px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; color: #374151; font-weight: 600; cursor: pointer;">No,
+                    Cancel</button>
+                <button type="button" onclick="finalProcessUpdate()"
+                    style="flex: 1; padding: 14px; border-radius: 12px; border: none; background: #f97316; color: white; font-weight: 600; cursor: pointer;">Yes,
+                    Update</button>
+            </div>
         </div>
     </div>
 
