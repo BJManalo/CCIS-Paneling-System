@@ -9,8 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Hide Evaluations link from nav for 'Adviser' role
-    if (loginUser.role === 'Adviser') {
-        const evalNav = document.querySelector('a[href="instructor_evaluation"]');
+    if (loginUser.role && loginUser.role.trim() === 'Adviser') {
+        const evalNav = document.querySelector('a[href*="instructor_evaluation"]');
         if (evalNav) evalNav.style.display = 'none';
     }
 

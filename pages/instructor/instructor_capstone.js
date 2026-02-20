@@ -72,8 +72,8 @@ async function loadCapstoneData() {
     }
 
     // Hide Evaluations link from nav for 'Adviser' role
-    if (user.role === 'Adviser') {
-        const evalNav = document.querySelector('a[href="instructor_evaluation"]');
+    if (user.role && user.role.trim() === 'Adviser') {
+        const evalNav = document.querySelector('a[href*="instructor_evaluation"]');
         if (evalNav) evalNav.style.display = 'none';
     }
 

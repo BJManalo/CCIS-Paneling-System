@@ -16,9 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = userJson ? JSON.parse(userJson) : null;
 
     // If role is strictly 'Adviser', they are blocked from this page
-    if (user && user.role === 'Adviser') {
+    if (user && user.role && user.role.trim() === 'Adviser') {
         // Hide link (though we are redirecting anyway)
-        const evalNav = document.querySelector('a[href="instructor_evaluation"]');
+        const evalNav = document.querySelector('a[href*="instructor_evaluation"]');
         if (evalNav) evalNav.style.display = 'none';
 
         window.location.href = 'instructor_dashboard';
