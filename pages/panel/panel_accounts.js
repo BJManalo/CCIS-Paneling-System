@@ -8,6 +8,17 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userRole = (user && user.role) ? user.role.trim().toLowerCase() : '';
+
+    // Hide Evaluation link from nav for 'Adviser' role
+    if (userRole === 'adviser') {
+        document.querySelectorAll('a[href*="panel_evaluation"]').forEach(nav => {
+            nav.style.setProperty('display', 'none', 'important');
+        });
+    }
+
     loadUserProfile();
 });
 

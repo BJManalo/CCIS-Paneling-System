@@ -53,6 +53,15 @@ async function loadCapstoneData() {
         return;
     }
     const user = JSON.parse(userJson);
+    const userRole = (user && user.role) ? user.role.trim().toLowerCase() : '';
+
+    // Hide Evaluation link from nav for 'Adviser' role
+    if (userRole === 'adviser') {
+        document.querySelectorAll('a[href*="panel_evaluation"]').forEach(nav => {
+            nav.style.setProperty('display', 'none', 'important');
+        });
+    }
+
     const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
     tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;">Loading capstone data...</td></tr>';

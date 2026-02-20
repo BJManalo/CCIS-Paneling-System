@@ -11,15 +11,13 @@ let rawGroups = [];
 let allDefenseStatuses = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Check role - Adviser ONLY cannot access this page
-    const userJson = localStorage.getItem('loginUser');
-    const user = userJson ? JSON.parse(userJson) : null;
+    const loginUser = JSON.parse(localStorage.getItem('loginUser'));
+    const userRole = (loginUser && loginUser.role) ? loginUser.role.trim().toLowerCase() : '';
 
-    // If role is strictly 'Adviser', they are blocked from this page
-    if (user && user.role && user.role.trim() === 'Adviser') {
-        // Hide link (though we are redirecting anyway)
-        const evalNav = document.querySelector('a[href*="instructor_evaluation"]');
-        if (evalNav) evalNav.style.display = 'none';
+    if (userRole === 'adviser') {
+        document.querySelectorAll('a[href*="instructor_evaluation"]').forEach(nav => {
+            nav.style.setProperty('display', 'none', 'important');
+        });
 
         window.location.href = 'instructor_dashboard';
         return;

@@ -23,6 +23,16 @@ const allPanels = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
+    const loginUser = JSON.parse(localStorage.getItem('loginUser'));
+    const userRole = (loginUser && loginUser.role) ? loginUser.role.trim().toLowerCase() : '';
+
+    // Hide Evaluation link from nav for 'Adviser' role
+    if (userRole === 'adviser') {
+        document.querySelectorAll('a[href*="panel_evaluation"]').forEach(nav => {
+            nav.style.setProperty('display', 'none', 'important');
+        });
+    }
+
     loadSchedules();
 });
 

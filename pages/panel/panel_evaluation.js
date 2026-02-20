@@ -9,6 +9,17 @@ let loadedEvaluations = [];
 let currentStatusFilter = 'pending'; // Default view: To Be Evaluated
 
 document.addEventListener('DOMContentLoaded', () => {
+    const loginUser = JSON.parse(localStorage.getItem('loginUser'));
+    const userRole = (loginUser && loginUser.role) ? loginUser.role.trim().toLowerCase() : '';
+
+    if (userRole === 'adviser') {
+        document.querySelectorAll('a[href*="panel_evaluation"]').forEach(nav => {
+            nav.style.setProperty('display', 'none', 'important');
+        });
+        window.location.href = 'panel_capstone';
+        return;
+    }
+
     loadEvaluations();
 });
 

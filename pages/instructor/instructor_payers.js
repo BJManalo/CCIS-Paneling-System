@@ -3,15 +3,20 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
-    if (!loginUser || (loginUser.role !== 'Instructor' && loginUser.role !== 'Instructor/Adviser' && loginUser.role !== 'Adviser')) {
+    const role = (loginUser && loginUser.role) ? loginUser.role.trim().toLowerCase() : '';
+    const allowedRoles = ['instructor', 'instructor/adviser', 'adviser'];
+
+    if (!loginUser || !allowedRoles.includes(role)) {
         window.location.href = '../../';
         return;
     }
 
     // Hide Evaluations link from nav for 'Adviser' role
-    if (loginUser.role && loginUser.role.trim() === 'Adviser') {
-        const evalNav = document.querySelector('a[href*="instructor_evaluation"]');
-        if (evalNav) evalNav.style.display = 'none';
+    const userRole = (loginUser.role || '').trim().toLowerCase();
+    if (userRole === 'adviser') {
+        document.querySelectorAll('a[href*="instructor_evaluation"]').forEach(nav => {
+            nav.style.setProperty('display', 'none', 'important');
+        });
     }
 
     loadPayers();
