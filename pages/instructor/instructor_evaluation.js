@@ -423,8 +423,13 @@ function applyFilters() {
             // Must be the Adviser of the group being evaluated
             matchesMain = isAdviser;
         } else {
-            // "All Evaluations" tab: show everything in the system
-            matchesMain = true;
+            // "Evaluation" tab: Hide panel evaluations from the group's Adviser
+            // If you ARE the adviser but NOT the panelist who rated this, you can't see it.
+            if (isAdviser && !isPanelist) {
+                matchesMain = false;
+            } else {
+                matchesMain = true;
+            }
         }
         if (!matchesMain) return false;
 
