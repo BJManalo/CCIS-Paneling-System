@@ -11,6 +11,20 @@ let rawGroups = [];
 let allDefenseStatuses = [];
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Check role - Adviser ONLY cannot access this page
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+
+    // If role is strictly 'Adviser', they are blocked from this page
+    if (user && user.role === 'Adviser') {
+        // Hide link (though we are redirecting anyway)
+        const evalNav = document.querySelector('a[href="instructor_evaluation"]');
+        if (evalNav) evalNav.style.display = 'none';
+
+        window.location.href = 'instructor_dashboard';
+        return;
+    }
+
     loadEvaluations();
     initTooltip();
 });
@@ -423,13 +437,8 @@ function applyFilters() {
             // Must be the Adviser of the group being evaluated
             matchesMain = isAdviser;
         } else {
-            // "Evaluation" tab: Hide panel evaluations from the group's Adviser
-            // If you ARE the adviser but NOT the panelist who rated this, you can't see it.
-            if (isAdviser && !isPanelist) {
-                matchesMain = false;
-            } else {
-                matchesMain = true;
-            }
+            // "Evaluation" tab: show everything in the system
+            matchesMain = true;
         }
         if (!matchesMain) return false;
 

@@ -10,6 +10,19 @@ const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 let allGroups = [];
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Check Login
+    const loginUser = JSON.parse(localStorage.getItem('loginUser'));
+    if (!loginUser || (loginUser.role !== 'Instructor' && loginUser.role !== 'Instructor/Adviser' && loginUser.role !== 'Adviser')) {
+        window.location.href = '../../';
+        return;
+    }
+
+    // Hide Evaluations link from nav for 'Adviser' role
+    if (loginUser.role === 'Adviser') {
+        const evalNav = document.querySelector('a[href="instructor_evaluation"]');
+        if (evalNav) evalNav.style.display = 'none';
+    }
+
     loadGroups();
     loadAdviserOptions();
 });

@@ -66,9 +66,15 @@ async function loadCapstoneData() {
     const user = JSON.parse(userJson);
 
     // Auth Check for Instructor
-    if (user.role !== 'Instructor' && user.role !== 'Instructor/Adviser') {
+    if (user.role !== 'Instructor' && user.role !== 'Instructor/Adviser' && user.role !== 'Adviser') {
         window.location.href = '../../';
         return;
+    }
+
+    // Hide Evaluations link from nav for 'Adviser' role
+    if (user.role === 'Adviser') {
+        const evalNav = document.querySelector('a[href="instructor_evaluation"]');
+        if (evalNav) evalNav.style.display = 'none';
     }
 
     const userName = user ? (user.name || user.full_name || 'Instructor') : 'Instructor';
