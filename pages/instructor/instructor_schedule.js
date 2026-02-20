@@ -666,18 +666,28 @@ async function saveSchedule(e) {
         scheduleData.panel5
     ].filter(p => p && p.trim() !== "");
 
-    const normalizeTime = (t) => t ? t.substring(0, 5) : "";
+    const timeToMinutes = (t) => {
+        if (!t) return 0;
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+    };
+
+    const newTimeMins = timeToMinutes(scheduleData.schedule_time);
 
     const conflict = allSchedules.find(s => {
         // Skip current record if editing
         if (editingId && s.id == editingId) return false;
 
-        // Check date and time (normalized to HH:MM)
-        if (s.schedule_date === scheduleData.schedule_date &&
-            normalizeTime(s.schedule_time) === normalizeTime(scheduleData.schedule_time)) {
+        // Check date
+        if (s.schedule_date === scheduleData.schedule_date) {
+            const existingTimeMins = timeToMinutes(s.schedule_time);
+            const diff = Math.abs(newTimeMins - existingTimeMins);
 
-            const existingPanels = [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].filter(p => p);
-            return newPanels.some(p => existingPanels.includes(p));
+            // Conflict if scheduled within 60 minutes of each other
+            if (diff < 60) {
+                const existingPanels = [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].filter(p => p);
+                return newPanels.some(p => existingPanels.includes(p));
+            }
         }
         return false;
     });
