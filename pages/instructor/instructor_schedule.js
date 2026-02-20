@@ -627,6 +627,9 @@ function closeScheduleModal() {
 async function saveSchedule(e) {
     e.preventDefault();
     const editingId = document.getElementById('scheduleForm').getAttribute('data-editing-id');
+    const schedule_date = document.getElementById('schedDate').value;
+    const schedule_time = document.getElementById('schedTime').value;
+
     const scheduleData = {
         schedule_type: document.getElementById('schedType').value,
         group_id: document.getElementById('schedGroupId').value,
@@ -636,10 +639,46 @@ async function saveSchedule(e) {
         panel4: document.getElementById('schedPanel4').value,
         panel5: document.getElementById('schedPanel5').value,
         adviser: document.getElementById('schedAdviser').value,
-        schedule_date: document.getElementById('schedDate').value,
-        schedule_time: document.getElementById('schedTime').value,
+        schedule_date: schedule_date,
+        schedule_time: schedule_time,
         schedule_venue: document.getElementById('schedVenue').value
     };
+
+    // --- Conflict Validation ---
+    const newPanels = [
+        scheduleData.panel1,
+        scheduleData.panel2,
+        scheduleData.panel3,
+        scheduleData.panel4,
+        scheduleData.panel5
+    ].filter(p => p && p.trim() !== "");
+
+    const normalizeTime = (t) => t ? t.substring(0, 5) : "";
+
+    const conflict = allSchedules.find(s => {
+        // Skip current record if editing
+        if (editingId && s.id == editingId) return false;
+
+        // Check date and time (normalized to HH:MM)
+        if (s.schedule_date === scheduleData.schedule_date &&
+            normalizeTime(s.schedule_time) === normalizeTime(scheduleData.schedule_time)) {
+
+            const existingPanels = [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].filter(p => p);
+            return newPanels.some(p => existingPanels.includes(p));
+        }
+        return false;
+    });
+
+    if (conflict) {
+        const conflictingGroupName = conflict.student_groups?.group_name || 'another group';
+        const overlappingPanels = newPanels.filter(p =>
+            [conflict.panel1, conflict.panel2, conflict.panel3, conflict.panel4, conflict.panel5].includes(p)
+        );
+
+        alert(`Conflict Detected!\n\nPanelist(s): ${overlappingPanels.join(', ')}\nis/are already scheduled for ${conflictingGroupName} at ${scheduleData.schedule_time} on ${scheduleData.schedule_date}.`);
+        return;
+    }
+    // -------------------------
 
     const { error } = editingId
         ? await supabaseClient.from('schedules').update(scheduleData).eq('id', editingId)
