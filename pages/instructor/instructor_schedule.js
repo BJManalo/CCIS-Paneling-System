@@ -1,4 +1,4 @@
-// instructor_schedule.js
+// instructor_schedule.js - v1.0.1 (Conflict Validation)
 
 // --- Supabase Configuration ---
 const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
