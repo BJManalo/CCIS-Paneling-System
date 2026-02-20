@@ -675,7 +675,7 @@ async function saveSchedule(e) {
             [conflict.panel1, conflict.panel2, conflict.panel3, conflict.panel4, conflict.panel5].includes(p)
         );
 
-        alert(`Conflict Detected!\n\nPanelist(s): ${overlappingPanels.join(', ')}\nis/are already scheduled for ${conflictingGroupName} at ${scheduleData.schedule_time} on ${scheduleData.schedule_date}.`);
+        showConflictModal(overlappingPanels, conflictingGroupName, scheduleData.schedule_time, scheduleData.schedule_date);
         return;
     }
     // -------------------------
@@ -711,6 +711,50 @@ function showToast(message) {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 3000);
+}
+
+function showConflictModal(panels, group, time, date) {
+    const details = document.getElementById('conflictDetails');
+    if (!details) return;
+
+    details.innerHTML = `
+        <div style="display: grid; gap: 15px;">
+            <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <div style="background: #f1f5f9; padding: 8px; border-radius: 10px; color: #64748b;">
+                    <span class="material-icons-round" style="font-size: 20px; display: block;">people</span>
+                </div>
+                <div>
+                    <div style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; letter-spacing: 0.8px; margin-bottom: 2px;">Panelist(s) Affected</div>
+                    <div style="color: #0f172a; font-weight: 700; line-height: 1.4;">${panels.join(', ')}</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <div style="background: #f1f5f9; padding: 8px; border-radius: 10px; color: #64748b;">
+                    <span class="material-icons-round" style="font-size: 20px; display: block;">groups</span>
+                </div>
+                <div>
+                    <div style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; letter-spacing: 0.8px; margin-bottom: 2px;">Conflicting Group</div>
+                    <div style="color: #0f172a; font-weight: 700; line-height: 1.4;">${group}</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <div style="background: #f1f5f9; padding: 8px; border-radius: 10px; color: #64748b;">
+                    <span class="material-icons-round" style="font-size: 20px; display: block;">schedule</span>
+                </div>
+                <div>
+                    <div style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; letter-spacing: 0.8px; margin-bottom: 2px;">Date & Time</div>
+                    <div style="color: #0f172a; font-weight: 700; line-height: 1.4;">${date} at ${time}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('conflictModal').classList.add('active');
+}
+
+function closeConflictModal() {
+    document.getElementById('conflictModal').classList.remove('active');
 }
 
 function logout() {
