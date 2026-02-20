@@ -10,6 +10,17 @@ let searchTerm = '';
 let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
 let currentStatusFilter = 'ALL';
 
+function formatTime12Hour(timeStr) {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${hours}:${minutes} ${ampm}`;
+}
+
 let currentRole = 'All'; // Default to All Groups as requested
 let adobeDCView = null;
 let currentViewerFileKey = null;
@@ -490,7 +501,7 @@ function renderTable() {
             <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>
                 <div style="font-weight: 500;">${dateStr}</div>
-                <div style="font-size: 11px; color: #64748b;">${g.time || ''}</div>
+                <div style="font-size: 11px; color: #64748b;">${formatTime12Hour(g.time)}</div>
             </td>
             <td>
                 <div style="display: flex; align-items: center; gap: 4px; color: #475569;">

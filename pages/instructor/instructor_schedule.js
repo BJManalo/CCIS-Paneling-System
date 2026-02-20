@@ -12,6 +12,19 @@ let allSchedules = [];
 let filteredSchedules = [];
 let fetchedGroups = [];
 
+// Helper to format time to 12-hour format
+function formatTime12Hour(timeStr) {
+    if (!timeStr) return '';
+    // Handle HH:MM or HH:MM:SS
+    const parts = timeStr.split(':');
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    return `${hours}:${minutes} ${ampm}`;
+}
+
 // Calendar State
 let calendarDate = new Date();
 
@@ -191,7 +204,7 @@ function renderCalendar() {
                 eventEl.style.color = '#166534';
             }
 
-            eventEl.textContent = `${sched.schedule_time || ''} ${sched.student_groups?.group_name || 'Group'}`;
+            eventEl.textContent = `${formatTime12Hour(sched.schedule_time)} ${sched.student_groups?.group_name || 'Group'}`;
             eventEl.title = `${sched.schedule_type}: ${sched.student_groups?.group_name}`;
 
             eventEl.onclick = (e) => {
@@ -745,7 +758,7 @@ function showConflictModal(panels, group, time, date) {
                 </div>
                 <div>
                     <div style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; letter-spacing: 0.8px; margin-bottom: 2px;">Date & Time</div>
-                    <div style="color: #0f172a; font-weight: 700; line-height: 1.4;">${date} at ${time}</div>
+                    <div style="color: #0f172a; font-weight: 700; line-height: 1.4;">${date} at ${formatTime12Hour(time)}</div>
                 </div>
             </div>
         </div>
