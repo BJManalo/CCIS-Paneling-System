@@ -8,26 +8,54 @@ let allData = [];
 let loadedEvaluations = [];
 let currentStatusFilter = 'pending'; // Default view: To Be Evaluated
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
+    if (!loginUser) {
+        window.location.href = '../../';
+        return;
+    }
+
     const rawRole = (loginUser && loginUser.role) ? loginUser.role.toString().toLowerCase() : '';
     const isAdviser = rawRole.includes('adviser') || rawRole.includes('advisor');
     const hasOtherRole = rawRole.includes('instructor') || rawRole.includes('panel') || rawRole.includes('admin');
+    const userName = loginUser.name || loginUser.full_name || '';
 
+    // First pass: Adviser-only role check
     if (isAdviser && !hasOtherRole) {
-        document.querySelectorAll('.nav-item, a').forEach(nav => {
-            const href = (nav.getAttribute('href') || '').toLowerCase();
-            const text = (nav.textContent || '').toLowerCase();
-            if (href.includes('evaluation') || text.includes('evaluation')) {
-                nav.style.setProperty('display', 'none', 'important');
-            }
-        });
+        hideEvaluationTab();
         window.location.href = 'panel_capstone';
         return;
     }
 
+    // Second pass: Check if actually assigned as a panelist
+    try {
+        const { data: schedules } = await supabaseClient.from('schedules').select('panel1, panel2, panel3, panel4, panel5');
+        const isActuallyPanelist = (schedules || []).some(s =>
+            [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].includes(userName)
+        );
+
+        if (!isActuallyPanelist) {
+            hideEvaluationTab();
+            // If they are on this page but NOT a panelist, boot them
+            window.location.href = 'panel_capstone';
+            return;
+        }
+    } catch (err) {
+        console.error('Error checking panel assignments:', err);
+    }
+
     loadEvaluations();
 });
+
+function hideEvaluationTab() {
+    document.querySelectorAll('.nav-item, a').forEach(nav => {
+        const href = (nav.getAttribute('href') || '').toLowerCase();
+        const text = (nav.textContent || '').toLowerCase();
+        if (href.includes('evaluation') || text.includes('evaluation')) {
+            nav.style.setProperty('display', 'none', 'important');
+        }
+    });
+}
 
 // Criteria Definitions with Detailed Rubrics (From Images)
 const individualCriteria = [

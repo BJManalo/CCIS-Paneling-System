@@ -615,11 +615,11 @@ body {
 
 .search-bar input {
     width: 100%;
-    padding: 12px 12px 12px 40px;
-    border-radius: 12px;
+    padding: 10px 12px 10px 40px;
+    border-radius: 10px;
     border: none;
     background: #e5e7eb;
-    font-size: 1rem;
+    font-size: 0.95rem;
     outline: none;
     transition: background 0.2s;
 }
@@ -664,9 +664,9 @@ body {
 }
 
 .filter-btn {
-    padding: 8px 16px;
+    padding: 6px 14px;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -724,7 +724,7 @@ body {
 
 .data-table th,
 .data-table td {
-    padding: 12px 16px;
+    padding: 10px 14px;
     text-align: left;
     border-bottom: 1px solid #f3f4f6;
 }
@@ -733,13 +733,13 @@ body {
     background: #f9fafb;
     font-weight: 600;
     color: var(--text-light);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 .data-table td {
-    padding: 16px;
+    padding: 12px 14px;
     vertical-align: middle;
 }
 

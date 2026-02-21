@@ -70,7 +70,7 @@ async function loadCapstoneData() {
 
     const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
-    tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;">Loading capstone data...</td></tr>';
+    if (tableBody) tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;">Loading capstone data...</td></tr>';
     if (emptyState) emptyState.style.display = 'none';
 
     try {
@@ -87,6 +87,23 @@ async function loadCapstoneData() {
             .select('*');
 
         if (sError) throw sError;
+
+        // --- Assignment Check for Evaluation Tab Hide ---
+        // If user has Panel role but zero assignments, hide Eval tab
+        const isActuallyPanelist = schedules.some(s =>
+            [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].includes(userName)
+        );
+
+        if (!isActuallyPanelist) {
+            document.querySelectorAll('.nav-item, a').forEach(nav => {
+                const href = (nav.getAttribute('href') || '').toLowerCase();
+                const text = (nav.textContent || '').toLowerCase();
+                if (href.includes('evaluation') || text.includes('evaluation')) {
+                    nav.style.setProperty('display', 'none', 'important');
+                }
+            });
+        }
+        // Redirect if on evaluation page and not a panelist (will be handled in panel_evaluation.js)
 
         // 3. Fetch Evaluations (For sequential Locking)
         const { data: students, error: stdError } = await supabaseClient
