@@ -54,10 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const email = usernameInput.value;
+            const identifier = usernameInput.value;
             const password = passwordInput.value;
 
-            if (!email || !password) {
+            if (!identifier || !password) {
                 showErrorModal('Please fill in all fields.');
                 return;
             }
@@ -76,10 +76,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // In a real production app, use supabase.auth.signInWithPassword()
                 // Here we are manually checking against our 'accounts' table as requested
                 // First try 'accounts' table (Admin, Instructor, Panel, Adviser)
+                // Allow login via Email OR Name
                 let { data: accountData, error: accountError } = await supabaseClient
                     .from('accounts')
                     .select('*')
-                    .eq('email', email)
+                    .or(`email.eq."${identifier}",name.eq."${identifier}"`)
                     .eq('password', password)
                     .maybeSingle(); // Use maybeSingle to avoid 406 error if not found
 
@@ -100,10 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // If not found in accounts, try 'student_groups' table
+                // Allow login via Email OR Group Name
                 let { data: groupData, error: groupError } = await supabaseClient
                     .from('student_groups')
                     .select('*')
-                    .eq('email', email)
+                    .or(`email.eq."${identifier}",group_name.eq."${identifier}"`)
                     .eq('password', password)
                     .maybeSingle();
 
@@ -117,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // If neither found
-                showErrorModal('Invalid Credentials. Please check your email or password and try again.');
+                showErrorModal('Invalid Credentials. Please check your username/email or password and try again.');
                 loginBtn.innerHTML = originalBtnText;
                 loginBtn.style.opacity = '1';
                 loginBtn.disabled = false;
