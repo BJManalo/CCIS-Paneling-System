@@ -22,9 +22,17 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
             padding: 30px;
             max-width: 800px;
-            /* Wider for grades table */
             margin: 40px auto;
             border: 1px solid #f0f0f0;
+            overflow: hidden;
+        }
+
+        @media (max-width: 768px) {
+            .submission-card {
+                padding: 20px 15px;
+                margin: 20px 10px;
+                border-radius: 12px;
+            }
         }
 
         .section-title {
@@ -139,7 +147,7 @@
                     <!-- Tabs will be injected here -->
                 </div>
 
-                <div id="grades-content">
+                <div id="grades-content" class="table-responsive">
                     <!-- Content will be injected here -->
                 </div>
             </div>

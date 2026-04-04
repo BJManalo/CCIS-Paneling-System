@@ -24,6 +24,15 @@
             margin: 40px auto;
             border: 1px solid #f0f0f0;
             position: relative;
+            overflow: hidden; /* Ensure anything overflowing is clipped to border radius */
+        }
+
+        @media (max-width: 768px) {
+            .submission-card {
+                padding: 15px;
+                margin: 20px 10px;
+                border-radius: 12px;
+            }
         }
 
         /* Expandable Row Styles */
@@ -155,7 +164,7 @@
             <p style="text-align: center; color: #64748b; margin-bottom: 25px; font-size: 0.9rem;">View your defense
                 schedules</p>
 
-            <div id="scheduleContainer">
+            <div id="scheduleContainer" class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px;">
                 <table class="data-table">
                     <thead>
                         <tr>

@@ -181,31 +181,44 @@ if ('serviceWorker' in navigator) {
 
 // 2. Catch the native 'beforeinstallprompt' event
 window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('PWA: beforeinstallprompt event fired.');
     // Stash the event so it can be triggered later
     deferredPrompt = e;
     
-    // Check if user is logged in and not on login page
+    // Attempt to trigger if already on a dashboard
+    checkAndShowPrompt();
+});
+
+// 3. Helper to trigger prompt on Dashboards
+function checkAndShowPrompt() {
+    if (!deferredPrompt) return;
+
     const isLoggedIn = localStorage.getItem('loginUser');
-    const isLoginPage = window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('System/') || window.location.pathname.endsWith('System');
+    const isLoginPage = window.location.pathname.endsWith('index.html') || 
+                       window.location.pathname === '/' || 
+                       window.location.pathname.endsWith('BJManalo/') ||
+                       window.location.pathname.includes('/System/') ||
+                       window.location.pathname.endsWith('System');
 
     if (isLoggedIn && !isLoginPage) {
-        // Automatically trigger the native "Install app" dialog after 2 seconds
-        // This is exactly what the user requested
+        console.log('PWA: Conditions met! Preparing prompt in 2 seconds...');
         setTimeout(() => {
             if (deferredPrompt) {
-                console.log('PWA: Automatically triggering native install prompt...');
+                console.log('PWA: Triggering native "Install as App" dialog...');
                 deferredPrompt.prompt();
                 
-                // Wait for the user to respond to the prompt
                 deferredPrompt.userChoice.then((choiceResult) => {
                     if (choiceResult.outcome === 'accepted') {
-                        console.log('PWA: User accepted the install prompt');
+                        console.log('PWA: User accepted installation');
                     } else {
-                        console.log('PWA: User dismissed the install prompt');
+                        console.log('PWA: User dismissed installation');
                     }
                     deferredPrompt = null;
                 });
             }
-        }, 2000); // 2 second delay on dashboard
+        }, 2000);
     }
-});
+}
+
+// 4. Run Check on every page load (in case event fired before script loaded or persisted)
+window.addEventListener('load', checkAndShowPrompt);

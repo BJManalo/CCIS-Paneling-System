@@ -24,6 +24,24 @@
             margin: 40px auto;
             border: 1px solid #f0f0f0;
             position: relative;
+            overflow: hidden;
+        }
+
+        @media (max-width: 768px) {
+            .submission-card {
+                padding: 20px 15px;
+                margin: 20px 10px;
+                border-radius: 12px;
+            }
+            .fab-btn {
+                top: 15px;
+                right: 15px;
+                width: 40px;
+                height: 40px;
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .section-title {
@@ -371,7 +389,7 @@
                 <span class="material-icons-round" style="font-size: 24px;">add</span>
             </button>
 
-            <div id="payments-container">
+            <div id="payments-container" class="table-responsive">
                 <div style="display: flex; justify-content: center; padding: 40px;">
                     <span class="material-icons-round spin"
                         style="font-size: 30px; color: var(--primary-color);">sync</span>
