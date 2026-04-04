@@ -2,7 +2,7 @@
   "name": "CCIS Paneling System",
   "short_name": "CCIS Paneling",
   "description": "Progressive Web App for CCIS Paneling System at University of Antique",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#e0a12e",
@@ -10,12 +10,20 @@
     {
       "src": "assets/images/ccs_logo.jpg",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/jpeg",
+      "purpose": "any"
     },
     {
       "src": "assets/images/logo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

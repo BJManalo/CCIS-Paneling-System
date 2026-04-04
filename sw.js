@@ -1,11 +1,11 @@
 const CACHE_NAME = 'ccis-paneling-cache-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/assets/css/style.css',
-  '/assets/js/shared.js',
-  '/assets/images/logo.png',
-  '/assets/images/ccs_logo.jpg'
+  './',
+  './index.html',
+  './assets/css/style.css',
+  './assets/js/shared.js',
+  './assets/images/logo.png',
+  './assets/images/ccs_logo.jpg'
 ];
 
 // Install a service worker
