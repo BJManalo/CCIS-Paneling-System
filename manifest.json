@@ -15,7 +15,7 @@
     },
     {
       "src": "assets/images/pwa_icon_tiny.png",
-      "sizes": "512x512",
+      "sizes": "256x256",
       "type": "image/png",
       "purpose": "maskable"
     }
