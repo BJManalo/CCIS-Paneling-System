@@ -399,13 +399,14 @@ body {
     }
 
     .search-bar input {
-        padding: 8px 8px 8px 30px !important;
+        padding: 8px 30px 8px 12px !important;
         font-size: 13px !important;
     }
 
     .search-bar .material-icons-round {
         font-size: 18px !important;
-        left: 8px !important;
+        right: 8px !important;
+        left: auto !important;
     }
 
     .logout-btn {
@@ -607,7 +608,7 @@ body {
 
 .search-bar .material-icons-round {
     position: absolute;
-    left: 12px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
     color: var(--text-light);
@@ -615,7 +616,7 @@ body {
 
 .search-bar input {
     width: 100%;
-    padding: 10px 12px 10px 40px;
+    padding: 10px 40px 10px 12px;
     border-radius: 10px;
     border: none;
     background: #e5e7eb;
