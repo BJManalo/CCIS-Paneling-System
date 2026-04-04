@@ -53,21 +53,6 @@ async function loadCapstoneData() {
         return;
     }
     const user = JSON.parse(userJson);
-    const rawRole = (user && user.role) ? user.role.toString().toLowerCase() : '';
-    const isAdviser = rawRole.includes('adviser') || rawRole.includes('advisor');
-    const hasOtherRole = rawRole.includes('instructor') || rawRole.includes('panel') || rawRole.includes('admin');
-
-    // Aggressive Eval Hide for Adviser-only
-    if (isAdviser && !hasOtherRole) {
-        document.querySelectorAll('.nav-item, a').forEach(nav => {
-            const href = (nav.getAttribute('href') || '').toLowerCase();
-            const text = (nav.textContent || '').toLowerCase();
-            if (href.includes('evaluation') || text.includes('evaluation')) {
-                nav.style.setProperty('display', 'none', 'important');
-            }
-        });
-    }
-
     const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
 
     if (tableBody) tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 40px;">Loading capstone data...</td></tr>';
@@ -75,35 +60,12 @@ async function loadCapstoneData() {
 
     try {
         // 1. Fetch Student Groups (with status columns)
-        const { data: groups, error: gError } = await supabaseClient
-            .from('student_groups')
-            .select('*');
-
+        const { data: groups, error: gError } = await supabaseClient.from('student_groups').select('*');
         if (gError) throw gError;
 
         // 2. Fetch Schedules (to map defense types)
-        const { data: schedules, error: sError } = await supabaseClient
-            .from('schedules')
-            .select('*');
-
+        const { data: schedules, error: sError } = await supabaseClient.from('schedules').select('*');
         if (sError) throw sError;
-
-        // --- Assignment Check for Evaluation Tab Hide ---
-        // If user has Panel role but zero assignments, hide Eval tab
-        const isActuallyPanelist = schedules.some(s =>
-            [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].includes(userName)
-        );
-
-        if (!isActuallyPanelist) {
-            document.querySelectorAll('.nav-item, a').forEach(nav => {
-                const href = (nav.getAttribute('href') || '').toLowerCase();
-                const text = (nav.textContent || '').toLowerCase();
-                if (href.includes('evaluation') || text.includes('evaluation')) {
-                    nav.style.setProperty('display', 'none', 'important');
-                }
-            });
-        }
-        // Redirect if on evaluation page and not a panelist (will be handled in panel_evaluation.js)
 
         // 3. Fetch Evaluations (For sequential Locking)
         const { data: students, error: stdError } = await supabaseClient
