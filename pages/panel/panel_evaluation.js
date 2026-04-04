@@ -496,8 +496,9 @@ function renderIndividualTable(evalItem) {
                          <span style="flex: 1;">${c.name}</span>
                          <span class="material-icons-round tooltip-trigger" 
                                style="font-size: 18px; color: #cbd5e1; cursor: help;"
-                               onmouseover="showRubricTip(event, '${c.name}');" 
-                               onmouseout="hideRubricTip();">
+                               onmouseover="if(window.innerWidth > 768) showRubricTip(event, '${c.name}');" 
+                               onmouseout="if(window.innerWidth > 768) hideRubricTip();"
+                               onclick="if(window.innerWidth <= 768) showRubricTip(event, '${c.name}');">
                                help_outline
                          </span>
                     </div>
@@ -577,8 +578,9 @@ function renderSystemTable(evalItem) {
                          <span style="flex: 1;">${c.name}</span>
                          <span class="material-icons-round tooltip-trigger" 
                                style="font-size: 18px; color: #cbd5e1; cursor: help;"
-                               onmouseover="showRubricTip(event, '${c.name}', true);" 
-                               onmouseout="hideRubricTip();">
+                               onmouseover="if(window.innerWidth > 768) showRubricTip(event, '${c.name}', true);" 
+                               onmouseout="if(window.innerWidth > 768) hideRubricTip();"
+                               onclick="if(window.innerWidth <= 768) showRubricTip(event, '${c.name}', true);">
                                help_outline
                          </span>
                     </div>
@@ -836,21 +838,40 @@ function initTooltip() {
         tip.id = 'rubricTooltip';
         tip.style.cssText = `
             position: fixed;
-            background: rgba(44, 62, 80, 0.95);
+            background: rgba(15, 23, 42, 0.98);
             color: white;
-            padding: 12px 18px;
-            border-radius: 8px;
+            padding: 16px 20px;
+            border-radius: 12px;
             font-size: 13px;
-            max-width: 300px;
-            z-index: 10000;
+            max-width: 90vw;
+            width: 380px;
+            z-index: 100000;
             display: none;
-            pointer-events: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
             line-height: 1.5;
-            transition: opacity 0.2s;
-            border-left: 4px solid var(--accent-color);
+            transition: opacity 0.2s, transform 0.2s;
+            border-left: 5px solid #ffcc00;
+            max-height: 80vh;
+            overflow-y: auto;
         `;
         document.body.appendChild(tip);
+
+        // Add overlay for mobile
+        const overlay = document.createElement('div');
+        overlay.id = 'rubricOverlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 99999;
+            display: none;
+            backdrop-filter: blur(2px);
+        `;
+        overlay.onclick = hideRubricTip;
+        document.body.appendChild(overlay);
     }
 }
 
@@ -863,49 +884,63 @@ window.showRubricTip = (event, criteriaName, isSystem = false) => {
     if (!criteria) return;
 
     const tip = document.getElementById('rubricTooltip');
+    const overlay = document.getElementById('rubricOverlay');
+    const isMobile = window.innerWidth <= 768;
+
     tip.innerHTML = `
-        <div style="font-weight: 700; margin-bottom: 12px; color: #ffcc00; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
-            ${criteriaName} Rubric
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+            <div style="font-weight: 700; color: #ffcc00; font-size: 14px;">
+                ${criteriaName} Rubric
+            </div>
+            ${isMobile ? '<span class="material-icons-round" onclick="hideRubricTip()" style="cursor:pointer; font-size: 18px; color: #94a3b8;">close</span>' : ''}
         </div>
-        <div style="display: grid; gap: 10px;">
-            <div style="font-size: 12px;"><strong style="color: #4ade80;">4 - Excellent:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[4]}</span></div>
-            <div style="font-size: 12px;"><strong style="color: #fbbf24;">3 - Good:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[3]}</span></div>
-            <div style="font-size: 12px;"><strong style="color: #f87171;">2 - Fair:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[2]}</span></div>
-            <div style="font-size: 12px;"><strong style="color: #ef4444;">1 - Needs Improvement:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[1]}</span></div>
+        <div style="display: grid; gap: 12px;">
+            <div style="font-size: 12px; background: rgba(74, 222, 128, 0.1); padding: 8px; border-radius: 6px;"><strong style="color: #4ade80;">4 - Excellent:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[4]}</span></div>
+            <div style="font-size: 12px; background: rgba(251, 191, 36, 0.1); padding: 8px; border-radius: 6px;"><strong style="color: #fbbf24;">3 - Good:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[3]}</span></div>
+            <div style="font-size: 12px; background: rgba(248, 113, 113, 0.1); padding: 8px; border-radius: 6px;"><strong style="color: #f87171;">2 - Fair:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[2]}</span></div>
+            <div style="font-size: 12px; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 6px;"><strong style="color: #ef4444;">1 - Needs Improvement:</strong><br> <span style="opacity: 0.95;">${criteria.rubrics[1]}</span></div>
         </div>
     `;
 
     tip.style.display = 'block';
-    tip.style.maxWidth = '380px';
-    tip.style.width = '380px';
+    
+    if (isMobile) {
+        overlay.style.display = 'block';
+        tip.style.left = '50%';
+        tip.style.top = '50%';
+        tip.style.transform = 'translate(-50%, -50%)';
+        tip.style.width = '90vw';
+        tip.style.pointerEvents = 'auto';
+    } else {
+        tip.style.pointerEvents = 'none';
+        tip.style.transform = 'none';
+        tip.style.width = '380px';
+        const rect = event.currentTarget.getBoundingClientRect();
+        const tipWidth = 380;
 
-    // Position intelligently
-    const rect = event.currentTarget.getBoundingClientRect();
-    const tipWidth = 380;
+        let x = rect.right + 20;
+        let y = event.clientY - 50;
 
-    // Show to the right of the hovered item
-    let x = rect.right + 20;
-    let y = event.clientY - 50;
+        if (x + tipWidth > window.innerWidth) {
+            x = rect.left - tipWidth - 20;
+        }
 
-    // If it would go off the right edge, show it to the left
-    if (x + tipWidth > window.innerWidth) {
-        x = rect.left - tipWidth - 20;
+        const tipHeight = tip.offsetHeight || 300;
+        if (y + tipHeight > window.innerHeight) {
+            y = window.innerHeight - tipHeight - 20;
+        }
+        if (y < 20) y = 20;
+
+        tip.style.left = x + 'px';
+        tip.style.top = y + 'px';
     }
-
-    // Ensure it doesn't go off bottom
-    const tipHeight = tip.offsetHeight || 300;
-    if (y + tipHeight > window.innerHeight) {
-        y = window.innerHeight - tipHeight - 20;
-    }
-    if (y < 20) y = 20;
-
-    tip.style.left = x + 'px';
-    tip.style.top = y + 'px';
 };
 
 window.hideRubricTip = () => {
     const tip = document.getElementById('rubricTooltip');
+    const overlay = document.getElementById('rubricOverlay');
     if (tip) tip.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
 };
 
 // Initial tooltips setup
