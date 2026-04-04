@@ -77,26 +77,38 @@ async function loadGrades() {
     tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Loading grades...</td></tr>';
 
     try {
-        const { data: groups, error } = await supabaseClient
-            .from('student_groups')
-            .select(`
-                *,
-                schedules (
-                    id, 
-                    schedule_type,
-                    panel1, panel2, panel3, panel4, panel5
-                ),
-                students (
-                    id,
-                    full_name,
-                    grades ( grade, grade_type )
-                )
-            `)
-            .order('id', { ascending: false });
+        // Fetch groups, student grades, AND defense statuses (evaluations/decisions)
+        const [groupsRes, statusesRes] = await Promise.all([
+            supabaseClient
+                .from('student_groups')
+                .select(`
+                    *,
+                    schedules (
+                        id, 
+                        schedule_type,
+                        panel1, panel2, panel3, panel4, panel5
+                    ),
+                    students (
+                        id,
+                        full_name,
+                        grades ( grade, grade_type )
+                    )
+                `)
+                .order('id', { ascending: false }),
+            supabaseClient.from('defense_statuses').select('*')
+        ]);
 
-        if (error) throw error;
+        if (groupsRes.error) throw groupsRes.error;
 
-        allGradesData = groups || [];
+        // Attach statuses to groups
+        const groups = groupsRes.data || [];
+        const defStatuses = statusesRes.data || [];
+        
+        allGradesData = groups.map(g => {
+            const groupStatuses = defStatuses.filter(ds => ds.group_id === g.id);
+            return { ...g, defense_statuses: groupStatuses };
+        });
+
         populateSectionFilter();
         renderGrades();
 
@@ -124,7 +136,6 @@ function renderGrades() {
 
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
-    // Robust extraction: check 'name', then 'full_name'
     const userName = (user ? (user.name || user.full_name || '') : '').toLowerCase().trim();
 
     tableBody.innerHTML = '';
@@ -176,6 +187,7 @@ function renderGrades() {
             if (typeFilter !== 'All' && schedType !== typeFilter) return;
 
             // Get students/grades for THIS schedule type
+            const totalStudents = group.students.length;
             const gradedStudents = group.students.map(s => {
                 const g = (s.grades || []).find(gr => gr.grade_type === schedType);
                 return {
@@ -185,16 +197,39 @@ function renderGrades() {
                 };
             });
 
-            // Check strict "Show only if graded" rule
             const gradedCount = gradedStudents.filter(s => s.hasGrade).length;
-            if (gradedCount === 0) return;
-
+            
+            // NEW: Instead of hiding ungraded groups, we show them with "Pending" status
             hasVisibleData = true;
 
-            const totalStudents = group.students.length;
-            const status = (gradedCount === totalStudents) ? 'Completed' : 'Partial';
-            const statusClass = status === 'Completed' ? 'badge-completed' : 'badge-partial';
-            const statusIcon = status === 'Completed' ? 'check_circle' : 'pending';
+            let status = 'Pending';
+            let statusClass = 'badge-partial';
+            let statusIcon = 'pending';
+            let statusTooltip = '';
+
+            // Check evaluations for this specific type
+            const normType = schedType.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const matchingStatus = (group.defense_statuses || []).find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === normType);
+            const hasVerdict = matchingStatus && matchingStatus.statuses && Object.keys(matchingStatus.statuses).length > 0;
+
+            if (gradedCount === totalStudents && totalStudents > 0) {
+                status = 'Completed';
+                statusClass = 'badge-completed';
+                statusIcon = 'check_circle';
+            } else if (gradedCount > 0) {
+                status = 'Partial';
+                statusClass = 'badge-partial';
+                statusIcon = 'more_horiz';
+            } else if (hasVerdict) {
+                status = 'Ready';
+                statusClass = 'badge-ready'; // We'll add this CSS if needed or use primary
+                statusIcon = 'assignment_turned_in';
+                statusTooltip = 'Evaluation Complete - Ready for Grading';
+            } else {
+                status = 'Not Graded';
+                statusClass = 'badge-partial';
+                statusIcon = 'assignment_late';
+            }
 
             const program = (group.program || '').toUpperCase();
             let progClass = 'prog-unknown';
@@ -225,16 +260,19 @@ function renderGrades() {
                 <td><span class="type-badge ${typeClass}">${schedType}</span></td>
                 <td><span class="prog-badge ${progClass}">${program}</span></td>
                 <td>
-                    <span class="badge ${statusClass}">
+                    <span class="badge ${statusClass}" title="${statusTooltip}">
                         <span class="material-icons-round" style="font-size:14px;">${statusIcon}</span>
                         ${status} (${gradedCount}/${totalStudents})
                     </span>
                 </td>
                 <td>
                     <div style="display:flex; gap: 5px;">
-                        ${(currentMainTab === 'Manage' && isPanelist) ? `
-                        <button class="action-btn edit" onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" title="Edit Grades">
-                            <span class="material-icons-round">edit</span>
+                        ${(currentMainTab === 'Manage') ? `
+                        <button class="action-btn ${gradedCount > 0 ? 'edit' : 'add'}" 
+                                onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" 
+                                title="${gradedCount > 0 ? 'Edit Grades' : 'Input Grades'}"
+                                style="${status === 'Ready' ? 'background: #dcfce7; color: #166534;' : (gradedCount === 0 ? 'background: #f1f5f9; color: #64748b;' : '')}">
+                            <span class="material-icons-round">${gradedCount > 0 ? 'edit' : 'add_task'}</span>
                         </button>` : ''}
                         <button class="action-btn" onclick="event.stopPropagation(); printGroup(${group.id}, '${schedType}')" title="Print Group Grades" style="color: var(--primary-color); background: #eff6ff;">
                             <span class="material-icons-round">print</span>
