@@ -1,6 +1,6 @@
-const PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
-const PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
-const supabaseClient = window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
+var PROJECT_URL = PROJECT_URL || 'https://oddzwiddvniejcawzpwi.supabase.co';
+var PUBLIC_KEY = PUBLIC_KEY || 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
+var supabaseClient = supabaseClient || window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
 let allData = [];
 let filteredGroups = [];
