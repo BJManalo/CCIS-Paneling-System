@@ -1,16 +1,13 @@
-const CACHE_NAME = 'ccis-paneling-cache-v2';
+const CACHE_NAME = 'ccis-paneling-v3';
 const urlsToCache = [
   './',
   './index.html',
   './assets/css/style.css',
-  './assets/js/shared.js',
-  './assets/images/logo.png',
-  './assets/images/ccs_logo.jpg'
+  './assets/js/shared.js'
 ];
 
 // Install a service worker
 self.addEventListener('install', event => {
-  // Perform install steps
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -20,33 +17,42 @@ self.addEventListener('install', event => {
   );
 });
 
-// Cache and return requests
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      }
-    )
-  );
-});
-
-// Update a service worker
+// Activate the service worker and clean up old caches
 self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     })
+  );
+  return self.clients.claim();
+});
+
+// Network-first strategy: Try the network, fallback to cache
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        // If we have a valid response, clone it and put it in the cache
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME)
+          .then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+        return response;
+      })
+      .catch(() => {
+        // If the network fails (offline), try the cache
+        return caches.match(event.request);
+      })
   );
 });
