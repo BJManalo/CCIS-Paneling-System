@@ -228,7 +228,7 @@ function showInstallPrompt() {
     banner.id = 'pwa-install-banner';
     banner.style.cssText = `
         position: fixed;
-        bottom: 25px;
+        top: 25px;
         left: 50%;
         transform: translateX(-50%);
         background: rgba(255, 255, 255, 0.95);
@@ -243,7 +243,7 @@ function showInstallPrompt() {
         width: 90%;
         max-width: 400px;
         border: 1px solid rgba(224, 161, 46, 0.3);
-        animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        animation: slideDownPrompt 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     `;
 
     banner.innerHTML = `
@@ -259,6 +259,19 @@ function showInstallPrompt() {
     `;
 
     document.body.appendChild(banner);
+
+    // Add animation keyframe if not present
+    if (!document.getElementById('pwa-prompt-styles')) {
+        const style = document.createElement('style');
+        style.id = 'pwa-prompt-styles';
+        style.innerHTML = `
+            @keyframes slideDownPrompt {
+                from { transform: translate(-50%, -100px); opacity: 0; }
+                to { transform: translate(-50%, 0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 
     const installBtn = document.getElementById('pwa-install-btn');
     const closeBtn = document.getElementById('pwa-close-banner');
@@ -278,17 +291,4 @@ function showInstallPrompt() {
         console.log('PWA: User closed the banner');
         banner.remove();
     });
-}
-
-// Add animation keyframe if not present
-if (!document.getElementById('pwa-styles')) {
-    const style = document.createElement('style');
-    style.id = 'pwa-styles';
-    style.innerHTML = `
-        @keyframes slideUp {
-            from { transform: translate(-50%, 100px); opacity: 0; }
-            to { transform: translate(-50%, 0); opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
 }
