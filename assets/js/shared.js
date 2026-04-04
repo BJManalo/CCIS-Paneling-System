@@ -162,10 +162,11 @@ window.showErrorModal = function (message) {
 /* ---------------------------------------------------
     PWA INSTALLATION LOGIC
 --------------------------------------------------- */
-// Register Service Worker with robust path detection
+let deferredPrompt;
+
+// 1. Register Service Worker with robust path detection
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        // Determine the correct path to sw.js based on current location
         const isInPages = window.location.pathname.includes('/pages/');
         const swPath = isInPages ? '../../sw.js' : 'sw.js';
         
@@ -177,3 +178,34 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.error('PWA: Service Worker registration failed:', err));
     });
 }
+
+// 2. Catch the native 'beforeinstallprompt' event
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Stash the event so it can be triggered later
+    deferredPrompt = e;
+    
+    // Check if user is logged in and not on login page
+    const isLoggedIn = localStorage.getItem('loginUser');
+    const isLoginPage = window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('System/') || window.location.pathname.endsWith('System');
+
+    if (isLoggedIn && !isLoginPage) {
+        // Automatically trigger the native "Install app" dialog after 2 seconds
+        // This is exactly what the user requested
+        setTimeout(() => {
+            if (deferredPrompt) {
+                console.log('PWA: Automatically triggering native install prompt...');
+                deferredPrompt.prompt();
+                
+                // Wait for the user to respond to the prompt
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('PWA: User accepted the install prompt');
+                    } else {
+                        console.log('PWA: User dismissed the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }, 2000); // 2 second delay on dashboard
+    }
+});
