@@ -162,133 +162,18 @@ window.showErrorModal = function (message) {
 /* ---------------------------------------------------
     PWA INSTALLATION LOGIC
 --------------------------------------------------- */
-let deferredPrompt;
-
 // Register Service Worker with robust path detection
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         // Determine the correct path to sw.js based on current location
-        const depth = window.location.pathname.split('/').filter(p => p).length;
         const isInPages = window.location.pathname.includes('/pages/');
         const swPath = isInPages ? '../../sw.js' : 'sw.js';
         
-        console.log('PWA: Attempting to register Service Worker at:', swPath);
-        
         navigator.serviceWorker.register(swPath)
             .then(reg => {
-                console.log('PWA: Service Worker registered successfully.');
-                reg.update(); // Check for updates
+                console.log('PWA: Service Worker registered correctly.');
+                reg.update();
             })
-            .catch(err => {
-                console.error('PWA: Service Worker registration failed:', err);
-            });
-    });
-}
-
-// Handle 'beforeinstallprompt' to show a custom install popup
-window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('PWA: "beforeinstallprompt" event captured!');
-    // Prevent the mini-infobar from appearing on mobile
-    e.preventDefault();
-    // Stash the event so it can be triggered later.
-    deferredPrompt = e;
-    
-    // Check if the user is logged in before showing the prompt
-    const isLoggedIn = localStorage.getItem('loginUser');
-    const isLoginPage = window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('System/') || window.location.pathname.endsWith('System');
-
-    if (isLoggedIn && !isLoginPage) {
-        console.log('PWA: User is logged in and not on login page. Showing prompt in 2s...');
-        setTimeout(() => {
-            showInstallPrompt();
-        }, 2000);
-    } else {
-        console.log('PWA: User not logged in (or on login page). Prompt hidden for now.');
-    }
-});
-
-// Also check for the prompt if we navigate to dashboard after catching the event
-// (In case the event fired before we checked)
-document.addEventListener('DOMContentLoaded', () => {
-    const isLoggedIn = localStorage.getItem('loginUser');
-    const isLoginPage = window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('System/') || window.location.pathname.endsWith('System');
-    
-    if (isLoggedIn && !isLoginPage && deferredPrompt) {
-        console.log('PWA: Already have deferredPrompt on a dashboard. Showing prompt.');
-        showInstallPrompt();
-    }
-});
-
-function showInstallPrompt() {
-    // Only show if not already showing
-    if (document.getElementById('pwa-install-banner')) return;
-
-    console.log('PWA: Displaying install banner UI');
-    const banner = document.createElement('div');
-    banner.id = 'pwa-install-banner';
-    banner.style.cssText = `
-        position: fixed;
-        top: 25px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
-        padding: 16px 24px;
-        border-radius: 20px;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        z-index: 10000;
-        width: 90%;
-        max-width: 400px;
-        border: 1px solid rgba(224, 161, 46, 0.3);
-        animation: slideDownPrompt 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    `;
-
-    banner.innerHTML = `
-        <div style="background: #e0a12e; width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white;">
-            <span class="material-icons-round">install_mobile</span>
-        </div>
-        <div style="flex: 1;">
-            <h4 style="margin: 0; color: #333; font-size: 15px;">Install App</h4>
-            <p style="margin: 0; color: #666; font-size: 12px;">Add to home screen for better experience</p>
-        </div>
-        <button id="pwa-install-btn" style="background: #e0a12e; color: white; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 13px; box-shadow: 0 4px 10px rgba(224, 161, 46, 0.3);">Install</button>
-        <span id="pwa-close-banner" class="material-icons-round" style="cursor: pointer; color: #999; font-size: 20px;">close</span>
-    `;
-
-    document.body.appendChild(banner);
-
-    // Add animation keyframe if not present
-    if (!document.getElementById('pwa-prompt-styles')) {
-        const style = document.createElement('style');
-        style.id = 'pwa-prompt-styles';
-        style.innerHTML = `
-            @keyframes slideDownPrompt {
-                from { transform: translate(-50%, -100px); opacity: 0; }
-                to { transform: translate(-50%, 0); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    const installBtn = document.getElementById('pwa-install-btn');
-    const closeBtn = document.getElementById('pwa-close-banner');
-
-    installBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            console.log('PWA: Triggering native install prompt');
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`PWA: User response to the install prompt: ${outcome}`);
-            deferredPrompt = null;
-            banner.remove();
-        }
-    });
-
-    closeBtn.addEventListener('click', () => {
-        console.log('PWA: User closed the banner');
-        banner.remove();
+            .catch(err => console.error('PWA: Service Worker registration failed:', err));
     });
 }
