@@ -176,6 +176,7 @@ async function loadEvaluations() {
         window.location.href = '../../';
         return;
     }
+    const userNameRaw = loginUser.name || loginUser.full_name || 'Panel';
 
     try {
         // 1. Fetch Groups + their Schedules + Students (Core Data)
@@ -192,21 +193,27 @@ async function loadEvaluations() {
             `)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        const currentUserNormalized = String(userNameRaw).trim().toLowerCase();
+        
+        const fuzzyMatch = (nameA, nameB) => {
+            const nA = String(nameA || "").trim().toLowerCase();
+            const nB = String(nameB || "").trim().toLowerCase();
+            if (!nA || !nB) return false;
+            if (nA === nB) return true;
+            const wA = nA.split(/\s+/).filter(w => w);
+            const wB = nB.split(/\s+/).filter(w => w);
+            if (wA.length <= wB.length) return wA.every(word => wB.includes(word));
+            return wB.every(word => wA.includes(word));
+        };
 
-        // 2. Process Data & Check Roles
-        const currentUser = (loginUser.name || "").trim().toLowerCase();
         const evaluations = (groups || []).flatMap(group => {
-            const adviserName = (group.adviser || group.advisor || "").trim().toLowerCase();
-            const isAdviser = adviserName === currentUser;
+            const isAdviser = fuzzyMatch(group.adviser || group.advisor, currentUserNormalized);
             const schedules = group.schedules || [];
             const results = [];
 
             schedules.forEach(sched => {
-                const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5]
-                    .filter(p => p).map(p => p.trim().toLowerCase());
-
-                const isPanel = panels.includes(currentUser);
+                const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
+                const isPanel = panels.some(p => fuzzyMatch(p, currentUserNormalized));
                 let dType = sched.schedule_type || 'Defense';
                 if (dType.toLowerCase().endsWith(' defense')) {
                     dType = dType.substring(0, dType.length - 8).trim();

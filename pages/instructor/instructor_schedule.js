@@ -28,15 +28,7 @@ function formatTime12Hour(timeStr) {
 // Calendar State
 let calendarDate = new Date();
 
-const allPanels = [
-    "May Lynn Farren",
-    "Nolan Yumen",
-    "Apolinario Ballenas Jr.",
-    "Irene Robles",
-    "Levi John Bernesto",
-    "Vexter Jeff Ojeno",
-    "Myra Samillano"
-];
+let allPanels = []; // Will be fetched dynamically
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
@@ -65,8 +57,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadSchedules();
+    fetchPanels(); // Fetch dynamic panel list
     checkUrlParams();
 });
+
+// --- Fetch Panels from Accounts Table ---
+async function fetchPanels() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('accounts')
+            .select('name, role')
+            .or('role.ilike.%panel%,role.ilike.%instructor%'); // Match any panel or instructor roles
+
+        if (error) throw error;
+        
+        // Remove duplicates and sort
+        const names = [...new Set(data.map(acc => acc.name))].filter(n => n);
+        allPanels = names.sort();
+        console.log('Dynamic panels loaded:', allPanels);
+        
+        // Refresh options if modal is open
+        if (document.getElementById('scheduleModal').classList.contains('active')) {
+            updatePanelOptions();
+        }
+    } catch (err) {
+        console.error('Error fetching panels:', err);
+    }
+}
 
 // Check if we came from the Accounts page to schedule a specific group
 function checkUrlParams() {

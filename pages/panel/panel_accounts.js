@@ -27,12 +27,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Second pass: Check assignments to conditionally hide Evaluation tab
     try {
+        const userNameNormalized = String(userName).trim().toLowerCase();
         const { data: schedules } = await supabaseClient.from('schedules').select('panel1, panel2, panel3, panel4, panel5');
-        const isActuallyPanelist = (schedules || []).some(s =>
-            [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].includes(userName)
-        );
+        const isActuallyPanelist = (schedules || []).some(s => {
+            const panels = [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5]
+                .filter(p => p).map(p => String(p).trim().toLowerCase());
+            return panels.includes(userNameNormalized);
+        });
 
         if (!isActuallyPanelist) {
+            console.log(`User "${userName}" not found in any schedules. Evaluation tab hidden.`);
             hideEvaluationTab();
         }
     } catch (err) {

@@ -210,16 +210,28 @@ async function loadCapstoneData() {
                 // 3. Skip if neither schedule nor files exist
                 if (!sched && !hasFiles) return;
 
-                // 4. Construct Data Object
-                // 4. Construct Data Object
-                const isAdviser = group.adviser === user.name;
+                // 5. Construct Data Object with fuzzy name matching
+                const userNameNormalized = String(user.name || user.full_name || "Panel").trim().toLowerCase();
+                const userWords = userNameNormalized.split(/\s+/).filter(w => w);
+                
+                const robustMatch = (nameA, nameB) => {
+                    const nA = String(nameA || "").trim().toLowerCase();
+                    const nB = String(nameB || "").trim().toLowerCase();
+                    if (!nA || !nB) return false;
+                    if (nA === nB) return true;
+                    const wA = nA.split(/\s+/).filter(w => w);
+                    const wB = nB.split(/\s+/).filter(w => w);
+                    // Return true if all words of shorter name are in longer name
+                    if (wA.length <= wB.length) return wA.every(word => wB.includes(word));
+                    return wB.every(word => wA.includes(word));
+                };
+
+                const isAdviser = robustMatch(group.adviser, userNameNormalized);
 
                 let panelList = [];
                 if (sched) {
                     panelList = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
                 } else {
-                    // Fallback: If no schedule for this specific defense, check ALL schedules for this group
-                    // to see if user is a panelist in any of them (e.g. was panel in Title Defense, so is likely panel for Final)
                     const allGroupSchedules = schedules.filter(s => s.group_id === group.id);
                     const allPanels = new Set();
                     allGroupSchedules.forEach(s => {
@@ -230,9 +242,16 @@ async function loadCapstoneData() {
                     panelList = Array.from(allPanels);
                 }
 
-                const isPanelist = panelList.includes(user.name);
+                // Check panelist match with fuzzy logic
+                const isPanelist = panelList.some(p => robustMatch(p, userNameNormalized));
 
-                // Get Merged Feedback (Legacy + New Table)
+                // DEBUG LOG: Help identify why groups are hidden
+                if (group.id === 1 || panelList.length > 0 || group.adviser) {
+                    console.log(`Checking Visibility for Group: ${group.group_name} | Stage: ${defType}`);
+                    console.log(`- User: "${userNameNormalized}" | Adviser: "${group.adviser}" | isAdviser: ${isAdviser}`);
+                    console.log(`- Panels:`, panelList, `| isPanelist: ${isPanelist}`);
+                }
+
                 const feedbackRes = getMergedFeedback(group.id, normType);
                 const currentStatuses = feedbackRes.statuses;
                 const currentRemarks = feedbackRes.remarks;

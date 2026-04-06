@@ -86,8 +86,9 @@ async function loadSchedules() {
 
     const userJson = localStorage.getItem('loginUser');
     if (!userJson) return;
-    const user = JSON.parse(userJson);
-    const userName = user.name || user.full_name;
+    const user = userJson ? JSON.parse(userJson) : null;
+    const userNameRaw = user ? (user.name || user.full_name || 'Panel') : 'Panel';
+    const userNameNormalized = String(userNameRaw).trim().toLowerCase();
 
     tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Loading your schedules...</td></tr>';
 
@@ -95,11 +96,21 @@ async function loadSchedules() {
 
     // Filter schedules where the user is INVOLVED (Panel OR Adviser)
     // We store all relevant schedules locally and filter by View Mode later
-    const mySchedules = schedules.filter(sched => {
-        const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5];
-        const isPanel = panels.includes(userName);
-        const isAdviser = sched.student_groups && sched.student_groups.adviser === userName;
+    const fuzzyMatch = (nameA, nameB) => {
+        const nA = String(nameA || "").trim().toLowerCase();
+        const nB = String(nameB || "").trim().toLowerCase();
+        if (!nA || !nB) return false;
+        if (nA === nB) return true;
+        const wA = nA.split(/\s+/).filter(w => w);
+        const wB = nB.split(/\s+/).filter(w => w);
+        if (wA.length <= wB.length) return wA.every(word => wB.includes(word));
+        return wB.every(word => wA.includes(word));
+    };
 
+    const mySchedules = schedules.filter(sched => {
+        const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
+        const isPanel = panels.some(p => fuzzyMatch(p, userNameNormalized));
+        const isAdviser = fuzzyMatch(sched.student_groups?.adviser, userNameNormalized);
         return isPanel || isAdviser;
     });
 
@@ -110,15 +121,31 @@ async function loadSchedules() {
 function applyFiltersAndRender() {
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : {};
-    const userName = user.name || user.full_name;
+    const userNameRaw = user.name || user.full_name || 'Panel';
+    const userNameNormalized = String(userNameRaw).trim().toLowerCase();
 
     const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
 
     const filtered = allSchedules.filter(sched => {
         // 1. Role Filter
-        const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5];
-        const isPanel = panels.includes(userName);
-        const isAdviser = sched.student_groups && sched.student_groups.adviser === userName;
+        const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
+        
+        // Use already defined fuzzyMatch or re-define if scope requires
+        const isPanel = panels.some(p => {
+             const nA = String(p || "").trim().toLowerCase();
+             const nB = String(userNameNormalized || "").trim().toLowerCase();
+             const wA = nA.split(/\s+/).filter(w => w);
+             const wB = nB.split(/\s+/).filter(w => w);
+             return wA.length <= wB.length ? wA.every(word => wB.includes(word)) : wB.every(word => wA.includes(word));
+        });
+        
+        const isAdviser = (() => {
+             const nA = String(sched.student_groups?.adviser || "").trim().toLowerCase();
+             const nB = String(userNameNormalized || "").trim().toLowerCase();
+             const wA = nA.split(/\s+/).filter(w => w);
+             const wB = nB.split(/\s+/).filter(w => w);
+             return wA.length <= wB.length ? wA.every(word => wB.includes(word)) : wB.every(word => wA.includes(word));
+        })();
 
         if (currentRole === 'Panel' && !isPanel) return false;
         if (currentRole === 'Adviser' && !isAdviser) return false;
