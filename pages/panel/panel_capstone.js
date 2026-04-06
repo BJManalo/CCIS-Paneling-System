@@ -762,13 +762,11 @@ window.openFileModal = (groupId) => {
                 `;
             } else if (categoryKey === 'pre_oral') {
                 optionsHtml = `
-                    <option value="Redefend" ${myStatus === 'Redefend' ? 'selected' : ''}>Redefend</option>
                     <option value="Approved with Revisions" ${myStatus === 'Approved with Revisions' ? 'selected' : ''}>Approved with Revisions</option>
                     <option value="Approved" ${myStatus === 'Approved' ? 'selected' : ''}>Approved</option>
                 `;
             } else if (categoryKey === 'final') {
                 optionsHtml = `
-                    <option value="Redefend" ${myStatus === 'Redefend' ? 'selected' : ''}>Redefend</option>
                     <option value="Approved with Revisions" ${myStatus === 'Approved with Revisions' ? 'selected' : ''}>Approved with Revisions</option>
                     <option value="Completed" ${myStatus === 'Completed' ? 'selected' : ''}>Completed</option>
                 `;
