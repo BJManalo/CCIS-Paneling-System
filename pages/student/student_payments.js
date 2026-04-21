@@ -333,19 +333,72 @@ function closePaymentModal() {
     document.getElementById('paymentModal').classList.remove('active');
 }
 
-function previewImage(input) {
+async function previewImage(input) {
     if (input.files && input.files[0]) {
+        const file = input.files[0];
         const reader = new FileReader();
-        reader.onload = function (e) {
+        
+        reader.onload = async function (e) {
             const img = document.getElementById('imagePreview');
             const box = document.getElementById('uploadBox');
+            const scanOverlay = document.getElementById('scanOverlay');
+            const resultDiv = document.getElementById('verificationResult');
+            const resultText = document.getElementById('verificationText');
+            const resultIcon = document.getElementById('verificationIcon');
 
             if (img && box) {
                 img.src = e.target.result;
                 box.classList.add('has-image');
             }
+
+            // --- Smart Scanner Logic ---
+            if (scanOverlay && resultDiv) {
+                scanOverlay.style.display = 'flex';
+                resultDiv.style.display = 'none';
+
+                try {
+                    // Initialize Tesseract worker
+                    const worker = await Tesseract.createWorker('eng');
+                    const ret = await worker.recognize(file);
+                    const text = ret.data.text.toLowerCase();
+                    await worker.terminate();
+
+                    console.log("OCR Result:", text);
+
+                    // Verification Rules
+                    const isGCash = text.includes('gcash') || text.includes('transaction id') || text.includes('ref no');
+                    const isMaya = text.includes('maya') || text.includes('paymaya') || text.includes('ref number');
+                    const hasAmount = text.includes('amount') || text.includes('peso') || text.includes('php');
+
+                    resultDiv.style.display = 'flex';
+                    if (isGCash || isMaya) {
+                        resultDiv.style.background = '#dcfce7';
+                        resultDiv.style.color = '#166534';
+                        resultIcon.innerText = 'verified';
+                        resultText.innerText = `${isGCash ? 'GCash' : 'Maya'} Receipt Detected Successfully!`;
+                        showToast(`${isGCash ? 'GCash' : 'Maya'} payment receipt detected.`, 'success');
+                    } else if (hasAmount) {
+                        resultDiv.style.background = '#fef9c3';
+                        resultDiv.style.color = '#854d0e';
+                        resultIcon.innerText = 'info';
+                        resultText.innerText = "Payment detected, but company name is unclear.";
+                    } else {
+                        resultDiv.style.background = '#fee2e2';
+                        resultDiv.style.color = '#991b1b';
+                        resultIcon.innerText = 'warning';
+                        resultText.innerText = "Warning: This does not look like a payment receipt.";
+                        showToast("The scanned image might not be a valid receipt. Please double-check.", "error");
+                    }
+
+                } catch (ocrError) {
+                    console.error("OCR Error:", ocrError);
+                    resultDiv.style.display = 'none';
+                } finally {
+                    scanOverlay.style.display = 'none';
+                }
+            }
         }
-        reader.readAsDataURL(input.files[0]);
+        reader.readAsDataURL(file);
     }
 }
 

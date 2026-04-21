@@ -298,7 +298,10 @@ async function loadCapstoneData() {
                     status: sched ? (sched.status || 'Active') : 'Pending Schedule',
                     isAdviser: isAdviser,
                     isPanelist: isPanelist,
-                    projectTitle: group.project_title
+                    projectTitle: group.project_title,
+                    // Advisor Approval Data
+                    adviserStatus: group.adviser_status || {},
+                    adviserRemarks: group.adviser_remarks || {}
                 });
             });
         });
@@ -801,7 +804,7 @@ window.openFileModal = (groupId) => {
             }
 
             let interactiveControls = '';
-            if (currentRole === 'Panel') {
+            if (currentRole === 'Panel' && group.isPanelist) {
                 interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
@@ -825,12 +828,46 @@ window.openFileModal = (groupId) => {
                     </button>
                 </div>
                 `;
-            } else {
-                // Adviser View (Read Only)
+            } else if (currentRole === 'Adviser' && group.isAdviser) {
+                // Get Adviser Status for this category
+                const catKey = categoryKey === 'titles' ? 'title' : categoryKey === 'pre_oral' ? 'preoral' : 'final';
+                const groupAdviserStatus = group.adviserStatus || {};
+                const currentAdvStatus = groupAdviserStatus[catKey] || 'Pending';
+                const currentAdvRemarks = group.adviserRemarks || {};
+
                 interactiveControls = `
-                    <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
+                    <div style="padding: 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; margin-bottom: 10px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: #0369a1; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                            <span class="material-icons-round" style="font-size: 16px;">verified_user</span>
+                            Adviser Approval
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                            <button onclick="updateAdviserStatus(${group.id}, '${catKey}', 'Approved')" 
+                                style="flex: 1; background: ${currentAdvStatus === 'Approved' ? '#059669' : 'white'}; color: ${currentAdvStatus === 'Approved' ? 'white' : '#059669'}; border: 1px solid #059669; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-icons-round" style="font-size: 16px;">check_circle</span> Approve
+                            </button>
+                            <button onclick="updateAdviserStatus(${group.id}, '${catKey}', 'Declined')" 
+                                style="flex: 1; background: ${currentAdvStatus === 'Declined' ? '#dc2626' : 'white'}; color: ${currentAdvStatus === 'Declined' ? 'white' : '#dc2626'}; border: 1px solid #dc2626; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-icons-round" style="font-size: 16px;">cancel</span> Decline
+                            </button>
+                        </div>
+                        <div id="adviser-remarks-container-${catKey}" style="display: ${currentAdvStatus === 'Declined' ? 'block' : 'none'};">
+                            <div style="font-size: 11px; color: #64748b; font-weight: 600; margin-bottom: 4px;">REVISION REMARKS:</div>
+                            <textarea id="adviser-remarks-${catKey}" placeholder="Reason for declining..." 
+                                style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; min-height: 50px; resize: vertical; margin-bottom: 6px;">${currentAdvRemarks[catKey] || ''}</textarea>
+                            <button onclick="saveAdviserRemarks(${group.id}, '${catKey}')" 
+                                    style="width: 100%; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">
+                                    Save Remarks Only
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Actual Read Only view
+                interactiveControls = `
+                    <div style="padding: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 6px; color: #64748b; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
                         <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
-                        Viewing as Adviser (Read Only)
+                        Viewing (Read Only)
                     </div>
                 `;
             }
@@ -1500,8 +1537,148 @@ async function archiveProject(groupId) {
     }
 }
 
+window.updateAdviserStatus = async (groupId, catKey, newStatus) => {
+    try {
+        // Show remarks box immediately if declining
+        const remarksBox = document.getElementById(`adviser-remarks-container-${catKey}`);
+        if (newStatus === 'Declined' && remarksBox) {
+            remarksBox.style.display = 'block';
+        } else if (newStatus === 'Approved' && remarksBox) {
+            remarksBox.style.display = 'none';
+        }
+
+        const btnApprove = document.querySelector(`button[onclick*="'Approved'"][onclick*="'${catKey}'"]`);
+        const btnDecline = document.querySelector(`button[onclick*="'Declined'"][onclick*="'${catKey}'"]`);
+        
+        if (btnApprove) {
+            btnApprove.disabled = true;
+            if (newStatus === 'Approved') {
+                btnApprove.style.background = '#059669';
+                btnApprove.style.color = 'white';
+            } else {
+                btnApprove.style.background = 'white';
+                btnApprove.style.color = '#059669';
+            }
+        }
+        if (btnDecline) {
+            btnDecline.disabled = true;
+            if (newStatus === 'Declined') {
+                btnDecline.style.background = '#dc2626';
+                btnDecline.style.color = 'white';
+            } else {
+                btnDecline.style.background = 'white';
+                btnDecline.style.color = '#dc2626';
+            }
+        }
+
+        const { data: group, error: fetchError } = await supabaseClient
+            .from('student_groups')
+            .select('adviser_status, adviser_remarks')
+            .eq('id', groupId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const currentStatus = group.adviser_status || {};
+        const currentRemarks = group.adviser_remarks || {};
+        
+        const remarksValue = document.getElementById(`adviser-remarks-${catKey}`)?.value.trim() || '';
+
+        currentStatus[catKey] = newStatus;
+        currentRemarks[catKey] = remarksValue;
+
+        const { error } = await supabaseClient
+            .from('student_groups')
+            .update({
+                adviser_status: currentStatus,
+                adviser_remarks: currentRemarks
+            })
+            .eq('id', groupId);
+
+        if (error) throw error;
+
+        // Update local global state so UI reflects change immediately
+        const localGroup = allData.find(g => String(g.id) === String(groupId));
+        if (localGroup) {
+            localGroup.adviserStatus = currentStatus;
+            localGroup.adviserRemarks = currentRemarks;
+        }
+
+        const toastType = newStatus === 'Approved' ? 'success' : 'error';
+        showToast(`Status updated to ${newStatus}.`, toastType);
+        
+        // Refresh UI
+        openFileModal(groupId); 
+        loadCapstoneData(); // Refresh main list
+
+    } catch (err) {
+        console.error('Error updating adviser status:', err);
+        showToast('Failed to update status', 'error');
+    }
+};
+
+window.saveAdviserRemarks = async (groupId, catKey) => {
+    try {
+        const { data: group, error: fetchError } = await supabaseClient
+            .from('student_groups')
+            .select('adviser_remarks')
+            .eq('id', groupId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const currentRemarks = group.adviser_remarks || {};
+        const remarksValue = document.getElementById(`adviser-remarks-${catKey}`)?.value.trim() || '';
+
+        currentRemarks[catKey] = remarksValue;
+
+        const { error } = await supabaseClient
+            .from('student_groups')
+            .update({
+                adviser_remarks: currentRemarks
+            })
+            .eq('id', groupId);
+
+        if (error) throw error;
+
+        alert('Remarks saved successfully.');
+
+    } catch (err) {
+        console.error('Error saving adviser remarks:', err);
+        alert('Failed to save remarks.');
+    }
+};
+
 function logout() {
     localStorage.removeItem('loginUser');
     window.location.href = '../../';
+}
+
+function showToast(message, type = 'info') {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.innerHTML = `<span id="toastIcon" class="material-icons-round">info</span><span id="toastMessage"></span>`;
+        toast.style = "position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #334155; color: white; padding: 12px 24px; border-radius: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; font-weight: 600; display: none;";
+        document.body.appendChild(toast);
+    }
+    
+    document.getElementById('toastMessage').innerText = message;
+    const icon = document.getElementById('toastIcon');
+    
+    if (type === 'success') {
+        toast.style.backgroundColor = '#10b981';
+        icon.innerText = 'check_circle';
+    } else if (type === 'error') {
+        toast.style.backgroundColor = '#ef4444';
+        icon.innerText = 'error';
+    } else {
+        toast.style.backgroundColor = '#334155';
+        icon.innerText = 'info';
+    }
+    
+    toast.style.display = 'flex';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
 }
 

@@ -89,13 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('loginUser', JSON.stringify(accountData));
 
                     if (accountData.role === 'Admin') {
-                        window.location.href = 'pages/admin/admin';
+                        window.location.href = 'pages/admin/admin.html';
                     } else if (accountData.role === 'Instructor' || accountData.role === 'Instructor/Adviser') {
-                        window.location.href = 'pages/instructor/instructor_dashboard';
+                        window.location.href = 'pages/instructor/instructor_dashboard.html';
                     } else if (accountData.role === 'Panel' || accountData.role === 'Adviser') {
-                        window.location.href = 'pages/panel/panel_capstone';
+                        window.location.href = 'pages/panel/panel_capstone.html';
                     } else {
-                        window.location.href = 'pages/panel/panel_capstone';
+                        window.location.href = 'pages/panel/panel_capstone.html';
                     }
                     return;
                 }
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Add a pseudo-role for local logic if needed
                     groupData.role = 'StudentGroup';
                     localStorage.setItem('loginUser', JSON.stringify(groupData));
-                    window.location.href = 'pages/student/student_dashboard';
+                    window.location.href = 'pages/student/student_dashboard.html';
                     return;
                 }
 
@@ -160,9 +160,8 @@ window.showErrorModal = function (message) {
 }
 
 /* ---------------------------------------------------
-    PWA INSTALLATION LOGIC
+    PWA INSTALLATION LOGIC (Manual via Browser only)
 --------------------------------------------------- */
-let deferredPrompt;
 
 // 1. Register Service Worker with robust path detection
 if ('serviceWorker' in navigator) {
@@ -178,47 +177,3 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.error('PWA: Service Worker registration failed:', err));
     });
 }
-
-// 2. Catch the native 'beforeinstallprompt' event
-window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('PWA: beforeinstallprompt event fired.');
-    // Stash the event so it can be triggered later
-    deferredPrompt = e;
-    
-    // Attempt to trigger if already on a dashboard
-    checkAndShowPrompt();
-});
-
-// 3. Helper to trigger prompt on Dashboards
-function checkAndShowPrompt() {
-    if (!deferredPrompt) return;
-
-    const isLoggedIn = localStorage.getItem('loginUser');
-    const isLoginPage = window.location.pathname.endsWith('index.html') || 
-                       window.location.pathname === '/' || 
-                       window.location.pathname.endsWith('BJManalo/') ||
-                       window.location.pathname.includes('/System/') ||
-                       window.location.pathname.endsWith('System');
-
-    if (isLoggedIn && !isLoginPage) {
-        console.log('PWA: Conditions met! Preparing prompt in 2 seconds...');
-        setTimeout(() => {
-            if (deferredPrompt) {
-                console.log('PWA: Triggering native "Install as App" dialog...');
-                deferredPrompt.prompt();
-                
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('PWA: User accepted installation');
-                    } else {
-                        console.log('PWA: User dismissed installation');
-                    }
-                    deferredPrompt = null;
-                });
-            }
-        }, 2000);
-    }
-}
-
-// 4. Run Check on every page load (in case event fired before script loaded or persisted)
-window.addEventListener('load', checkAndShowPrompt);

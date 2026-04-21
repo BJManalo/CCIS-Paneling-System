@@ -265,6 +265,54 @@
             text-transform: uppercase;
         }
 
+        /* Smart Scanner UI */
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .scan-line {
+            width: 100%;
+            height: 2px;
+            background: var(--primary-color);
+            position: absolute;
+            top: 0;
+            left: 0;
+            box-shadow: 0 0 15px var(--primary-color);
+            animation: scanMove 2s infinite linear;
+        }
+
+        @keyframes scanMove {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+
+        .verification-status {
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* Expandable Table Styles */
         .payments-table tr.main-row {
             cursor: pointer;
@@ -473,11 +521,24 @@
                                 onclick="event.stopPropagation(); openLightbox(this.src);" title="Click to enlarge"
                                 style="cursor: zoom-in;">
 
-                            <!-- Overlay -->
+                             <!-- Overlay -->
                             <div class="change-overlay">
                                 <span class="material-icons-round" style="font-size: 16px;">edit</span>
                                 Change Image
                             </div>
+
+                            <!-- Smart Scan Animation -->
+                            <div id="scanOverlay" class="scan-overlay">
+                                <div class="scan-line"></div>
+                                <span class="material-icons-round spin" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;">document_scanner</span>
+                                <p style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--primary-dark);">Smart Verifying Receipt...</p>
+                            </div>
+                        </div>
+
+                        <!-- Verification Result -->
+                        <div id="verificationResult" class="verification-status">
+                            <span id="verificationIcon" class="material-icons-round" style="font-size: 18px;"></span>
+                            <span id="verificationText"></span>
                         </div>
                     </div>
                 </div>
@@ -496,23 +557,23 @@
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-        <a href="student_dashboard" class="nav-item">
+        <a href="student_dashboard.html" class="nav-item">
             <span class="material-icons-round">analytics</span>
             <span class="nav-label">Dashboard</span>
         </a>
-        <a href="student_grades" class="nav-item">
+        <a href="student_grades.html" class="nav-item">
             <span class="material-icons-round">folder_open</span>
             <span class="nav-label">Grades</span>
         </a>
-        <a href="student_payments" class="nav-item active">
+        <a href="student_payments.html" class="nav-item active">
             <span class="material-icons-round">monetization_on</span>
             <span class="nav-label">Payment</span>
         </a>
-        <a href="student_schedule" class="nav-item">
+        <a href="student_schedule.html" class="nav-item">
             <span class="material-icons-round">calendar_today</span>
             <span class="nav-label">Schedule</span>
         </a>
-        <a href="student_account" class="nav-item">
+        <a href="student_account.html" class="nav-item">
             <span class="material-icons-round">manage_accounts</span>
             <span class="nav-label">Account</span>
         </a>
@@ -538,6 +599,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="../../assets/js/shared.js"></script>
     <script src="student_payments.js"></script>
     <script>

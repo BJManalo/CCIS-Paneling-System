@@ -284,6 +284,8 @@ async function loadCapstoneData() {
                     venue: sched ? sched.schedule_venue : 'Online / TBA',
                     panels: panelList,
                     files: filesObj,
+                    adviser_status: group.adviser_status,
+                    adviser_remarks: group.adviser_remarks,
 
                     // Unified accessors
                     titleStatus, preOralStatus, finalStatus,
@@ -579,6 +581,9 @@ window.openFileModal = (groupId) => {
         header.style.marginBottom = '10px';
         section.appendChild(header);
 
+        // Get Group Data reference
+        const groupData = group;
+
         Object.entries(fileObj).forEach(([label, url]) => {
             const isRevised = label.endsWith('_revised');
             let projectTitles = {};
@@ -780,10 +785,36 @@ window.openFileModal = (groupId) => {
                 </div>
                 `;
             } else if (group.isAdviser) {
+                // Get Adviser Status for this category
+                const catKey = categoryKey === 'titles' ? 'title' : categoryKey === 'pre_oral' ? 'preoral' : 'final';
+                const groupAdviserStatus = groupData.adviser_status || {};
+                const currentAdvStatus = groupAdviserStatus[catKey] || 'Pending';
+
                 interactiveControls = `
-                    <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
-                        <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
-                        Viewing as Adviser (Read Only)
+                    <div style="padding: 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; margin-bottom: 10px;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: #0369a1; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 5px;">
+                            <span class="material-icons-round" style="font-size: 16px;">verified_user</span>
+                            Adviser Approval
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                            <button onclick="updateAdviserStatus(${group.id}, '${catKey}', 'Approved')" 
+                                style="flex: 1; background: ${currentAdvStatus === 'Approved' ? '#059669' : 'white'}; color: ${currentAdvStatus === 'Approved' ? 'white' : '#059669'}; border: 1px solid #059669; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-icons-round" style="font-size: 16px;">check_circle</span> Approve
+                            </button>
+                            <button onclick="updateAdviserStatus(${group.id}, '${catKey}', 'Declined')" 
+                                style="flex: 1; background: ${currentAdvStatus === 'Declined' ? '#dc2626' : 'white'}; color: ${currentAdvStatus === 'Declined' ? 'white' : '#dc2626'}; border: 1px solid #dc2626; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-icons-round" style="font-size: 16px;">cancel</span> Decline
+                            </button>
+                        </div>
+                        <div id="adviser-remarks-container-${catKey}" style="display: ${currentAdvStatus === 'Declined' ? 'block' : 'none'};">
+                            <div style="font-size: 11px; color: #64748b; font-weight: 600; margin-bottom: 4px;">REVISION REMARKS:</div>
+                            <textarea id="adviser-remarks-${catKey}" placeholder="Reason for declining..." 
+                                style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; min-height: 50px; resize: vertical; margin-bottom: 6px;">${groupData.adviser_remarks?.[catKey] || ''}</textarea>
+                            <button onclick="saveAdviserRemarks(${group.id}, '${catKey}')" 
+                                    style="width: 100%; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">
+                                    Save Remarks Only
+                            </button>
+                        </div>
                     </div>
                 `;
             } else {
@@ -1266,6 +1297,108 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
     searchTerm = e.target.value;
     renderTable();
 });
+
+window.updateAdviserStatus = async (groupId, catKey, newStatus) => {
+    try {
+         // Show remarks box immediately if declining
+         const remarksBox = document.getElementById(`adviser-remarks-container-${catKey}`);
+         if (newStatus === 'Declined' && remarksBox) {
+             remarksBox.style.display = 'block';
+         } else if (newStatus === 'Approved' && remarksBox) {
+             remarksBox.style.display = 'none';
+         }
+
+        const group = allData.find(g => g.id == groupId);
+        if (!group) return;
+
+        const btnApprove = document.querySelector(`button[onclick*="'Approved'"][onclick*="'${catKey}'"]`);
+        const btnDecline = document.querySelector(`button[onclick*="'Declined'"][onclick*="'${catKey}'"]`);
+        
+        if (btnApprove) {
+            btnApprove.disabled = true;
+            if (newStatus === 'Approved') {
+                btnApprove.style.background = '#059669';
+                btnApprove.style.color = 'white';
+            } else {
+                btnApprove.style.background = 'white';
+                btnApprove.style.color = '#059669';
+            }
+        }
+        if (btnDecline) {
+            btnDecline.disabled = true;
+            if (newStatus === 'Declined') {
+                btnDecline.style.background = '#dc2626';
+                btnDecline.style.color = 'white';
+            } else {
+                btnDecline.style.background = 'white';
+                btnDecline.style.color = '#dc2626';
+            }
+        }
+
+        const currentStatus = group.adviser_status || {};
+        const currentRemarks = group.adviser_remarks || {};
+        
+        const remarksValue = document.getElementById(`adviser-remarks-${catKey}`)?.value.trim() || '';
+
+        currentStatus[catKey] = newStatus;
+        currentRemarks[catKey] = remarksValue;
+
+        const { error } = await supabaseClient
+            .from('student_groups')
+            .update({
+                adviser_status: currentStatus,
+                adviser_remarks: currentRemarks
+            })
+            .eq('id', groupId);
+
+        if (error) throw error;
+
+        // Update local state
+        group.adviser_status = currentStatus;
+        group.adviser_remarks = currentRemarks;
+
+        if (typeof showToast === 'function') {
+            const toastType = newStatus === 'Approved' ? 'success' : 'error';
+            showToast(`Status updated to ${newStatus}.`, toastType);
+        }
+        
+        // Refresh UI
+        openFileModal(groupId); 
+        renderTable();
+
+    } catch (err) {
+        console.error('Error updating adviser status:', err);
+        alert('Failed to update status: ' + err.message);
+    }
+};
+
+window.saveAdviserRemarks = async (groupId, catKey) => {
+    try {
+        const group = allData.find(g => g.id == groupId);
+        if (!group) return;
+
+        const currentRemarks = group.adviser_remarks || {};
+        const remarksValue = document.getElementById(`adviser-remarks-${catKey}`)?.value.trim() || '';
+
+        currentRemarks[catKey] = remarksValue;
+
+        const { error } = await supabaseClient
+            .from('student_groups')
+            .update({
+                adviser_remarks: currentRemarks
+            })
+            .eq('id', groupId);
+
+        if (error) throw error;
+
+        group.adviser_remarks = currentRemarks;
+        alert('Remarks saved successfully.');
+
+    } catch (err) {
+        console.error('Error saving adviser remarks:', err);
+        alert('Failed to save remarks.');
+    }
+};
 
 function logout() {
     localStorage.removeItem('loginUser');

@@ -353,6 +353,24 @@ function updateSaveButtonState(tabId) {
         else if (tabId === 'final') isScheduled = window.scheduleStatus.final;
     }
 
+    const groupData = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
+    const adviserStatusRaw = groupData.adviser_status || {};
+    const adviserRemarksRaw = groupData.adviser_remarks || {};
+
+    let adviserStatus = 'Pending';
+    let adviserRemarks = '';
+
+    if (tabId === 'titles') {
+        adviserStatus = adviserStatusRaw.title || 'Pending';
+        adviserRemarks = adviserRemarksRaw.title || '';
+    } else if (tabId === 'preoral') {
+        adviserStatus = adviserStatusRaw.preoral || 'Pending';
+        adviserRemarks = adviserRemarksRaw.preoral || '';
+    } else if (tabId === 'final') {
+        adviserStatus = adviserStatusRaw.final || 'Pending';
+        adviserRemarks = adviserRemarksRaw.final || '';
+    }
+
     const tabEl = document.querySelector(`#tab-${tabId}`);
     if (!tabEl) return;
 
@@ -378,29 +396,75 @@ function updateSaveButtonState(tabId) {
         const inputs = subContent.querySelectorAll('input');
         const fieldKey = getFieldKey(subContent);
 
-        if (!isScheduled) {
-            // Hide the revision group
-            const revGroup = subContent.querySelector('.revision-group');
-            if (revGroup) revGroup.style.display = 'none';
-
-            if (saveBtn) {
-                saveBtn.innerHTML = '<span class="material-icons-round">event_busy</span> Not Scheduled';
-                saveBtn.disabled = true;
-                saveBtn.style.opacity = '0.7';
-            }
-            inputs.forEach(input => {
-                input.readOnly = true;
-                input.style.backgroundColor = '#f1f5f9';
-                input.title = "Not Scheduled yet";
-            });
-            return;
-        }
-
-        // Check if THIS specific field is already submitted
+        // Define submission state for this specific field
         const stageName = tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final';
         const stageLinks = window.currentLinks[stageName] || {};
         const isSubmitted = fieldKey && stageLinks[fieldKey] && stageLinks[fieldKey].trim() !== '';
 
+        // --- ADVISER STATUS BADGE (Always Visible) ---
+        const existingBadge = subContent.querySelector('.adviser-status-badge');
+        if (existingBadge) existingBadge.remove();
+
+        let statusHtml = '';
+        if (isSubmitted) {
+            if (adviserStatus === 'Approved') {
+                statusHtml = `<div class="adviser-status-badge" style="background:#dcfce7; color:#166534; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid #bbf7d0;"><span class="material-icons-round">check_circle</span> Approved by Adviser. ${isScheduled ? 'Schedule is set.' : 'Waiting for Instructor to Schedule.'}</div>`;
+            } else if (adviserStatus === 'Declined') {
+                statusHtml = `<div class="adviser-status-badge" style="background:#fee2e2; color:#991b1b; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; flex-direction:column; gap:4px; border:1px solid #fecaca;">
+                    <div style="display:flex; align-items:center; gap:8px;"><span class="material-icons-round">error</span> Declined by Adviser. Please revise and re-upload.</div>
+                    ${adviserRemarks ? `<div style="font-size:0.75rem; font-weight:400; background:rgba(255,255,255,0.5); padding:8px; border-radius:4px; margin-top:4px;"><strong>Remarks:</strong> ${adviserRemarks}</div>` : ''}
+                </div>`;
+            } else {
+                statusHtml = `<div class="adviser-status-badge" style="background:#eff6ff; color:#1e40af; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid #bfdbfe;"><span class="material-icons-round">check_circle</span> Submitted for Adviser Approval</div>`;
+            }
+        } else {
+            statusHtml = `<div class="adviser-status-badge" style="background:#f8fafc; color:#64748b; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid #e2e8f0; border-style:dashed;"><span class="material-icons-round">info</span> Upload document for Adviser Review</div>`;
+        }
+        subContent.prepend(new DOMParser().parseFromString(statusHtml, 'text/html').body.firstChild);
+
+        if (!isScheduled) {
+            if (isSubmitted && adviserStatus === 'Approved') {
+                if (saveBtn) {
+                    saveBtn.innerHTML = '<span class="material-icons-round">event_busy</span> Approved - Wait for Schedule';
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.7';
+                }
+                inputs.forEach(input => {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f1f5f9';
+                });
+            } else if (isSubmitted && adviserStatus === 'Pending') {
+                if (saveBtn) {
+                    saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Submitted for Review';
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.7';
+                }
+                inputs.forEach(input => {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f1f5f9';
+                });
+            } else {
+                // Allow upload if NOT submitted OR if Declined
+                if (saveBtn) {
+                    saveBtn.innerHTML = isSubmitted && adviserStatus === 'Declined' ? '<span class="material-icons-round">sync</span> Re-upload for Review' : '<span class="material-icons-round">upload_file</span> Send to Adviser';
+                    saveBtn.disabled = false;
+                    saveBtn.style.opacity = '1';
+                }
+                inputs.forEach(input => {
+                    const isLinkField = input.id.toLowerCase().includes('link') || input.id.toLowerCase().includes('ch');
+                    if (isLinkField) {
+                        input.readOnly = true;
+                        input.style.backgroundColor = '#f1f5f9';
+                    } else {
+                        input.readOnly = false;
+                        input.style.backgroundColor = '#f8fafc';
+                    }
+                });
+            }
+            return;
+        }
+
+        // --- REST OF THE LOGIC (If Scheduled) ---
         if (isSubmitted) {
             // CHECK IF PANELS HAVE REPLIED (Allow Revision)
             let hasFeedback = false;

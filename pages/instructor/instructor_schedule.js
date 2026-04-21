@@ -418,6 +418,17 @@ function updateGroupDropdown() {
             if (!checkGraded('Pre-Oral Defense') && !checkGraded('Pre Oral Defense')) return false;
         }
 
+        // Rule 4: Adviser Approval Check
+        // Students must have their document APPROVED by their adviser before scheduling.
+        const adviserStatus = group.adviser_status || {};
+        const catKey = normalize(targetType).includes('title') ? 'title' :
+                       normalize(targetType).includes('preoral') ? 'preoral' :
+                       normalize(targetType).includes('final') ? 'final' : null;
+        
+        if (catKey && adviserStatus[catKey] !== 'Approved') {
+            return false;
+        }
+
         return true;
     });
 
