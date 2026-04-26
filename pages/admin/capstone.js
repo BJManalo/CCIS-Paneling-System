@@ -463,8 +463,6 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
     });
 
     // SCORING SUMMARY REMOVED AS REQUESTED
-}
-
     document.getElementById('fileList').appendChild(section);
 }
 
