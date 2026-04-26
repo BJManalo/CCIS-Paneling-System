@@ -356,21 +356,6 @@ function updateSaveButtonState(tabId) {
     const groupData = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
     const adviserStatusRaw = groupData.adviser_status || {};
     const adviserRemarksRaw = groupData.adviser_remarks || {};
-
-    let adviserStatus = 'Pending';
-    let adviserRemarks = '';
-
-    if (tabId === 'titles') {
-        adviserStatus = adviserStatusRaw.title || 'Pending';
-        adviserRemarks = adviserRemarksRaw.title || '';
-    } else if (tabId === 'preoral') {
-        adviserStatus = adviserStatusRaw.preoral || 'Pending';
-        adviserRemarks = adviserRemarksRaw.preoral || '';
-    } else if (tabId === 'final') {
-        adviserStatus = adviserStatusRaw.final || 'Pending';
-        adviserRemarks = adviserRemarksRaw.final || '';
-    }
-
     const tabEl = document.querySelector(`#tab-${tabId}`);
     if (!tabEl) return;
 
@@ -395,6 +380,23 @@ function updateSaveButtonState(tabId) {
         const saveBtn = subContent.querySelector('.save-btn');
         const inputs = subContent.querySelectorAll('input');
         const fieldKey = getFieldKey(subContent);
+
+        // --- ADVISER STATUS LOOKUP (Granular) ---
+        let adviserStatus = 'Pending';
+        let adviserRemarks = '';
+
+        if (fieldKey) {
+            // First try granular file-specific status
+            adviserStatus = adviserStatusRaw[fieldKey] || 'Pending';
+            adviserRemarks = adviserRemarksRaw[fieldKey] || '';
+
+            // Fallback to legacy stage status if granular is missing
+            if (adviserStatus === 'Pending') {
+                const stageKey = tabId === 'titles' ? 'title' : tabId === 'preoral' ? 'preoral' : 'final';
+                adviserStatus = adviserStatusRaw[stageKey] || 'Pending';
+                adviserRemarks = adviserRemarksRaw[stageKey] || '';
+            }
+        }
 
         // Define submission state for this specific field
         const stageName = tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final';
@@ -432,6 +434,17 @@ function updateSaveButtonState(tabId) {
                 inputs.forEach(input => {
                     input.readOnly = true;
                     input.style.backgroundColor = '#f1f5f9';
+
+                    // Lock individual upload icon
+                    const wrapper = input.closest('.input-with-action');
+                    if (wrapper) {
+                        const uBtn = wrapper.querySelector('button');
+                        if (uBtn) {
+                            uBtn.disabled = true;
+                            uBtn.style.opacity = '0.5';
+                            uBtn.style.cursor = 'not-allowed';
+                        }
+                    }
                 });
             } else if (isSubmitted && adviserStatus === 'Pending') {
                 if (saveBtn) {
@@ -442,6 +455,17 @@ function updateSaveButtonState(tabId) {
                 inputs.forEach(input => {
                     input.readOnly = true;
                     input.style.backgroundColor = '#f1f5f9';
+
+                    // Lock individual upload icon
+                    const wrapper = input.closest('.input-with-action');
+                    if (wrapper) {
+                        const uBtn = wrapper.querySelector('button');
+                        if (uBtn) {
+                            uBtn.disabled = true;
+                            uBtn.style.opacity = '0.5';
+                            uBtn.style.cursor = 'not-allowed';
+                        }
+                    }
                 });
             } else {
                 // Allow upload if NOT submitted OR if Declined
@@ -455,6 +479,27 @@ function updateSaveButtonState(tabId) {
                     if (isLinkField) {
                         input.readOnly = true;
                         input.style.backgroundColor = '#f1f5f9';
+
+                        // Allow upload if Declined or haven't submitted
+                        const wrapper = input.closest('.input-with-action');
+                        if (wrapper) {
+                            const uBtn = wrapper.querySelector('button');
+                            if (uBtn) {
+                                uBtn.disabled = false;
+                                uBtn.style.opacity = '1';
+                                uBtn.style.cursor = 'pointer';
+                                
+                                if (adviserStatus === 'Declined' && isSubmitted) {
+                                    uBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">sync</span>';
+                                    uBtn.style.background = '#dc2626';
+                                    uBtn.style.borderColor = '#dc2626';
+                                    uBtn.title = "Re-upload revised document";
+                                } else {
+                                    uBtn.style.background = 'var(--primary-color)';
+                                    uBtn.style.borderColor = 'var(--primary-color)';
+                                }
+                            }
+                        }
                     } else {
                         input.readOnly = false;
                         input.style.backgroundColor = '#f8fafc';

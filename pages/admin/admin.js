@@ -121,7 +121,7 @@ window.setCategoryFilter = (category) => {
     });
 
     if (currentCategory !== 'ALL') {
-        const titleMap = { 'APPROVED': 'Approved Titles', 'REJECTED': 'Rejected Titles', 'COMPLETED': 'Completed Titles' };
+        const titleMap = { 'APPROVED': 'Approved Titles', 'COMPLETED': 'Completed Titles' };
         document.querySelectorAll('.chart-card').forEach(card => {
             if (card.querySelector('.chart-title').innerText === titleMap[currentCategory]) {
                 card.style.border = '2px solid var(--primary-color)';
@@ -221,16 +221,6 @@ window.applyDashboardFilters = () => {
                     statusHtml: '<span class="status-badge approved">Title Approved</span>'
                 });
             }
-        } else if (currentCategory === 'REJECTED') {
-            Object.keys(tMap).forEach(k => {
-                if (tMap[k] === 'Rejected' || tMap[k] === 'Redefend') {
-                    displayRows.push({
-                        ...baseObj,
-                        title: `<span style="color: #dc2626;">${getTitleText(g.project_title, k)}</span>`,
-                        statusHtml: `<span class="status-badge rejected">${tMap[k]}</span>`
-                    });
-                }
-            });
         }
     });
 
@@ -311,7 +301,6 @@ function resolveStatusMap(groupId, defenseType) {
 
 function updateCounts(groups) {
     let approvedTotal = 0;
-    let rejectedTotal = 0;
 
     groups.forEach(g => {
         const tMap = resolveStatusMap(g.id, 'Title Defense');
@@ -319,22 +308,16 @@ function updateCounts(groups) {
         values.forEach(v => {
             if (v && (v === 'Approved' || v === 'Approved with Revisions' || v === 'Completed')) {
                 approvedTotal++;
-            } else if (v === 'Rejected' || v === 'Redefend') {
-                rejectedTotal++;
             }
         });
     });
 
     if (currentCategory === 'APPROVED') {
         approvedTotal = displayRows.length;
-    } else if (currentCategory === 'REJECTED') {
-        rejectedTotal = displayRows.length;
     }
 
     const titleEl = document.getElementById('countTitle');
-    const rejectedEl = document.getElementById('countRejected');
     if (titleEl) titleEl.innerText = approvedTotal;
-    if (rejectedEl) rejectedEl.innerText = rejectedTotal;
 }
 
 async function renderTable() {
@@ -654,9 +637,11 @@ window.loadPDF = (url, title, fileKey) => {
     const viewerDiv = document.getElementById('adobe-dc-view');
     viewerDiv.style.display = 'block';
     viewerDiv.innerHTML = '';
-    if (window.AdobeDC) {
+    const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+
+    if (window.AdobeDC && !isLocal) {
         currentAdobeView = new AdobeDC.View({
-            clientId: "5edc19dfde9349e3acb7ecc73bfa4848", // Reverted to Vercel-authorized ID
+            clientId: window.getAdobeClientId ? window.getAdobeClientId() : "5edc19dfde9349e3acb7ecc73bfa4848",
             divId: "adobe-dc-view"
         });
         currentAdobeView.previewFile({
@@ -671,6 +656,7 @@ window.loadPDF = (url, title, fileKey) => {
             showPrintPDF: true
         });
     } else {
+        // Fallback to Iframe for local development or if SDK missing
         viewerDiv.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
     }
 };

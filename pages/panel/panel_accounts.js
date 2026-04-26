@@ -15,46 +15,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    const rawRole = (user && user.role) ? user.role.toString().toLowerCase() : '';
-    const isAdviser = rawRole.includes('adviser') || rawRole.includes('advisor');
-    const hasOtherRole = rawRole.includes('instructor') || rawRole.includes('panel') || rawRole.includes('admin');
-    const userName = user.name || user.full_name || '';
-
-    // First pass: Adviser-only role check
-    if (isAdviser && !hasOtherRole) {
-        hideEvaluationTab();
-    }
-
-    // Second pass: Check assignments to conditionally hide Evaluation tab
-    try {
-        const userNameNormalized = String(userName).trim().toLowerCase();
-        const { data: schedules } = await supabaseClient.from('schedules').select('panel1, panel2, panel3, panel4, panel5');
-        const isActuallyPanelist = (schedules || []).some(s => {
-            const panels = [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5]
-                .filter(p => p).map(p => String(p).trim().toLowerCase());
-            return panels.includes(userNameNormalized);
-        });
-
-        if (!isActuallyPanelist) {
-            console.log(`User "${userName}" not found in any schedules. Evaluation tab hidden.`);
-            hideEvaluationTab();
-        }
-    } catch (err) {
-        console.error('Error checking panel assignments:', err);
-    }
-
     loadUserProfile();
 });
-
-function hideEvaluationTab() {
-    document.querySelectorAll('.nav-item, a').forEach(nav => {
-        const href = (nav.getAttribute('href') || '').toLowerCase();
-        const text = (nav.textContent || '').toLowerCase();
-        if (href.includes('evaluation') || text.includes('evaluation')) {
-            nav.style.setProperty('display', 'none', 'important');
-        }
-    });
-}
 
 function loadUserProfile() {
     const userJson = localStorage.getItem('loginUser');

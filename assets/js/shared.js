@@ -1,6 +1,24 @@
 var PROJECT_URL = 'https://oddzwiddvniejcawzpwi.supabase.co';
 var PUBLIC_KEY = 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
-var supabaseClient = window.supabase?.createClient(PROJECT_URL, PUBLIC_KEY);
+var supabaseClient = (window.supabase) ? window.supabase.createClient(PROJECT_URL, PUBLIC_KEY) : null;
+
+// ADOBE PDF EMBED API CLIENT ID
+// Automatically selects the correct key based on the environment (Local vs Production)
+var ADOBE_CLIENT_ID = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+    ? "5edc19dfde9349e3acb7ecc73bfa4848" // Keep original Vercel ID as default
+    : "5edc19dfde9349e3acb7ecc73bfa4848";
+
+// Helper to get authorized ID (You might need to replace 'YOUR_LOCAL_KEY' if you have one)
+window.getAdobeClientId = function() {
+    const host = window.location.hostname;
+    // Local Live Server (usually 127.0.0.1:5500)
+    if (host === '127.0.0.1' || host === 'localhost') {
+        // If you have a local-specific key, put it here. 
+        // Otherwise, we will use a fallback logic in the viewer.
+        return "5edc19dfde9349e3acb7ecc73bfa4848"; 
+    }
+    return "5edc19dfde9349e3acb7ecc73bfa4848"; // Vercel ID
+};
 
 // Toggle password visibility function needs to be global
 window.togglePasswordVisibility = function () {
@@ -175,5 +193,63 @@ if ('serviceWorker' in navigator) {
                 reg.update();
             })
             .catch(err => console.error('PWA: Service Worker registration failed:', err));
+    });
+}
+
+/* ---------------------------------------------------
+    PANEL ASSIGNMENT GUARD
+--------------------------------------------------- */
+window.checkPanelAssignments = async function() {
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    if (!user) return;
+
+    const rawRole = (user && user.role) ? user.role.toString().toLowerCase() : '';
+    const isAdviser = rawRole.includes('adviser');
+    const userName = user.name || user.full_name || '';
+
+    // Logic: If user is an Adviser, check if they are also a Panelist in any schedule.
+    // If they aren't a panelist anywhere, hide the Evaluation tab.
+    if (isAdviser) {
+        try {
+            const userNameNormalized = String(userName).trim().toLowerCase();
+            const { data: schedules } = await supabaseClient.from('schedules').select('panel1, panel2, panel3, panel4, panel5');
+            
+            const fuzzyMatch = (nameA, nameB) => {
+                const nA = String(nameA || "").trim().toLowerCase();
+                const nB = String(nameB || "").trim().toLowerCase();
+                if (!nA || !nB) return false;
+                if (nA === nB) return true;
+                const wA = nA.split(/\s+/).filter(w => w);
+                const wB = nB.split(/\s+/).filter(w => w);
+                if (wA.length === 0 || wB.length === 0) return false;
+                return wA.length <= wB.length ? wA.every(word => wB.includes(word)) : wB.every(word => wA.includes(word));
+            };
+
+            const isActuallyPanelist = (schedules || []).some(s => {
+                const panels = [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].filter(p => p);
+                return panels.some(p => fuzzyMatch(p, userNameNormalized));
+            });
+
+            if (!isActuallyPanelist) {
+                console.log(`Guard: User "${userName}" is not a panelist. Hiding Evaluation tab.`);
+                document.querySelectorAll('.nav-item').forEach(nav => {
+                    const href = (nav.getAttribute('href') || '').toLowerCase();
+                    const text = (nav.textContent || '').toLowerCase();
+                    if (href.includes('evaluation') || text.includes('evaluation')) {
+                        nav.style.setProperty('display', 'none', 'important');
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Guard Error:', err);
+        }
+    }
+}
+
+// Auto-run if on a panel page
+if (window.location.pathname.includes('/panel/')) {
+    document.addEventListener('DOMContentLoaded', () => {
+        window.checkPanelAssignments();
     });
 }

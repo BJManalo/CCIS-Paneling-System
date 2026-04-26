@@ -1,26 +1,36 @@
-// instructor_schedule.js
-
-// --- Supabase Configuration ---
-var PROJECT_URL = PROJECT_URL || 'https://oddzwiddvniejcawzpwi.supabase.co';
-var PUBLIC_KEY = PUBLIC_KEY || 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
-
-// Initialize Supabase client
-var supabaseClient = supabaseClient || window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
-
 // State
 let allSchedules = [];
-let fetchedGroups = []; // Keeping for potential future use or consistency
+let filteredSchedules = [];
 let currentRole = 'Panel'; // Default role
+let calendarDate = new Date();
 
-const allPanels = [
-    "May Lynn Farren",
-    "Nolan Yumen",
-    "Apolinario Ballenas Jr.",
-    "Irene Robles",
-    "Levi John Bernesto",
-    "Vexter Jeff Ojeno",
-    "Myra Samillano"
-];
+// --- Helper Functions ---
+function formatTime12Hour(timeStr) {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${hours}:${minutes} ${ampm}`;
+}
+
+const fuzzyMatch = (nameA, nameB) => {
+    const nA = String(nameA || "").trim().toLowerCase();
+    const nB = String(nameB || "").trim().toLowerCase();
+    if (!nA || !nB) return false;
+    if (nA === nB) return true;
+    
+    // Split into words and check if all words of one are in the other
+    const wA = nA.split(/\s+/).filter(w => w);
+    const wB = nB.split(/\s+/).filter(w => w);
+    
+    if (wA.length === 0 || wB.length === 0) return false;
+    
+    if (wA.length <= wB.length) return wA.every(word => wB.includes(word));
+    return wB.every(word => wA.includes(word));
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
@@ -28,124 +38,75 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = '../../';
         return;
     }
-
-    const rawRole = (loginUser && loginUser.role) ? loginUser.role.toString().toLowerCase() : '';
-    const userName = loginUser.name || loginUser.full_name || '';
-
-    // Simplified load for Panelists
-    loadSchedules();
-
-    loadSchedules();
+    await loadSchedules();
 });
-
 
 // --- Role Switching ---
 window.switchRole = (role) => {
     currentRole = role;
-
-    // Update active buttons
     document.querySelectorAll('.role-filter-btn').forEach(btn => {
-        if (btn.id === `role-${role}`) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
+        btn.classList.toggle('active', btn.id === `role-${role}`);
     });
-
-    // Re-render with new filter
     applyFiltersAndRender();
 };
 
-// --- Fetch Schedules ---
+// --- Data Fetching ---
 async function getSchedules() {
-    console.log('Fetching schedules...');
     try {
-        const { data: schedules, error } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('schedules')
-            .select(`
-                *,
-                student_groups ( group_name, program, adviser )
-            `)
+            .select('*, student_groups ( group_name, program, adviser )')
             .order('schedule_date', { ascending: false });
 
-        if (error) {
-            console.error('Error fetching schedules:', error);
-            return [];
-        }
-        return schedules;
+        if (error) throw error;
+        return data || [];
     } catch (err) {
-        console.error('Unexpected error:', err);
+        console.error('Error fetching schedules:', err);
         return [];
     }
 }
 
-// --- Load Schedules into UI ---
 async function loadSchedules() {
-    const tableBody = document.getElementById('scheduleTableBody');
-    if (!tableBody) return;
-
     const userJson = localStorage.getItem('loginUser');
     if (!userJson) return;
-    const user = userJson ? JSON.parse(userJson) : null;
-    const userNameRaw = user ? (user.name || user.full_name || 'Panel') : 'Panel';
-    const userNameNormalized = String(userNameRaw).trim().toLowerCase();
-
-    tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Loading your schedules...</td></tr>';
+    const user = JSON.parse(userJson);
+    const userNameNormalized = String(user.name || user.full_name || '').trim().toLowerCase();
 
     const schedules = await getSchedules();
 
-    // Filter schedules where the user is INVOLVED (Panel OR Adviser)
-    // We store all relevant schedules locally and filter by View Mode later
-    const fuzzyMatch = (nameA, nameB) => {
-        const nA = String(nameA || "").trim().toLowerCase();
-        const nB = String(nameB || "").trim().toLowerCase();
-        if (!nA || !nB) return false;
-        if (nA === nB) return true;
-        const wA = nA.split(/\s+/).filter(w => w);
-        const wB = nB.split(/\s+/).filter(w => w);
-        if (wA.length <= wB.length) return wA.every(word => wB.includes(word));
-        return wB.every(word => wA.includes(word));
-    };
-
-    const mySchedules = schedules.filter(sched => {
+    // Filter schedules where the user is involved in ANY capacity
+    allSchedules = schedules.filter(sched => {
         const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
         const isPanel = panels.some(p => fuzzyMatch(p, userNameNormalized));
         const isAdviser = fuzzyMatch(sched.student_groups?.adviser, userNameNormalized);
         return isPanel || isAdviser;
     });
 
-    allSchedules = mySchedules;
     applyFiltersAndRender();
+}
+
+// --- Calendar Logic ---
+function prevMonth() {
+    calendarDate.setMonth(calendarDate.getMonth() - 1);
+    renderCalendar();
+}
+
+function nextMonth() {
+    calendarDate.setMonth(calendarDate.getMonth() + 1);
+    renderCalendar();
 }
 
 function applyFiltersAndRender() {
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : {};
-    const userNameRaw = user.name || user.full_name || 'Panel';
-    const userNameNormalized = String(userNameRaw).trim().toLowerCase();
-
+    const userNameNormalized = String(user.name || user.full_name || '').trim().toLowerCase();
     const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
 
-    const filtered = allSchedules.filter(sched => {
-        // 1. Role Filter
+    filteredSchedules = allSchedules.filter(sched => {
+        // 1. Role Context Filter
         const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
-        
-        // Use already defined fuzzyMatch or re-define if scope requires
-        const isPanel = panels.some(p => {
-             const nA = String(p || "").trim().toLowerCase();
-             const nB = String(userNameNormalized || "").trim().toLowerCase();
-             const wA = nA.split(/\s+/).filter(w => w);
-             const wB = nB.split(/\s+/).filter(w => w);
-             return wA.length <= wB.length ? wA.every(word => wB.includes(word)) : wB.every(word => wA.includes(word));
-        });
-        
-        const isAdviser = (() => {
-             const nA = String(sched.student_groups?.adviser || "").trim().toLowerCase();
-             const nB = String(userNameNormalized || "").trim().toLowerCase();
-             const wA = nA.split(/\s+/).filter(w => w);
-             const wB = nB.split(/\s+/).filter(w => w);
-             return wA.length <= wB.length ? wA.every(word => wB.includes(word)) : wB.every(word => wA.includes(word));
-        })();
+        const isPanel = panels.some(p => fuzzyMatch(p, userNameNormalized));
+        const isAdviser = fuzzyMatch(sched.student_groups?.adviser, userNameNormalized);
 
         if (currentRole === 'Panel' && !isPanel) return false;
         if (currentRole === 'Adviser' && !isAdviser) return false;
@@ -153,121 +114,82 @@ function applyFiltersAndRender() {
         // 2. Search Filter
         const groupName = (sched.student_groups?.group_name || '').toLowerCase();
         const program = (sched.student_groups?.program || '').toLowerCase();
-        const venue = (sched.schedule_venue || '').toLowerCase();
         const type = (sched.schedule_type || '').toLowerCase();
-        const panelsStr = panels.filter(p => p).join(' ').toLowerCase();
-
-        const matchesSearch = groupName.includes(searchTerm) ||
-            program.includes(searchTerm) ||
-            venue.includes(searchTerm) ||
-            type.includes(searchTerm) ||
-            panelsStr.includes(searchTerm);
-
-        return matchesSearch;
+        
+        return groupName.includes(searchTerm) || program.includes(searchTerm) || type.includes(searchTerm);
     });
 
-    renderSchedules(filtered);
+    renderCalendar();
 }
 
-function renderSchedules(schedules) {
-    const tableBody = document.getElementById('scheduleTableBody');
-    if (!tableBody) return;
-    tableBody.innerHTML = '';
+function renderCalendar() {
+    const calendarDays = document.getElementById('calendarDays');
+    const calendarMonth = document.getElementById('calendarMonth');
+    if (!calendarDays || !calendarMonth) return;
 
-    if (!schedules || schedules.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 30px; color: #64748b;">No ${currentRole.toLowerCase()} schedules found.</td></tr>`;
-        return;
+    calendarDays.innerHTML = '';
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+
+    calendarMonth.textContent = calendarDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+
+    // Fill empty cells from previous month
+    for (let i = 0; i < firstDay; i++) {
+        const emptyDay = document.createElement('div');
+        emptyDay.style.cssText = 'background: #fcfcfc; padding: 15px; min-height: 130px; border: 1px solid #f1f5f9;';
+        calendarDays.appendChild(emptyDay);
     }
 
-    schedules.forEach(sched => {
-        const groupName = sched.student_groups ? sched.student_groups.group_name : 'Unknown Group';
-        const program = sched.student_groups ? sched.student_groups.program : '-';
-        const displayDate = sched.schedule_date ? new Date(sched.schedule_date).toLocaleDateString() : 'No Date';
-        const displayTime = sched.schedule_time || '-';
-        const displayVenue = sched.schedule_venue || '-';
-        const typeRaw = (sched.schedule_type || 'Defense').toLowerCase().trim();
-        const typeDisplay = sched.schedule_type || 'Defense';
+    // Render each day
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayEl = document.createElement('div');
+        const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
 
-        // Styling for Defense Types
-        let typeBadgeConfig = {
-            bg: '#f1f5f9',
-            color: '#475569',
-            border: '#e2e8f0'
-        };
-
-        if (typeRaw.includes('title')) {
-            typeBadgeConfig = { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' }; // Blue
-        } else if (typeRaw.includes('pre-oral') || typeRaw.includes('pre oral')) {
-            typeBadgeConfig = { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa' }; // Orange
-        } else if (typeRaw.includes('final')) {
-            typeBadgeConfig = { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' }; // Green
-        }
-
-        const typeBadge = `<span style="
-            font-weight: 700; 
-            font-size: 0.75rem; 
-            background: ${typeBadgeConfig.bg}; 
-            color: ${typeBadgeConfig.color}; 
-            padding: 4px 10px; 
-            border-radius: 6px; 
-            border: 1px solid ${typeBadgeConfig.border};
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: inline-block;
-        ">${typeDisplay}</span>`;
-
-        // Panels badges
-        const panelList = [
-            sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5
-        ].filter(p => p);
-
-        const panelsHtml = panelList.map(p => `
-            <span style="
-                display: inline-block;
-                padding: 6px 12px;
-                background: #f8fafc;
-                color: #475569;
-                font-weight: 600;
-                font-size: 0.85rem;
-                border-radius: 8px;
-                border: 1px solid #cbd5e1;
-                margin-right: 4px;
-                margin-bottom: 4px;
-                font-family: 'Outfit', sans-serif;
-            ">${p}</span>
-        `).join('');
-
-        const row = document.createElement('tr');
-        row.style.borderBottom = "1px solid #f1f5f9";
-        row.style.transition = "background-color 0.2s ease";
-        row.onmouseover = function () { this.style.backgroundColor = "#f8fafc"; };
-        row.onmouseout = function () { this.style.backgroundColor = "transparent"; };
-
-        row.innerHTML = `
-            <td style="padding: 16px;">${typeBadge}</td>
-            <td style="padding: 16px;">
-                <div style="font-weight: 700; color: #1e293b; font-size: 0.95rem;">${groupName}</div>
-            </td>
-            <td style="padding: 16px; color: #64748b; font-weight: 500;">${program}</td>
-            <td style="padding: 16px;">
-                <div style="font-weight: 600; color: #0f172a;">${displayDate}</div>
-                <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${displayTime}</div>
-            </td>
-            <td style="padding: 16px; color: #334155; font-weight: 500;">${displayVenue}</td>
-            <td style="padding: 16px;">
-                <div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 450px;">
-                    ${panelsHtml}
-                </div>
-            </td>
+        dayEl.style.cssText = `
+            background: white; padding: 12px; min-height: 130px; 
+            border: 1px solid #f1f5f9; transition: background 0.2s;
         `;
-        tableBody.appendChild(row);
-    });
+
+        dayEl.innerHTML = `
+            <div style="font-weight: 700; color: ${isToday ? 'var(--primary-color)' : '#1e293b'}; margin-bottom: 8px; font-size: 0.9rem;">
+                ${day}
+            </div>
+            <div id="events-${year}-${month + 1}-${day}" style="display: flex; flex-direction: column; gap: 4px;"></div>
+        `;
+        calendarDays.appendChild(dayEl);
+
+        // Map events to this specific day number
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayEvents = filteredSchedules.filter(s => s.schedule_date === dateStr);
+
+        const container = dayEl.querySelector(`#events-${year}-${month + 1}-${day}`);
+        dayEvents.forEach(sched => {
+            const evEl = document.createElement('div');
+            const typeLower = (sched.schedule_type || '').toLowerCase();
+            
+            let bg = '#dbeafe', color = '#1e40af'; // Blue
+            if (typeLower.includes('pre-oral') || typeLower.includes('pre oral')) { bg = '#fef3c7'; color = '#92400e'; } // Orange
+            else if (typeLower.includes('final')) { bg = '#dcfce7'; color = '#166534'; } // Green
+
+            evEl.style.cssText = `
+                font-size: 10px; padding: 4px 8px; border-radius: 6px; font-weight: 700;
+                background: ${bg}; color: ${color}; white-space: nowrap; 
+                overflow: hidden; text-overflow: ellipsis; border: 1px solid rgba(0,0,0,0.05);
+                cursor: help;
+            `;
+            evEl.textContent = `${formatTime12Hour(sched.schedule_time)} ${sched.student_groups?.group_name || 'Group'}`;
+            evEl.title = `${sched.schedule_type}: ${sched.student_groups?.group_name}\nVenue: ${sched.schedule_venue}`;
+            container.appendChild(evEl);
+        });
+    }
 }
 
-// --- Search Filter Listener ---
-document.getElementById('searchInput')?.addEventListener('input', (e) => {
-    applyFiltersAndRender();
-});
+// Listeners
+document.getElementById('searchInput')?.addEventListener('input', applyFiltersAndRender);
 
 function logout() {
     localStorage.removeItem('loginUser');

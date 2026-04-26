@@ -829,11 +829,11 @@ window.openFileModal = (groupId) => {
                 </div>
                 `;
             } else if (currentRole === 'Adviser' && group.isAdviser) {
-                // Get Adviser Status for this category
-                const catKey = categoryKey === 'titles' ? 'title' : categoryKey === 'pre_oral' ? 'preoral' : 'final';
+                // Get Adviser Status for this specific FILE (granular)
                 const groupAdviserStatus = group.adviserStatus || {};
-                const currentAdvStatus = groupAdviserStatus[catKey] || 'Pending';
-                const currentAdvRemarks = group.adviserRemarks || {};
+                const currentAdvStatus = groupAdviserStatus[label] || 'Pending';
+                const groupAdviserRemarks = group.adviserRemarks || {};
+                const currentAdvRemarks = groupAdviserRemarks[label] || '';
 
                 interactiveControls = `
                     <div style="padding: 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; margin-bottom: 10px;">
@@ -842,20 +842,20 @@ window.openFileModal = (groupId) => {
                             Adviser Approval
                         </div>
                         <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                            <button onclick="updateAdviserStatus(${group.id}, '${catKey}', 'Approved')" 
+                            <button onclick="updateAdviserStatus(${group.id}, '${label}', 'Approved')" 
                                 style="flex: 1; background: ${currentAdvStatus === 'Approved' ? '#059669' : 'white'}; color: ${currentAdvStatus === 'Approved' ? 'white' : '#059669'}; border: 1px solid #059669; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
                                 <span class="material-icons-round" style="font-size: 16px;">check_circle</span> Approve
                             </button>
-                            <button onclick="updateAdviserStatus(${group.id}, '${catKey}', 'Declined')" 
+                            <button onclick="updateAdviserStatus(${group.id}, '${label}', 'Declined')" 
                                 style="flex: 1; background: ${currentAdvStatus === 'Declined' ? '#dc2626' : 'white'}; color: ${currentAdvStatus === 'Declined' ? 'white' : '#dc2626'}; border: 1px solid #dc2626; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
                                 <span class="material-icons-round" style="font-size: 16px;">cancel</span> Decline
                             </button>
                         </div>
-                        <div id="adviser-remarks-container-${catKey}" style="display: ${currentAdvStatus === 'Declined' ? 'block' : 'none'};">
+                        <div id="adviser-remarks-container-${label}" style="display: ${currentAdvStatus === 'Declined' ? 'block' : 'none'};">
                             <div style="font-size: 11px; color: #64748b; font-weight: 600; margin-bottom: 4px;">REVISION REMARKS:</div>
-                            <textarea id="adviser-remarks-${catKey}" placeholder="Reason for declining..." 
-                                style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; min-height: 50px; resize: vertical; margin-bottom: 6px;">${currentAdvRemarks[catKey] || ''}</textarea>
-                            <button onclick="saveAdviserRemarks(${group.id}, '${catKey}')" 
+                            <textarea id="adviser-remarks-${label}" placeholder="Reason for declining..." 
+                                style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; min-height: 50px; resize: vertical; margin-bottom: 6px;">${currentAdvRemarks}</textarea>
+                            <button onclick="saveAdviserRemarks(${group.id}, '${label}')" 
                                     style="width: 100%; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">
                                     Save Remarks Only
                             </button>
@@ -1537,18 +1537,18 @@ async function archiveProject(groupId) {
     }
 }
 
-window.updateAdviserStatus = async (groupId, catKey, newStatus) => {
+window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
     try {
         // Show remarks box immediately if declining
-        const remarksBox = document.getElementById(`adviser-remarks-container-${catKey}`);
+        const remarksBox = document.getElementById(`adviser-remarks-container-${fileKey}`);
         if (newStatus === 'Declined' && remarksBox) {
             remarksBox.style.display = 'block';
         } else if (newStatus === 'Approved' && remarksBox) {
             remarksBox.style.display = 'none';
         }
 
-        const btnApprove = document.querySelector(`button[onclick*="'Approved'"][onclick*="'${catKey}'"]`);
-        const btnDecline = document.querySelector(`button[onclick*="'Declined'"][onclick*="'${catKey}'"]`);
+        const btnApprove = document.querySelector(`button[onclick*="'Approved'"][onclick*="'${fileKey}'"]`);
+        const btnDecline = document.querySelector(`button[onclick*="'Declined'"][onclick*="'${fileKey}'"]`);
         
         if (btnApprove) {
             btnApprove.disabled = true;
@@ -1582,10 +1582,10 @@ window.updateAdviserStatus = async (groupId, catKey, newStatus) => {
         const currentStatus = group.adviser_status || {};
         const currentRemarks = group.adviser_remarks || {};
         
-        const remarksValue = document.getElementById(`adviser-remarks-${catKey}`)?.value.trim() || '';
+        const remarksValue = document.getElementById(`adviser-remarks-${fileKey}`)?.value.trim() || '';
 
-        currentStatus[catKey] = newStatus;
-        currentRemarks[catKey] = remarksValue;
+        currentStatus[fileKey] = newStatus;
+        currentRemarks[fileKey] = remarksValue;
 
         const { error } = await supabaseClient
             .from('student_groups')
@@ -1617,7 +1617,7 @@ window.updateAdviserStatus = async (groupId, catKey, newStatus) => {
     }
 };
 
-window.saveAdviserRemarks = async (groupId, catKey) => {
+window.saveAdviserRemarks = async (groupId, fileKey) => {
     try {
         const { data: group, error: fetchError } = await supabaseClient
             .from('student_groups')
@@ -1628,9 +1628,9 @@ window.saveAdviserRemarks = async (groupId, catKey) => {
         if (fetchError) throw fetchError;
 
         const currentRemarks = group.adviser_remarks || {};
-        const remarksValue = document.getElementById(`adviser-remarks-${catKey}`)?.value.trim() || '';
+        const remarksValue = document.getElementById(`adviser-remarks-${fileKey}`)?.value.trim() || '';
 
-        currentRemarks[catKey] = remarksValue;
+        currentRemarks[fileKey] = remarksValue;
 
         const { error } = await supabaseClient
             .from('student_groups')

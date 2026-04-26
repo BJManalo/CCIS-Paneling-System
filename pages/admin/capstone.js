@@ -22,8 +22,7 @@ let displayRows = [];
 let currentAdobeView = null;
 let currentViewerFileKey = null;
 
-// ADOBE CLIENT ID - Verified for Vercel Domain
-const ADOBE_CLIENT_ID = "5edc19dfde9349e3acb7ecc73bfa4848";
+// ADOBE CLIENT ID is now centrally managed in shared.js
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
@@ -51,6 +50,7 @@ async function fetchCapstoneData() {
 
         if (gRes.error) throw gRes.error;
         allGroups = gRes.data || [];
+        console.log(`Fetched ${allGroups.length} groups for Capstone view.`);
 
         if (sRes.error) console.error('Error fetching defense statuses:', sRes.error);
         allDefenseStatuses = sRes.data || [];
@@ -134,6 +134,8 @@ function applyFilters() {
             (projectTitle && projectTitle.toLowerCase().includes(searchTerm));
 
         if (!matchesProgram || !matchesSearch) return;
+
+        console.log(`Group ${g.group_name}: Found approved title with key ${approvedKey}`);
 
         // Members
         const membersList = allStudents.filter(s => s.group_id == g.id).map(s => s.full_name);
@@ -248,8 +250,14 @@ function resolveStatusMap(groupId, defenseType) {
         const votes = Object.values(filePanelMap[fk]);
         if (votes.some(v => v === 'Redefend')) resolved[fk] = 'Redefend';
         else if (votes.some(v => v === 'Rejected')) resolved[fk] = 'Rejected';
-        else if (votes.some(v => v && v.includes('Revision'))) resolved[fk] = 'Approved with Revisions';
-        else if (votes.some(v => v && (v.includes('Approved') || v === 'Completed'))) resolved[fk] = 'Approved';
+        else if (votes.some(v => {
+            const nv = (v || '').toLowerCase();
+            return nv.includes('revision');
+        })) resolved[fk] = 'Approved with Revisions';
+        else if (votes.some(v => {
+            const nv = (v || '').toLowerCase();
+            return nv.includes('approved') || nv === 'completed';
+        })) resolved[fk] = 'Approved';
         else resolved[fk] = 'Pending';
     });
     return resolved;
@@ -355,6 +363,17 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
 
         // REMOVE NULLS and Empty URLs
         if (!cleanUrl || cleanUrl.toLowerCase() === "null" || isRevised) return;
+
+        // FILTER: Only show approved/completed/revision titles in Capstone Records
+        const votes = Object.values(mergedStatuses[label] || {});
+        const hasRejected = votes.some(v => v === 'Rejected' || v === 'Redefend');
+        const hasApproved = votes.some(v => {
+            const nv = (v || '').toLowerCase();
+            return nv.includes('approved') || nv.includes('revision') || nv === 'completed';
+        });
+
+        // If it was rejected or hasn't been approved yet, hide it from Capstone portal view
+        if (hasRejected || !hasApproved) return;
 
         let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
@@ -541,9 +560,11 @@ window.loadPDF = (url, title, fileKey) => {
     viewerDiv.style.display = 'block';
     viewerDiv.innerHTML = '';
 
-    if (window.AdobeDC) {
+    const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+
+    if (window.AdobeDC && !isLocal) {
         currentAdobeView = new AdobeDC.View({
-            clientId: ADOBE_CLIENT_ID,
+            clientId: window.getAdobeClientId ? window.getAdobeClientId() : ADOBE_CLIENT_ID,
             divId: "adobe-dc-view"
         });
         currentAdobeView.previewFile({
@@ -558,6 +579,7 @@ window.loadPDF = (url, title, fileKey) => {
             showPrintPDF: true
         });
     } else {
+        // Fallback for local dev or missing SDK
         viewerDiv.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
     }
 };
