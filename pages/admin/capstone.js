@@ -398,8 +398,21 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         item.className = 'file-item';
         item.style.cssText = 'padding: 10px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;';
 
+        // Resolve overall status for the file item badge
+        let badgeColor = '#059669'; // Default Approved
+        let finalStatus = 'Approved';
+        if (votes.some(v => (v || '').toLowerCase().includes('revision'))) {
+            badgeColor = '#d97706';
+            finalStatus = 'Approved with Revisions';
+        } else if (votes.some(v => (v || '').toLowerCase() === 'completed')) {
+            finalStatus = 'Completed';
+        }
+
         item.innerHTML = `
-            <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <span style="font-size: 0.9rem; font-weight: 500; color: #334155;">${displayLabel}</span>
+                <span style="font-size: 0.7rem; font-weight: 700; color: ${badgeColor}; text-transform: uppercase;">${finalStatus}</span>
+            </div>
             <span class="material-icons-round" style="font-size: 18px; color: var(--primary-color);">arrow_forward_ios</span>
         `;
         item.onclick = () => {
@@ -446,96 +459,11 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
             itemContainer.appendChild(revItem);
         }
 
-        const feedbackArea = document.createElement('div');
-        feedbackArea.style.cssText = 'padding: 12px; background: #f8fafc; border-top: 1px solid #e2e8f0;';
-
-        const fileStatuses = mergedStatuses[label] || {};
-        const fileRemarks = mergedRemarks[label] || {};
-        const panelsList = Object.keys(fileStatuses);
-
-        let evaluationsHtml = '';
-        if (panelsList.length > 0) {
-            evaluationsHtml = panelsList.map(panel => {
-                const status = fileStatuses[panel] || 'Pending';
-                const rmk = fileRemarks[panel] || '';
-                let color = '#64748b';
-                if (status.includes('Approved') || status === 'Completed') color = '#059669';
-                else if (status.includes('Revisions')) color = '#d97706';
-                else if (status === 'Rejected' || status === 'Redefend') color = '#dc2626';
-                return `
-                    <div style="font-size: 11px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
-                            <strong style="color: var(--primary-color);">${panel}</strong>
-                            <span style="font-weight:700; color:${color};">${status}</span>
-                        </div>
-                        <div style="color: #64748b; font-style: italic;">"${rmk || 'No specific remarks'}"</div>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            evaluationsHtml = '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:5px;">Waiting for panel evaluations...</div>';
-        }
-
-        feedbackArea.innerHTML = `
-            <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 11px; font-weight: 600; text-align: center; margin-bottom: 12px;">
-                <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
-                ADMIN VIEW
-            </div>
-            <div style="font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Panel Evaluations</div>
-            ${evaluationsHtml}
-        `;
-        itemContainer.appendChild(feedbackArea);
         section.appendChild(itemContainer);
     });
 
-    // SCORING SUMMARY
-    const scheds = allSchedules.filter(s => s.group_id === group.id && normalize(s.schedule_type).includes(typeFilter));
-    scheds.forEach(s => {
-        const sysEvs = allSystemEvaluations.filter(ev => ev.schedule_id === s.id);
-        const indEvs = allIndividualEvaluations.filter(ev => ev.schedule_id === s.id);
-
-        if (sysEvs.length > 0 || indEvs.length > 0) {
-            const scoresDiv = document.createElement('div');
-            scoresDiv.style.cssText = 'margin-top: 15px; padding: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px;';
-
-            let scoresHtml = `<div style="font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Scoring Summary (${s.schedule_type})</div>`;
-
-            if (sysEvs.length > 0) {
-                scoresHtml += `<div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #cbd5e1;">
-                    <div style="font-size: 10px; color: var(--primary-color); font-weight: 700; margin-bottom: 4px;">System Evaluation (Total: 32)</div>`;
-                sysEvs.forEach(ev => {
-                    scoresHtml += `<div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 2px;">
-                        <span>${ev.panelist_name}</span>
-                        <span style="font-weight:700; color:#059669;">${ev.total_score}/32</span>
-                    </div>`;
-                });
-                scoresHtml += `</div>`;
-            }
-
-            if (indEvs.length > 0) {
-                scoresHtml += `<div>
-                    <div style="font-size: 10px; color: var(--primary-color); font-weight: 700; margin-bottom: 4px;">Individual Avg (Total: 28)</div>`;
-                const studentSums = {};
-                indEvs.forEach(ev => {
-                    if (!studentSums[ev.student_id]) studentSums[ev.student_id] = { scores: [] };
-                    studentSums[ev.student_id].scores.push(ev.total_score);
-                });
-
-                Object.keys(studentSums).forEach(sid => {
-                    const std = allStudents.find(st => st.id == sid);
-                    const scores = studentSums[sid].scores;
-                    const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
-                    scoresHtml += `<div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 2px;">
-                        <span>${std ? std.full_name : 'Student'}</span>
-                        <span style="font-weight:700; color:#2563eb;">${avg}/28</span>
-                    </div>`;
-                });
-                scoresHtml += `</div>`;
-            }
-            scoresDiv.innerHTML = scoresHtml;
-            section.appendChild(scoresDiv);
-        }
-    });
+    // SCORING SUMMARY REMOVED AS REQUESTED
+}
 
     document.getElementById('fileList').appendChild(section);
 }
