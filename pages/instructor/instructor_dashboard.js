@@ -126,7 +126,7 @@ window.setCategoryFilter = (category) => {
     });
 
     if (currentCategory !== 'ALL') {
-        const titleMap = { 'APPROVED': 'Approved Titles', 'REJECTED': 'Rejected Titles', 'COMPLETED': 'Completed Titles' };
+        const titleMap = { 'APPROVED': 'Approved Titles', 'COMPLETED': 'Completed Titles' };
         document.querySelectorAll('.chart-card').forEach(card => {
             if (card.querySelector('.chart-title').innerText === titleMap[currentCategory]) {
                 card.style.border = '2px solid var(--primary-color)';
@@ -213,6 +213,11 @@ window.applyDashboardFilters = () => {
             const tStatus = Object.values(tMap).find(v => v.includes('Approved') || v.includes('Revisions')) ||
                 Object.values(tMap).find(v => v === 'Redefend' || v === 'Rejected') || 'Pending';
 
+            if (tStatus === 'Rejected' || tStatus === 'Redefend' || pStatus === 'Redefend' || fStatus === 'Redefend') {
+                // Skip rejected titles in Dashboard tab as requested
+                return;
+            }
+
             if (Object.values(fMap).some(v => v === 'Completed')) {
                 statusBadge = '<span class="status-badge approved">Completed</span>';
             } else if (Object.values(fMap).some(v => v.includes('Approved') || v.includes('Revisions'))) {
@@ -221,8 +226,6 @@ window.applyDashboardFilters = () => {
                 statusBadge = '<span class="status-badge approved" style="background:#e0f2fe; color:#0369a1;">Pre-Oral Passed</span>';
             } else if (tStatus.includes('Approved') || tStatus.includes('Revisions')) {
                 statusBadge = '<span class="status-badge approved" style="background:#dbeafe; color:#2563eb;">Title Approved</span>';
-            } else if (tStatus === 'Rejected' || tStatus === 'Redefend' || pStatus === 'Redefend' || fStatus === 'Redefend') {
-                statusBadge = `<span class="status-badge rejected">${fStatus === 'Redefend' ? 'Redefend Final' : pStatus === 'Redefend' ? 'Redefend Pre-Oral' : tStatus}</span>`;
             }
 
             displayRows.push({ ...baseObj, title: projectTitleDisplay, statusHtml: statusBadge });
@@ -235,16 +238,6 @@ window.applyDashboardFilters = () => {
                     statusHtml: '<span class="status-badge approved">Title Approved</span>'
                 });
             }
-        } else if (currentCategory === 'REJECTED') {
-            Object.keys(tMap).forEach(k => {
-                if (tMap[k] === 'Rejected' || tMap[k] === 'Redefend') {
-                    displayRows.push({
-                        ...baseObj,
-                        title: `<span style="color: #dc2626;">${getTitleText(g.project_title, k)}</span>`,
-                        statusHtml: `<span class="status-badge rejected">${tMap[k]}</span>`
-                    });
-                }
-            });
         } else if (currentCategory === 'COMPLETED') {
             if (Object.values(fMap).some(v => v === 'Completed')) {
                 displayRows.push({
@@ -718,8 +711,6 @@ function updateCounts(groups) {
 
     // Display Counts to Cards
     const titleEl = document.getElementById('countTitle');
-    const rejectedEl = document.getElementById('countRejected');
 
     if (titleEl) titleEl.innerText = approvedTotal;
-    if (rejectedEl) rejectedEl.innerText = rejectedTotal;
 }
