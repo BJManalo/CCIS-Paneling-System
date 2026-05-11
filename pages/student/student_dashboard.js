@@ -234,17 +234,25 @@ async function loadSubmissionData() {
                 } else {
                     wrapper = document.createElement('div');
                     wrapper.className = 'input-with-action';
-                    wrapper.style.cssText = 'position: relative; display: flex; align-items: center; gap: 8px; width: 100%;';
+                    // The CSS for .input-with-action is now in student_dashboard.html
                     targetEl.parentNode.insertBefore(wrapper, targetEl);
                     wrapper.appendChild(targetEl);
                     targetEl.style.marginBottom = '0';
 
                     uploadBtn = document.createElement('button');
+                    uploadBtn.type = 'button'; // Explicitly set to button to prevent form submission
                     uploadBtn.title = "Upload PDF directly";
                     uploadBtn.onclick = (e) => {
                         e.preventDefault();
-                        const fileInput = wrapper.parentElement.querySelector('input[type="file"]');
-                        if (fileInput) fileInput.click();
+                        e.stopPropagation();
+                        const parent = wrapper.parentElement;
+                        // Find the hidden file input in the same form-group
+                        const fileInput = parent.querySelector('input[type="file"]');
+                        if (fileInput) {
+                            fileInput.click();
+                        } else {
+                            console.error('File input not found for', targetEl.id);
+                        }
                     };
                     wrapper.appendChild(uploadBtn);
                 }
@@ -254,14 +262,29 @@ async function loadSubmissionData() {
                 const uploadColor = isRevised ? '#d97706' : 'var(--primary-color)';
 
                 uploadBtn.disabled = !canUpload;
-                uploadBtn.style.cssText = `background: ${!canUpload ? '#f1f5f9' : uploadColor}; border: 1.5px solid ${!canUpload ? '#e2e8f0' : uploadColor}; border-radius: 8px; color: ${!canUpload ? '#94a3b8' : 'white'}; padding: 10px; cursor: ${!canUpload ? 'default' : 'pointer'}; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: ${!canUpload ? 'none' : '0 2px 6px rgba(0,0,0, 0.1)'};`;
+                
+                // Use class for basic styling, but keep dynamic colors if needed
+                if (!canUpload) {
+                    uploadBtn.style.background = '#f1f5f9';
+                    uploadBtn.style.borderColor = '#e2e8f0';
+                    uploadBtn.style.color = '#94a3b8';
+                    uploadBtn.style.cursor = 'default';
+                    uploadBtn.style.boxShadow = 'none';
+                } else {
+                    uploadBtn.style.background = uploadColor;
+                    uploadBtn.style.borderColor = uploadColor;
+                    uploadBtn.style.color = 'white';
+                    uploadBtn.style.cursor = 'pointer';
+                    uploadBtn.style.boxShadow = '0 2px 6px rgba(0,0,0, 0.1)';
+                }
 
+                // Standardize icons and title
                 if (isRevised) {
                     uploadBtn.title = isUploaded ? "Update your Revision" : "Upload Revision";
-                    uploadBtn.innerHTML = isUploaded ? '<span class="material-icons-round" style="font-size:18px;">sync</span>' : '<span class="material-icons-round" style="font-size:18px;">history_edu</span>';
+                    uploadBtn.innerHTML = isUploaded ? '<span class="material-icons-round" style="font-size:22px;">sync</span>' : '<span class="material-icons-round" style="font-size:22px;">history_edu</span>';
                 } else {
                     uploadBtn.title = isUploaded ? "File uploaded" : "Upload PDF directly";
-                    uploadBtn.innerHTML = isUploaded ? '<span class="material-icons-round" style="font-size:18px;">task_alt</span>' : '<span class="material-icons-round" style="font-size:18px;">upload_file</span>';
+                    uploadBtn.innerHTML = isUploaded ? '<span class="material-icons-round" style="font-size:22px;">task_alt</span>' : '<span class="material-icons-round" style="font-size:22px;">upload_file</span>';
                 }
             };
 
