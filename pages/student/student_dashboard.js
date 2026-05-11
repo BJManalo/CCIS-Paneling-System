@@ -5,6 +5,45 @@ let currentGroupId = null;
 let currentBlobUrl = null;
 let adobeDCView = null;
 
+// Global Tab Switching Logic
+window.switchSubTab = (stageId, index, btn) => {
+    const parent = document.getElementById('tab-' + stageId);
+    if (!parent) return;
+
+    parent.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
+
+    const target = document.getElementById(`${stageId}-content-${index}`);
+    if (target) target.classList.add('active');
+
+    parent.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+};
+
+window.switchSubmissionTab = (tabId, btn) => {
+    // 1. Update UI Tabs
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    const targetTab = document.getElementById('tab-' + tabId);
+    if (targetTab) targetTab.classList.add('active');
+    
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    // Reset sub-tabs to the first one when switching main tabs
+    const parent = document.getElementById('tab-' + tabId);
+    if (parent) {
+        const firstSubBtn = parent.querySelector('.sub-tab-btn');
+        if (firstSubBtn && tabId !== 'titles') {
+            let idx = (tabId === 'final') ? 4 : 1;
+            window.switchSubTab(tabId, idx, firstSubBtn);
+        }
+    }
+
+    // 2. Button/Input Locking Update
+    if (typeof updateSaveButtonState === 'function') {
+        updateSaveButtonState(tabId);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     loadSubmissionData();
 });
@@ -69,8 +108,8 @@ async function loadSubmissionData() {
             const isTitleGraded = checkGraded('Title');
             const isPreOralGraded = checkGraded('Pre');
 
-            const preOralBtn = document.querySelector('button[onclick*="preoral"]');
-            const finalBtn = document.querySelector('button[onclick*="final"]');
+            const preOralBtn = document.getElementById('btn-preoral');
+            const finalBtn = document.getElementById('btn-final');
 
             window.scheduleStatus = {
                 title: isTitleScheduled,
@@ -79,11 +118,12 @@ async function loadSubmissionData() {
             };
 
             if (preOralBtn) {
-                if (!isTitleGraded) {
+                const isLocked = !isTitleGraded || !isPreOralScheduled;
+                if (isLocked) {
                     preOralBtn.disabled = true;
                     preOralBtn.style.opacity = '0.5';
                     preOralBtn.style.cursor = 'not-allowed';
-                    preOralBtn.title = "Locked: Title Defense grades pending.";
+                    preOralBtn.title = !isTitleGraded ? "Locked: Title Defense grades pending." : "Locked: Not yet scheduled for Pre-Oral Defense.";
                     if (!preOralBtn.innerHTML.includes('lock')) preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
                 } else {
                     preOralBtn.disabled = false;
@@ -96,11 +136,12 @@ async function loadSubmissionData() {
             }
 
             if (finalBtn) {
-                if (!isPreOralGraded) {
+                const isLocked = !isPreOralGraded || !isFinalScheduled;
+                if (isLocked) {
                     finalBtn.disabled = true;
                     finalBtn.style.opacity = '0.5';
                     finalBtn.style.cursor = 'not-allowed';
-                    finalBtn.title = "Locked: Pre-Oral grades pending.";
+                    finalBtn.title = !isPreOralGraded ? "Locked: Pre-Oral grades pending." : "Locked: Not yet scheduled for Final Defense.";
                     if (!finalBtn.innerHTML.includes('lock')) finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
                 } else {
                     finalBtn.disabled = false;
@@ -326,50 +367,7 @@ async function loadSubmissionData() {
     }
 };
 
-// Global Tab Switching Logic
-window.switchSubTab = (stageId, index, btn) => {
-    const parent = document.getElementById('tab-' + stageId);
-    if (!parent) return;
-
-    parent.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
-
-    const target = document.getElementById(`${stageId}-content-${index}`);
-    if (target) target.classList.add('active');
-
-    parent.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
-    btn.classList.add('active');
-};
-
-window.switchSubmissionTab = (tabId, btn) => {
-    // 1. Update UI Tabs
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + tabId).classList.add('active');
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    btn.classList.add('active');
-
-    // Reset sub-tabs to the first one when switching main tabs
-    const parent = document.getElementById('tab-' + tabId);
-    const firstSubBtn = parent.querySelector('.sub-tab-btn');
-    if (firstSubBtn && tabId !== 'titles') {
-        // For titles, we don't want to auto-switch if they are clicking manually, 
-        // but initial load needs it. 
-        // Actually, just standard reset is fine.
-        const firstIndex = tabId === 'final' ? 4 : 1;
-        // logic for titles is 1, preoral 1, final 4? 
-        // Titles IDs are 1,2,3. Preoral 1,2,3. Final 4,5.
-        // Wait, preoral IDs in HTML are: preoral-content-1, 2, 3.
-        // Final IDs: final-content-4, 5.
-        // Title IDs: titles-content-1, 2, 3.
-
-        let idx = 1;
-        if (tabId === 'final') idx = 4;
-
-        window.switchSubTab(tabId, idx, firstSubBtn);
-    }
-
-    // 2. Button/Input Locking Update
-    updateSaveButtonState(tabId);
-};
+// No content here, moved to top level
 
 function updateSaveButtonState(tabId) {
     // 1. Check Global Schedule for the whole tab
