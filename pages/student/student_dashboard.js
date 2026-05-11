@@ -198,7 +198,8 @@ async function loadSubmissionData() {
                 // Remove previous injections
                 formGroup.querySelectorAll('.status-badge-container, .remarks-list-container, .view-doc-container').forEach(node => node.remove());
 
-                const hasFile = linkMap[key] && linkMap[key].trim() !== '';
+                const val = linkMap[key];
+                const hasFile = val && typeof val === 'string' && val.trim() !== '';
                 const rawAnnotations = annotationsMap[key] || {};
                 const hasAnnotations = Object.keys(rawAnnotations).length > 0;
 
@@ -206,7 +207,7 @@ async function loadSubmissionData() {
                     const headerHtml = `
                         <div class="view-doc-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                             <span style="font-size: 0.85rem; font-weight: 700; color: #475569;">Submission Link</span>
-                            <button onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: linkMap[key], annotations: annotationsMap[key] || {} }))}', '${key}')" 
+                            <button type="button" onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: val, annotations: annotationsMap[key] || {} }))}', '${key}')" 
                                     style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
                                 <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
                                 ${hasAnnotations ? 'View Document & Feedback' : 'View Document'}
@@ -216,7 +217,7 @@ async function loadSubmissionData() {
                     const targetNode = el.closest('.input-with-action') || el;
                     targetNode.insertAdjacentHTML('beforebegin', headerHtml);
                 }
-                el.value = linkMap[key] || '';
+                el.value = val || '';
                 const revEl = document.getElementById(elementId + '_revised');
                 if (revEl) revEl.value = linkMap[key + '_revised'] || '';
             };
@@ -315,7 +316,10 @@ async function loadSubmissionData() {
             injectActionButtons(document.getElementById('finalCh5_revised'), fLinks.ch5_revised);
 
             window.currentLinks = { titles: tLinks, preoral: pLinks, final: fLinks };
-            updateSaveButtonState(document.querySelector('.tab-btn.active')?.innerText.toLowerCase().includes('title') ? 'titles' : document.querySelector('.tab-btn.active')?.innerText.toLowerCase().includes('pre') ? 'preoral' : 'final');
+            const activeTabBtn = document.querySelector('.tab-btn.active');
+            const activeTabName = activeTabBtn?.innerText?.toLowerCase()?.includes('title') ? 'titles' : 
+                               activeTabBtn?.innerText?.toLowerCase()?.includes('pre') ? 'preoral' : 'final';
+            updateSaveButtonState(activeTabName);
         }
     } catch (err) {
         console.error('Unexpected error:', err);
@@ -423,8 +427,8 @@ function updateSaveButtonState(tabId) {
 
         // Define submission state for this specific field
         const stageName = tabId === 'titles' ? 'titles' : tabId === 'preoral' ? 'preoral' : 'final';
-        const stageLinks = window.currentLinks[stageName] || {};
-        const isSubmitted = fieldKey && stageLinks[fieldKey] && stageLinks[fieldKey].trim() !== '';
+        const stageLinks = (window.currentLinks && window.currentLinks[stageName]) || {};
+        const isSubmitted = fieldKey && stageLinks[fieldKey] && typeof stageLinks[fieldKey] === 'string' && stageLinks[fieldKey].trim() !== '';
 
         // --- ADVISER STATUS BADGE (Always Visible) ---
         const existingBadge = subContent.querySelector('.adviser-status-badge');
@@ -445,7 +449,7 @@ function updateSaveButtonState(tabId) {
         } else {
             statusHtml = `<div class="adviser-status-badge" style="background:#f8fafc; color:#64748b; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid #e2e8f0; border-style:dashed;"><span class="material-icons-round">info</span> Upload document for Adviser Review</div>`;
         }
-        subContent.prepend(new DOMParser().parseFromString(statusHtml, 'text/html').body.firstChild);
+        subContent.insertAdjacentHTML('afterbegin', statusHtml);
 
         if (!isScheduled) {
             if (isSubmitted && adviserStatus === 'Approved') {
