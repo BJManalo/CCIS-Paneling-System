@@ -195,25 +195,18 @@ function closeDetailsModal() {
 
 // --- Filter Logic ---
 function applyFilters() {
-    const term = document.getElementById('searchInput').value.toLowerCase();
     const phase = document.getElementById('phaseFilter').value;
 
     filteredSchedules = allSchedules.filter(sched => {
-        const groupName = (sched.student_groups?.group_name || '').toLowerCase();
-        const program = (sched.student_groups?.program || '').toLowerCase();
-        const venue = (sched.schedule_venue || '').toLowerCase();
         const type = (sched.schedule_type || '');
-
-        const matchesSearch = groupName.includes(term) || program.includes(term) || venue.includes(term) || type.toLowerCase().includes(term);
         const matchesPhase = phase === 'All' || type === phase;
 
-        return matchesSearch && matchesPhase;
+        return matchesPhase;
     });
 
     renderCalendar();
 }
 
-document.getElementById('searchInput')?.addEventListener('input', applyFilters);
 document.getElementById('phaseFilter')?.addEventListener('change', applyFilters);
 
 // --- Logout ---

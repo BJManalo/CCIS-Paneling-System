@@ -100,7 +100,6 @@ function applyFiltersAndRender() {
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : {};
     const userNameNormalized = String(user.name || user.full_name || '').trim().toLowerCase();
-    const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
 
     filteredSchedules = allSchedules.filter(sched => {
         // 1. Role Context Filter
@@ -111,12 +110,7 @@ function applyFiltersAndRender() {
         if (currentRole === 'Panel' && !isPanel) return false;
         if (currentRole === 'Adviser' && !isAdviser) return false;
 
-        // 2. Search Filter
-        const groupName = (sched.student_groups?.group_name || '').toLowerCase();
-        const program = (sched.student_groups?.program || '').toLowerCase();
-        const type = (sched.schedule_type || '').toLowerCase();
-        
-        return groupName.includes(searchTerm) || program.includes(searchTerm) || type.includes(searchTerm);
+        return true;
     });
 
     renderCalendar();
@@ -187,9 +181,6 @@ function renderCalendar() {
         });
     }
 }
-
-// Listeners
-document.getElementById('searchInput')?.addEventListener('input', applyFiltersAndRender);
 
 function logout() {
     localStorage.removeItem('loginUser');
