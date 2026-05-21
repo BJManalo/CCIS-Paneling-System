@@ -65,6 +65,9 @@ function renderAccounts(accounts) {
                 <button class="edit-btn" onclick="openEditUserModal(${acc.id})" style="background:none; border:none; cursor:pointer; color:var(--primary-color);">
                     <span class="material-icons-round">edit</span>
                 </button>
+                <button class="delete-btn" onclick="deleteAccount(${acc.id})" style="background:none; border:none; cursor:pointer; color:#ef4444; margin-left:8px;">
+                    <span class="material-icons-round">delete</span>
+                </button>
             </td>
         `;
         tableBody.appendChild(row);
@@ -171,6 +174,27 @@ async function saveUser(e) {
     } finally {
         saveBtn.textContent = originalBtnText;
         saveBtn.disabled = false;
+    }
+}
+
+// --- Delete User ---
+async function deleteAccount(id) {
+    if (!confirm('Are you sure you want to delete this account?')) {
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('accounts')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        loadAccounts(); // Refresh list
+    } catch (err) {
+        alert('Error deleting account: ' + err.message);
+        console.error(err);
     }
 }
 
