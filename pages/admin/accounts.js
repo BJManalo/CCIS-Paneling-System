@@ -62,12 +62,14 @@ function renderAccounts(accounts) {
             <td>${acc.email || '-'}</td>
             <td>${acc.designation !== 'None' ? acc.designation : '-'}</td>
             <td>
-                <button class="edit-btn" onclick="openEditUserModal(${acc.id})" style="background:none; border:none; cursor:pointer; color:var(--primary-color);">
-                    <span class="material-icons-round">edit</span>
-                </button>
-                <button class="delete-btn" onclick="deleteAccount(${acc.id})" style="background:none; border:none; cursor:pointer; color:#ef4444; margin-left:8px;">
-                    <span class="material-icons-round">delete</span>
-                </button>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="edit-btn" onclick="openEditUserModal(${acc.id})" style="background:none; border:none; cursor:pointer; color:var(--primary-color);" title="Edit">
+                        <span class="material-icons-round">edit</span>
+                    </button>
+                    <button class="delete-btn" onclick="deleteAccount(${acc.id})" style="background:none; border:none; cursor:pointer; color:#ef4444;" title="Delete">
+                        <span class="material-icons-round">delete</span>
+                    </button>
+                </div>
             </td>
         `;
         tableBody.appendChild(row);
