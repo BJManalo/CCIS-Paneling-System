@@ -239,9 +239,12 @@ function renderGroups(groups) {
                 </div>
             </td>
             <td>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; justify-content: center; gap: 10px;">
                     <button class="edit-btn" onclick="openEditGroupModal('${group.id}')" title="Edit Group Details" style="background:none; border:none; cursor:pointer; color:var(--primary-color);">
                         <span class="material-icons-round" style="font-size: 20px;">edit</span>
+                    </button>
+                    <button class="delete-btn" onclick="deleteGroup('${group.id}')" title="Delete Group" style="background:none; border:none; cursor:pointer; color:#ef4444;">
+                        <span class="material-icons-round" style="font-size: 20px;">delete</span>
                     </button>
                 </div>
             </td>
@@ -304,6 +307,60 @@ async function openEditGroupModal(groupId) {
 function closeGroupModal() {
     document.getElementById('editGroupModal').classList.remove('active');
 }
+
+// --- Delete Group Logic ---
+let groupIdToDelete = null;
+
+function deleteGroup(id) {
+    groupIdToDelete = id;
+    document.getElementById('deleteConfirmModal').classList.add('active');
+}
+
+function closeDeleteConfirmModal() {
+    groupIdToDelete = null;
+    document.getElementById('deleteConfirmModal').classList.remove('active');
+}
+
+async function confirmDeleteGroup() {
+    if (!groupIdToDelete) return;
+
+    const btn = document.getElementById('confirmDeleteBtn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Deleting...';
+    btn.disabled = true;
+
+    try {
+        const { error } = await supabaseClient
+            .from('student_groups')
+            .delete()
+            .eq('id', groupIdToDelete);
+
+        if (error) throw error;
+
+        closeDeleteConfirmModal();
+        showToast('Group deleted successfully!');
+        loadGroups(); // Refresh list
+    } catch (err) {
+        alert('Error deleting group: ' + err.message);
+        console.error(err);
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Close modals if clicked outside
+document.getElementById('editGroupModal').addEventListener('click', (e) => {
+    if (e.target.id === 'editGroupModal') {
+        closeGroupModal();
+    }
+});
+
+document.getElementById('deleteConfirmModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'deleteConfirmModal') {
+        closeDeleteConfirmModal();
+    }
+});
 
 async function saveGroupChanges(e) {
     e.preventDefault();

@@ -74,7 +74,7 @@
                         <th>Section</th>
                         <th>Adviser</th>
                         <th>Members</th>
-                        <th>Action</th>
+                        <th style="text-align: center;">Action</th>
                     </tr>
                 </thead>
                 <tbody id="groupsTableBody">
@@ -245,6 +245,22 @@
                     <button type="submit" class="btn-save">Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div style="color: #ef4444; margin-bottom: 20px;">
+                <span class="material-icons-round" style="font-size: 48px;">warning</span>
+            </div>
+            <h2 class="modal-title" style="text-align: center; margin-bottom: 15px;">Delete Group</h2>
+            <p style="color: #64748b; margin-bottom: 30px; font-size: 16px;">Are you sure you want to delete this group? This action cannot be undone.</p>
+            
+            <div class="modal-actions" style="margin-top: 0;">
+                <button type="button" class="btn-cancel" onclick="closeDeleteConfirmModal()">Cancel</button>
+                <button type="button" class="btn-save" style="background: #ef4444; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);" id="confirmDeleteBtn" onclick="confirmDeleteGroup()">Delete</button>
+            </div>
         </div>
     </div>
 
