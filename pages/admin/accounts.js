@@ -179,31 +179,56 @@ async function saveUser(e) {
     }
 }
 
-// --- Delete User ---
-async function deleteAccount(id) {
-    if (!confirm('Are you sure you want to delete this account?')) {
-        return;
-    }
+// --- Delete User Modal Logic ---
+let accountIdToDelete = null;
+
+function deleteAccount(id) {
+    accountIdToDelete = id;
+    document.getElementById('deleteConfirmModal').classList.add('active');
+}
+
+function closeDeleteConfirmModal() {
+    accountIdToDelete = null;
+    document.getElementById('deleteConfirmModal').classList.remove('active');
+}
+
+async function confirmDeleteAccount() {
+    if (!accountIdToDelete) return;
+
+    const btn = document.getElementById('confirmDeleteBtn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Deleting...';
+    btn.disabled = true;
 
     try {
         const { error } = await supabaseClient
             .from('accounts')
             .delete()
-            .eq('id', id);
+            .eq('id', accountIdToDelete);
 
         if (error) throw error;
 
+        closeDeleteConfirmModal();
         loadAccounts(); // Refresh list
     } catch (err) {
         alert('Error deleting account: ' + err.message);
         console.error(err);
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
 
-// Close modal if clicked outside
+// Close modals if clicked outside
 document.getElementById('addUserModal').addEventListener('click', (e) => {
     if (e.target.id === 'addUserModal') {
         closeAddUserModal();
+    }
+});
+
+document.getElementById('deleteConfirmModal').addEventListener('click', (e) => {
+    if (e.target.id === 'deleteConfirmModal') {
+        closeDeleteConfirmModal();
     }
 });
 
