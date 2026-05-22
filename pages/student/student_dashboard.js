@@ -99,10 +99,11 @@ async function loadSubmissionData() {
 
             const checkGraded = (keyword) => {
                 if (totalStudents === 0) return false;
+                const lowerKeyword = keyword.toLowerCase();
                 const gradedCount = students.filter(s =>
-                    s.grades && s.grades.some(g => g.grade_type && g.grade_type.includes(keyword))
+                    s.grades && s.grades.some(g => g.grade_type && g.grade_type.toLowerCase().includes(lowerKeyword) && g.grade !== null)
                 ).length;
-                return gradedCount === totalStudents;
+                return gradedCount > 0;
             };
 
             const isTitleGraded = checkGraded('Title');
