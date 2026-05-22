@@ -119,12 +119,12 @@ async function loadSubmissionData() {
             };
 
             if (preOralBtn) {
-                const isLocked = !isTitleGraded || !isPreOralScheduled;
+                const isLocked = !isTitleGraded;
                 if (isLocked) {
                     preOralBtn.disabled = true;
                     preOralBtn.style.opacity = '0.5';
                     preOralBtn.style.cursor = 'not-allowed';
-                    preOralBtn.title = !isTitleGraded ? "Locked: Title Defense grades pending." : "Locked: Not yet scheduled for Pre-Oral Defense.";
+                    preOralBtn.title = "Locked: Title Defense grades pending.";
                     if (!preOralBtn.innerHTML.includes('lock')) preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
                 } else {
                     preOralBtn.disabled = false;
@@ -137,12 +137,12 @@ async function loadSubmissionData() {
             }
 
             if (finalBtn) {
-                const isLocked = !isPreOralGraded || !isFinalScheduled;
+                const isLocked = !isPreOralGraded;
                 if (isLocked) {
                     finalBtn.disabled = true;
                     finalBtn.style.opacity = '0.5';
                     finalBtn.style.cursor = 'not-allowed';
-                    finalBtn.title = !isPreOralGraded ? "Locked: Pre-Oral grades pending." : "Locked: Not yet scheduled for Final Defense.";
+                    finalBtn.title = "Locked: Pre-Oral grades pending.";
                     if (!finalBtn.innerHTML.includes('lock')) finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
                 } else {
                     finalBtn.disabled = false;
