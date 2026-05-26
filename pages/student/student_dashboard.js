@@ -620,16 +620,84 @@ function updateSaveButtonState(tabId) {
         if (isSubmitted) {
             // CHECK IF PANELS HAVE REPLIED (Allow Revision)
             let hasFeedback = false;
-            // Requirement: Enable only if there are at least 2 status/comments
+            let isWinnerApproved = false;
+            
             if (window.feedbackStatus && window.feedbackStatus[tabId] && window.feedbackStatus[tabId][fieldKey]) {
                 const fStat = window.feedbackStatus[tabId][fieldKey];
-                // Check if AT LEAST 2 panels have set a status
+                
+                // Determine winner status by majority vote / May Lynn Farren
+                let mayLynnStatus = null;
+                const normalizedTarget = "may lynn farren";
+                Object.keys(fStat).forEach(panelName => {
+                    if (panelName.toLowerCase().trim() === normalizedTarget) {
+                        mayLynnStatus = fStat[panelName];
+                    }
+                });
+
+                let winnerStatus = null;
+                const statusCounts = {};
+                let totalVotesCount = 0;
+                Object.keys(fStat).forEach(name => {
+                    const s = fStat[name];
+                    if (s && s !== 'Pending') {
+                        statusCounts[s] = (statusCounts[s] || 0) + 1;
+                        totalVotesCount++;
+                    }
+                });
+
+                if (totalVotesCount > 0) {
+                    let maxCount = 0;
+                    Object.keys(statusCounts).forEach(s => {
+                        if (statusCounts[s] > maxCount) {
+                            maxCount = statusCounts[s];
+                            winnerStatus = s;
+                        } else if (statusCounts[s] === maxCount) {
+                            if (mayLynnStatus && mayLynnStatus === s) {
+                                winnerStatus = s;
+                            }
+                        }
+                    });
+                    if (totalVotesCount === 1 && mayLynnStatus) {
+                        winnerStatus = mayLynnStatus;
+                    }
+                } else if (mayLynnStatus) {
+                    winnerStatus = mayLynnStatus;
+                }
+
+                isWinnerApproved = winnerStatus && (winnerStatus.toLowerCase().trim() === 'approved' || winnerStatus.toLowerCase().trim() === 'approve');
+
                 if (fStat && Object.keys(fStat).length >= 2) {
                     hasFeedback = true;
                 }
             }
 
-            if (hasFeedback) {
+            if (isWinnerApproved) {
+                // Hide the revision group
+                const revGroup = subContent.querySelector('.revision-group');
+                if (revGroup) revGroup.style.display = 'none';
+
+                // FULL LOCK: Approved by panel
+                if (saveBtn) {
+                    saveBtn.innerHTML = '<span class="material-icons-round">check_circle</span> Approved';
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.7';
+                    saveBtn.style.cursor = 'default';
+                }
+                inputs.forEach(input => {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f1f5f9';
+                    input.title = "Approved";
+
+                    const wrapper = input.closest('.input-with-action');
+                    if (wrapper) {
+                        wrapper.querySelectorAll('button').forEach(b => {
+                            b.disabled = true;
+                            b.style.cursor = 'not-allowed';
+                            b.style.opacity = '0.6';
+                        });
+                    }
+                });
+            } else if (hasFeedback) {
                 // Show the revision group
                 const revGroup = subContent.querySelector('.revision-group');
                 if (revGroup) revGroup.style.display = 'block';
