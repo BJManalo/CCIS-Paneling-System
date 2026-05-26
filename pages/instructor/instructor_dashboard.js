@@ -652,12 +652,10 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
         }
 
         feedbackArea.innerHTML = `
-            <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 11px; font-weight: 600; text-align: center; margin-bottom: 12px;">
+            <div style="padding: 8px; background: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 6px; color: #0369a1; font-size: 11px; font-weight: 600; text-align: center;">
                 <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
                 ADVISER READ-ONLY VIEW
             </div>
-            <div style="font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Panel Evaluations</div>
-            ${evaluationsHtml}
         `;
 
         itemContainer.appendChild(feedbackArea);

@@ -932,8 +932,8 @@ window.openFileModal = (groupId) => {
             // Other Panel Feedback
             let panelsToDisplay = [];
             if (currentRole === 'Adviser') {
-                // Show ALL assigned panels, not just those who graded
-                panelsToDisplay = group.panels || [];
+                // Hide Panel Evaluations from Adviser view as requested
+                panelsToDisplay = [];
             } else {
                 // If grading mode, filter self out. If viewing as third party (All but not panelist), show all
                 if (canGrade) {
