@@ -1373,12 +1373,20 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 };
 
 window.saveAdviserRemarks = async (groupId, fileKey) => {
+    const textarea = document.getElementById(`adviser-remarks-${fileKey}`);
+    const btn = textarea ? textarea.nextElementSibling : null;
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Saving...';
+    }
+
     try {
         const group = allData.find(g => g.id == groupId);
         if (!group) return;
 
         const currentRemarks = group.adviser_remarks || {};
-        const remarksValue = document.getElementById(`adviser-remarks-${fileKey}`)?.value.trim() || '';
+        const remarksValue = textarea?.value.trim() || '';
 
         currentRemarks[fileKey] = remarksValue;
 
@@ -1398,12 +1406,28 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
             alert('Remarks saved successfully.');
         }
 
+        if (btn) {
+            btn.innerText = 'Saved';
+            btn.style.background = '#dcfce7';
+            btn.style.color = '#166534';
+            btn.style.borderColor = '#bbf7d0';
+            btn.disabled = true;
+            btn.style.cursor = 'not-allowed';
+        }
+
     } catch (err) {
         console.error('Error saving adviser remarks:', err);
         if (typeof showToast === 'function') {
             showToast('Failed to save remarks.', 'error');
         } else {
             alert('Failed to save remarks.');
+        }
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Save';
+            btn.style.background = '#f8fafc';
+            btn.style.color = '#475569';
         }
     }
 };
