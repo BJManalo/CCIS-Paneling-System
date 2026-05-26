@@ -412,14 +412,24 @@ function updateGroupDropdown() {
         }
 
         // Rule 4: Adviser Approval Check
-        // Students must have their document APPROVED by their adviser before scheduling.
+        // Students must have ALL their documents for this stage APPROVED by their adviser before scheduling.
         const adviserStatus = group.adviser_status || {};
-        const catKey = normalize(targetType).includes('title') ? 'title' :
-                       normalize(targetType).includes('preoral') ? 'preoral' :
-                       normalize(targetType).includes('final') ? 'final' : null;
-        
-        if (catKey && adviserStatus[catKey] !== 'Approved') {
-            return false;
+        const isTitle = normalize(targetType).includes('title');
+        const isPreOral = normalize(targetType).includes('preoral');
+        const isFinal = normalize(targetType).includes('final');
+
+        if (isTitle) {
+            const hasLegacy = adviserStatus['title'] === 'Approved';
+            const hasAllGranular = adviserStatus['title1'] === 'Approved' && adviserStatus['title2'] === 'Approved' && adviserStatus['title3'] === 'Approved';
+            if (!hasLegacy && !hasAllGranular) return false;
+        } else if (isPreOral) {
+            const hasLegacy = adviserStatus['preoral'] === 'Approved';
+            const hasAllGranular = adviserStatus['ch1'] === 'Approved' && adviserStatus['ch2'] === 'Approved' && adviserStatus['ch3'] === 'Approved';
+            if (!hasLegacy && !hasAllGranular) return false;
+        } else if (isFinal) {
+            const hasLegacy = adviserStatus['final'] === 'Approved';
+            const hasAllGranular = adviserStatus['ch4'] === 'Approved' && adviserStatus['ch5'] === 'Approved';
+            if (!hasLegacy && !hasAllGranular) return false;
         }
 
         return true;
