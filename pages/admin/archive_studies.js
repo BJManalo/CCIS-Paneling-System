@@ -235,18 +235,16 @@ function renderArchiveTable() {
         row.style.cursor = 'pointer';
         const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
         const panels = Array.isArray(item.panelists) ? item.panelists : JSON.parse(item.panelists || '[]');
-        const collapseId = `collapse-${item.id}`;
-
         const displaysTitle = cleanTitle(item.project_title || item.group_name);
 
         const fullMembers = members.join(', ');
         const fullPanels = panels.join(', ');
 
-        row.onclick = () => toggleRow(collapseId);
+        row.onclick = () => viewArchiveDetails(item.id);
         row.innerHTML = `
             <td style="font-weight: 700; color: #1e293b; font-size: 0.9rem; max-width: 300px;">
                 <div style="display:flex; align-items:flex-start; gap:10px;">
-                    <span class="material-icons-round" style="font-size: 20px; color:#cbd5e1; transition: transform 0.25s;" id="icon-${collapseId}">chevron_right</span>
+                    <span class="material-icons-round" style="font-size: 20px; color:#cbd5e1;">description</span>
                     <span style="line-height: 1.4;">${displaysTitle}</span>
                 </div>
             </td>
@@ -261,57 +259,6 @@ function renderArchiveTable() {
             </td>
         `;
         tableBody.appendChild(row);
-
-        const detailRow = document.createElement('tr');
-        detailRow.id = collapseId;
-        detailRow.style.display = 'none';
-        detailRow.style.background = '#fcfdfe';
-
-        const subData = typeof item.submissions === 'string' ? JSON.parse(item.submissions || '{}') : item.submissions || {};
-        const gradesData = item.grades || subData.grades_snapshot || [];
-
-        let gradesHtml = '';
-        if (Array.isArray(gradesData) && gradesData.length > 0) {
-            gradesHtml = gradesData.map(m => {
-                const titleGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('title')) || {}).grade || '-';
-                // DATABASE FIX: Checking for "Pre Oral" or "Preoral"
-                const preoralGrade = (m.grades.find(g => {
-                    const t = (g.grade_type || '').toLowerCase();
-                    return t.includes('pre') && t.includes('oral');
-                }) || {}).grade || '-';
-                const finalGrade = (m.grades.find(g => (g.grade_type || '').toLowerCase().includes('final')) || {}).grade || '-';
-
-                return `
-                    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:15px; padding:12px 0; border-bottom:1px solid #f1f5f9; align-items:center;">
-                        <span style="font-weight:600; color:#334155; font-size: 0.9rem;">${m.name}</span>
-                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Title</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${titleGrade}</div></div>
-                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Pre Oral</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${preoralGrade}</div></div>
-                        <div style="text-align:center;"><div style="font-size:9px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Final</div><div style="font-weight:700; color:var(--primary-color); font-size: 1.05rem;">${finalGrade}</div></div>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            gradesHtml = '<div style="padding:20px; text-align:center; color:#94a3b8;">No grade records found in archive.</div>';
-        }
-
-        detailRow.innerHTML = `
-            <td colspan="6" style="padding: 0;">
-                <div style="padding: 20px 40px; border-left: 4px solid var(--primary-color); animation: fadeIn 0.3s ease-out;">
-                    <div style="max-width: 750px; background:white; padding:25px; border-radius:16px; border:1px solid #e2e8f0; box-shadow: 0 4px 20px -5px rgba(0,0,0,0.05);">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px; color:var(--primary-dark);">
-                            <div style="width: 36px; height: 36px; background: #eff6ff; border-radius: 10px; display: flex; align-items:center; justify-content:center; color: var(--primary-color);">
-                                <span class="material-icons-round" style="font-size: 20px;">military_tech</span>
-                            </div>
-                            <strong style="font-size:1rem; letter-spacing: -0.2px;">Graduated Members Academic Achievement</strong>
-                        </div>
-                        <div style="display: flex; flex-direction: column;">
-                            ${gradesHtml}
-                        </div>
-                    </div>
-                </div>
-            </td>
-        `;
-        tableBody.appendChild(detailRow);
     });
 
     updatePaginationUI(totalPages);
@@ -418,42 +365,24 @@ function viewArchiveDetails(id) {
                 else links = { [catInfo[catKey].label]: linkVal };
             } catch (e) { links = { [catInfo[catKey].label]: linkVal }; }
 
-            const allKeys = Object.keys(links);
-            const hasAnyTitleRevision = allKeys.some(k => k.toLowerCase().includes('title') && k.toLowerCase().includes('revised'));
-
             Object.entries(links).forEach(([fileKey, url]) => {
                 if (url && url.toString().trim() !== '' && url !== "null") {
                     const lowKey = fileKey.toLowerCase();
                     const isRevisionKey = lowKey.includes('revised');
-                    const baseKey = fileKey.replace('_revised', '');
-                    const hasRevisedVersion = allKeys.includes(`${baseKey}_revised`);
 
                     let isRelevant = false;
 
-                    if (catKey === 'title_link') {
-                        // For Title Defense: 
-                        // If any revised title exists, ONLY show revised titles.
-                        // Otherwise (fallback) show original titles.
-                        if (lowKey.startsWith('title')) {
-                            if (hasAnyTitleRevision) {
-                                if (isRevisionKey) isRelevant = true;
-                            } else {
-                                isRelevant = true;
-                            }
-                        }
-                    } else if (catKey === 'pre_oral_link' || catKey === 'final_link') {
-                        // For Chapters:
-                        // Show the revised version if it exists, otherwise show the original.
-                        const isChapter = fileKey.match(/^ch[1-5]/);
-                        if (isChapter) {
-                            if (isRevisionKey || !hasRevisedVersion) {
-                                isRelevant = true;
-                            }
-                        }
+                    if (catKey === 'title_link' && lowKey.startsWith('title')) {
+                        isRelevant = true;
+                    } else if ((catKey === 'pre_oral_link' || catKey === 'final_link') && lowKey.match(/^ch[1-5]/)) {
+                        isRelevant = true;
                     }
 
                     if (isRelevant) {
-                        const prettyLabel = getPrettyLabel(fileKey, subData.project_title);
+                        let prettyLabel = getPrettyLabel(fileKey, subData.project_title);
+                        if (isRevisionKey) {
+                            prettyLabel += ' (Revised)';
+                        }
                         addFileCard(fileGrid, prettyLabel, url, catInfo[catKey].icon, catInfo[catKey].label, catInfo[catKey].color);
                     }
                 }
