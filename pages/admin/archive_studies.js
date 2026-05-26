@@ -369,11 +369,21 @@ function viewArchiveDetails(id) {
                 if (url && url.toString().trim() !== '' && url !== "null") {
                     const lowKey = fileKey.toLowerCase();
                     const isRevisionKey = lowKey.includes('revised');
+                    const baseKey = fileKey.replace('_revised', '');
 
                     let isRelevant = false;
 
                     if (catKey === 'title_link' && lowKey.startsWith('title')) {
-                        isRelevant = true;
+                        let titleString = "";
+                        try {
+                            const titlesObj = typeof subData.project_title === 'string' ? JSON.parse(subData.project_title) : subData.project_title;
+                            titleString = titlesObj[baseKey] || "";
+                        } catch (e) {}
+
+                        const approvedTitle = item.project_title || "";
+                        if (titleString && approvedTitle && titleString.trim().toLowerCase() === approvedTitle.trim().toLowerCase()) {
+                            isRelevant = true;
+                        }
                     } else if ((catKey === 'pre_oral_link' || catKey === 'final_link') && lowKey.match(/^ch[1-5]/)) {
                         isRelevant = true;
                     }
