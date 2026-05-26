@@ -181,16 +181,19 @@ async function loadCapstoneData() {
         // 4. Fetch Defense Statuses and Detailed Feedback
         let defStatuses = [];
         let capstoneFeedback = [];
+        let capstoneAnnotations = [];
 
         try {
-            const [dsRes, cfRes] = await Promise.all([
+            const [dsRes, cfRes, caRes] = await Promise.all([
                 supabaseClient.from('defense_statuses').select('*'),
-                supabaseClient.from('capstone_feedback').select('*')
+                supabaseClient.from('capstone_feedback').select('*'),
+                supabaseClient.from('capstone_annotations').select('*')
             ]);
 
             if (dsRes.error) console.error('Error fetching defense_statuses:', dsRes.error);
             defStatuses = dsRes.data || [];
             capstoneFeedback = cfRes.data || [];
+            capstoneAnnotations = caRes.data || [];
         } catch (e) {
             console.error('Critical Fetch Error:', e);
         }
@@ -218,6 +221,12 @@ async function loadCapstoneData() {
                 if (cf.status) statuses[cf.file_key][cf.user_name] = cf.status;
                 if (cf.remarks) remarks[cf.file_key][cf.user_name] = cf.remarks;
                 if (cf.annotated_file_url) annotations[cf.file_key][cf.user_name] = cf.annotated_file_url;
+            });
+
+            // 3. Merge Annotations from New Table (capstone_annotations) - Primary Source
+            capstoneAnnotations.filter(ca => ca.group_id == groupId && ca.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(ca => {
+                if (!annotations[ca.file_key] || typeof annotations[ca.file_key] !== 'object') annotations[ca.file_key] = {};
+                if (ca.annotated_file_url) annotations[ca.file_key][ca.user_name] = ca.annotated_file_url;
             });
 
             return { statuses, remarks, annotations, id: legacy ? legacy.id : null };
@@ -1346,7 +1355,7 @@ async function saveAnnotatedPDF(isAuto = false) {
             .getPublicUrl(`submissions/annotations/${fileName}`);
 
         const { error: dbError } = await supabaseClient
-            .from('capstone_feedback')
+            .from('capstone_annotations')
             .upsert({
                 group_id: currentViewerGroupId,
                 defense_type: normalizeType(currentTab),
