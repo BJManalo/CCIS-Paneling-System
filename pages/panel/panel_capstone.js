@@ -61,7 +61,7 @@ async function loadCapstoneData() {
 
     try {
         // 1. Fetch Student Groups (with status columns)
-        const { data: groups, error: gError } = await supabaseClient.from('student_groups').select('*');
+        const { data: groups, error: gError } = await supabaseClient.from('student_groups').select('*').order('created_at', { ascending: false });
         if (gError) throw gError;
 
         // 2. Fetch Schedules (to map defense types)

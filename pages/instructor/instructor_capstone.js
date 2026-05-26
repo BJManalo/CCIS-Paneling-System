@@ -125,10 +125,11 @@ async function loadCapstoneData() {
     if (emptyState) emptyState.style.display = 'none';
 
     try {
-        // 1. Fetch Student Groups (with status columns)
+        // 1. Fetch Student Groups
         const { data: groups, error: gError } = await supabaseClient
             .from('student_groups')
-            .select('*');
+            .select('*')
+            .order('created_at', { ascending: false });
 
         if (gError) throw gError;
 

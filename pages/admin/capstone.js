@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function fetchCapstoneData() {
     try {
         const [gRes, sRes, stdRes, fRes, schedRes, sysRes, indRes] = await Promise.all([
-            supabaseClient.from('student_groups').select('*'),
+            supabaseClient.from('student_groups').select('*').order('created_at', { ascending: false }),
             supabaseClient.from('defense_statuses').select('*'),
             supabaseClient.from('students').select('*'),
             supabaseClient.from('capstone_feedback').select('*'),
