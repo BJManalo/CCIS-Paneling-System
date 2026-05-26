@@ -275,19 +275,57 @@ async function loadSubmissionData() {
                     });
 
                     const isTitle = key.startsWith('title');
-                    const isApproved = mayLynnStatus && (mayLynnStatus.toLowerCase().trim() === 'approved' || mayLynnStatus.toLowerCase().trim() === 'approve');
-                    const isApprovedWithRevisions = mayLynnStatus && mayLynnStatus.toLowerCase().trim().includes('approve') && mayLynnStatus.toLowerCase().trim().includes('revision');
+                    
+                    // Determine winner status by majority vote
+                    let winnerStatus = null;
+                    const statusCounts = {};
+                    let totalVotesCount = 0;
+
+                    Object.keys(panelStatuses).forEach(name => {
+                        const s = panelStatuses[name];
+                        if (s && s !== 'Pending') {
+                            statusCounts[s] = (statusCounts[s] || 0) + 1;
+                            totalVotesCount++;
+                        }
+                    });
+
+                    if (totalVotesCount > 0) {
+                        let maxCount = 0;
+                        Object.keys(statusCounts).forEach(s => {
+                            if (statusCounts[s] > maxCount) {
+                                maxCount = statusCounts[s];
+                                winnerStatus = s;
+                            } else if (statusCounts[s] === maxCount) {
+                                if (mayLynnStatus && mayLynnStatus === s) {
+                                    winnerStatus = s;
+                                }
+                            }
+                        });
+                        if (totalVotesCount === 1 && mayLynnStatus) {
+                            winnerStatus = mayLynnStatus;
+                        }
+                    } else if (mayLynnStatus) {
+                        winnerStatus = mayLynnStatus;
+                    }
 
                     let overallStatusHtml = '';
                     let panelReviewsHtml = '';
 
-                    if (isTitle && (isApproved || isApprovedWithRevisions)) {
+                    if (isTitle) {
                         if (subTabContent) {
                             const label = subTabContent.querySelector('label[for^="projectTitle"]');
                             if (label) {
-                                const text = isApprovedWithRevisions ? " (Approved Title with Revisions)" : " (Approved Title)";
-                                const badgeColor = isApprovedWithRevisions ? "#d97706" : "#166534";
-                                label.insertAdjacentHTML('beforeend', `<span class="title-status-inline-badge" style="color: ${badgeColor}; font-weight: bold; margin-left: 8px; font-size: 0.9rem;">${text}</span>`);
+                                const displayStatusText = winnerStatus || "Pending Panel Review";
+                                let badgeColor = "#475569"; // slate default
+                                const sLower = displayStatusText.toLowerCase();
+                                if (sLower.includes('approve') && sLower.includes('revision')) {
+                                    badgeColor = "#d97706"; // amber
+                                } else if (sLower.includes('approve') || sLower.includes('approved')) {
+                                    badgeColor = "#166534"; // green
+                                } else if (sLower.includes('reject') || sLower.includes('redefend') || sLower.includes('decline') || sLower.includes('declined')) {
+                                    badgeColor = "#991b1b"; // red
+                                }
+                                label.insertAdjacentHTML('beforeend', `<span class="title-status-inline-badge" style="color: ${badgeColor}; font-weight: bold; margin-left: 8px; font-size: 0.9rem;">(${displayStatusText})</span>`);
                             }
                         }
                     } else {
