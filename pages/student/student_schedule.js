@@ -138,3 +138,55 @@ window.toggleScheduleRow = function (id) {
     }
 }
 
+
+
+// --- Details Modal (Read-only) ---
+function openDetailsModal(sched) {
+    document.getElementById('viewGroupHeader').textContent = sched.student_groups?.group_name || 'Unknown Group';
+
+    const typeBadge = document.getElementById('viewTypeBadge');
+    typeBadge.textContent = sched.schedule_type;
+    typeBadge.className = 'type-badge ' + (
+        sched.schedule_type.toLowerCase().includes('title') ? 'type-title' :
+            (sched.schedule_type.toLowerCase().includes('pre-oral') || sched.schedule_type.toLowerCase().includes('preoral')) ? 'type-pre-oral' :
+                'type-final'
+    );
+
+    const timeStr = typeof formatTime12Hour === 'function' && sched.schedule_time ? formatTime12Hour(sched.schedule_time) : (sched.schedule_time || 'TBA');
+    
+    document.getElementById('viewDateTime').textContent = `${new Date(sched.schedule_date).toLocaleDateString()} at ${timeStr}`;
+    document.getElementById('viewVenue').textContent = sched.schedule_venue || 'TBA';
+    document.getElementById('viewProgram').textContent = (sched.student_groups?.program || 'N/A').toUpperCase();
+    document.getElementById('viewAdviser').textContent = sched.adviser || sched.student_groups?.adviser || 'N/A';
+
+    const panelsContainer = document.getElementById('viewPanels');
+    panelsContainer.innerHTML = '';
+    const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
+
+    if (panels.length === 0) {
+        panelsContainer.innerHTML = '<span style="color:#94a3b8; font-style:italic;">No panels assigned.</span>';
+    } else {
+        panels.forEach(p => {
+            const chip = document.createElement('span');
+            chip.style.cssText = `
+                display: inline-block;
+                padding: 6px 12px;
+                background: #f1f5f9;
+                color: #475569;
+                font-weight: 600;
+                font-size: 0.85rem;
+                border-radius: 8px;
+                margin-right: 5px;
+                margin-bottom: 5px;
+            `;
+            chip.textContent = p;
+            panelsContainer.appendChild(chip);
+        });
+    }
+
+    document.getElementById('detailsModal').classList.add('active');
+}
+
+function closeDetailsModal() {
+    document.getElementById('detailsModal').classList.remove('active');
+}
