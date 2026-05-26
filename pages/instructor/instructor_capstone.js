@@ -1363,8 +1363,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
             showToast(`Status updated to ${newStatus}.`, toastType);
         }
         
-        // Refresh UI
-        openFileModal(groupId); 
+        // Refresh UI (only the background table, do NOT re-open modal to avoid resetting the PDF viewer)
         renderTable();
 
     } catch (err) {

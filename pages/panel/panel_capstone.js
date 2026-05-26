@@ -1607,8 +1607,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         const toastType = newStatus === 'Approved' ? 'success' : 'error';
         showToast(`Status updated to ${newStatus}.`, toastType);
         
-        // Refresh UI
-        openFileModal(groupId); 
+        // Refresh UI (only the background table, do NOT re-open modal to avoid resetting the PDF viewer)
         loadCapstoneData(); // Refresh main list
 
     } catch (err) {
