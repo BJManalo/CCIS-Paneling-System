@@ -454,6 +454,56 @@ function updateSaveButtonState(tabId) {
         else if (tabId === 'final') isScheduled = window.scheduleStatus.final;
     }
 
+    // Pre-calculate if any title is approved for Title Defense
+    let isAnyTitleApproved = false;
+    if (tabId === 'titles') {
+        ['title1', 'title2', 'title3'].forEach(key => {
+            const panelStatuses = window.feedbackStatus && window.feedbackStatus['titles'] && window.feedbackStatus['titles'][key] ? window.feedbackStatus['titles'][key] : {};
+            let mayLynnStatus = null;
+            const normalizedTarget = "may lynn farren";
+            Object.keys(panelStatuses).forEach(panelName => {
+                if (panelName.toLowerCase().trim() === normalizedTarget) {
+                    mayLynnStatus = panelStatuses[panelName];
+                }
+            });
+
+            let winnerStatus = null;
+            const statusCounts = {};
+            let totalVotesCount = 0;
+            Object.keys(panelStatuses).forEach(name => {
+                const s = panelStatuses[name];
+                if (s && s !== 'Pending') {
+                    statusCounts[s] = (statusCounts[s] || 0) + 1;
+                    totalVotesCount++;
+                }
+            });
+
+            if (totalVotesCount > 0) {
+                let maxCount = 0;
+                Object.keys(statusCounts).forEach(s => {
+                    if (statusCounts[s] > maxCount) {
+                        maxCount = statusCounts[s];
+                        winnerStatus = s;
+                    } else if (statusCounts[s] === maxCount) {
+                        if (mayLynnStatus && mayLynnStatus === s) {
+                            winnerStatus = s;
+                        }
+                    }
+                });
+                if (totalVotesCount === 1 && mayLynnStatus) {
+                    winnerStatus = mayLynnStatus;
+                }
+            } else if (mayLynnStatus) {
+                winnerStatus = mayLynnStatus;
+            }
+
+            const isApproved = winnerStatus && (winnerStatus.toLowerCase().trim() === 'approved' || winnerStatus.toLowerCase().trim() === 'approve');
+            if (isApproved) {
+                isAnyTitleApproved = true;
+            }
+        });
+    }
+
     const groupData = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
     const adviserStatusRaw = groupData.adviser_status || {};
     const adviserRemarksRaw = groupData.adviser_remarks || {};
@@ -687,6 +737,32 @@ function updateSaveButtonState(tabId) {
                     input.readOnly = true;
                     input.style.backgroundColor = '#f1f5f9';
                     input.title = "Approved";
+
+                    const wrapper = input.closest('.input-with-action');
+                    if (wrapper) {
+                        wrapper.querySelectorAll('button').forEach(b => {
+                            b.disabled = true;
+                            b.style.cursor = 'not-allowed';
+                            b.style.opacity = '0.6';
+                        });
+                    }
+                });
+            } else if (tabId === 'titles' && isAnyTitleApproved) {
+                // Hide the revision group
+                const revGroup = subContent.querySelector('.revision-group');
+                if (revGroup) revGroup.style.display = 'none';
+
+                // Lock this title input & save button
+                if (saveBtn) {
+                    saveBtn.innerHTML = '<span class="material-icons-round">lock</span> Locked (Another Title Approved)';
+                    saveBtn.disabled = true;
+                    saveBtn.style.opacity = '0.7';
+                    saveBtn.style.cursor = 'default';
+                }
+                inputs.forEach(input => {
+                    input.readOnly = true;
+                    input.style.backgroundColor = '#f1f5f9';
+                    input.title = "Locked (Another Title Approved)";
 
                     const wrapper = input.closest('.input-with-action');
                     if (wrapper) {
