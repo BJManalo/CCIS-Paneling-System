@@ -499,8 +499,8 @@ function applyFilters() {
             // Must be the Adviser of the group being evaluated
             matchesMain = isAdviser;
         } else {
-            // "Evaluation" tab: show everything in the system
-            matchesMain = true;
+            // "Evaluation" tab: only show evaluations for groups created by this instructor
+            matchesMain = (String(ev.createdBy) === String(userId));
         }
         if (!matchesMain) return false;
 

@@ -436,6 +436,12 @@ async function saveGroupChanges(e) {
                 .eq('id', groupId);
             if (error) throw error;
         } else {
+            const userJson = localStorage.getItem('loginUser');
+            const user = userJson ? JSON.parse(userJson) : null;
+            if (user && user.id) {
+                groupData.created_by = user.id;
+                groupData.user_id = user.id;
+            }
             const { data, error } = await supabaseClient
                 .from('student_groups')
                 .insert([groupData])
