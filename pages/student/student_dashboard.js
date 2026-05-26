@@ -246,6 +246,120 @@ async function loadSubmissionData() {
                 const hasAnnotations = Object.keys(rawAnnotations).length > 0;
 
                 if (hasFile) {
+                    const tabData = key.startsWith('title') ? titleData : (['ch1', 'ch2', 'ch3'].includes(key) ? preOralData : finalData);
+                    const panelStatuses = tabData.statuses[key] || {};
+                    const panelRemarks = tabData.remarks[key] || {};
+
+                    let mayLynnStatus = null;
+                    let mayLynnRemarks = null;
+                    const normalizedTarget = "may lynn farren";
+                    
+                    Object.keys(panelStatuses).forEach(panelName => {
+                        if (panelName.toLowerCase().trim() === normalizedTarget) {
+                            mayLynnStatus = panelStatuses[panelName];
+                        }
+                    });
+                    Object.keys(panelRemarks).forEach(panelName => {
+                        if (panelName.toLowerCase().trim() === normalizedTarget) {
+                            mayLynnRemarks = panelRemarks[panelName];
+                        }
+                    });
+
+                    let overallText = "Pending Panel Review";
+                    let overallColor = "#1e40af"; // blue
+                    let overallBg = "#eff6ff";
+                    let overallBorder = "#bfdbfe";
+                    let overallIcon = "pending";
+
+                    if (mayLynnStatus) {
+                        const normalizedStatus = mayLynnStatus.toLowerCase().trim();
+                        if (normalizedStatus.includes('approve') && normalizedStatus.includes('revision')) {
+                            overallText = "Approved with Revisions";
+                            overallColor = "#b45309"; // amber
+                            overallBg = "#fffbeb";
+                            overallBorder = "#fcd34d";
+                            overallIcon = "warning";
+                        } else if (normalizedStatus === 'approve' || normalizedStatus === 'approved') {
+                            overallText = "Approved";
+                            overallColor = "#166534"; // green
+                            overallBg = "#dcfce7";
+                            overallBorder = "#bbf7d0";
+                            overallIcon = "check_circle";
+                        } else if (normalizedStatus === 'rejected' || normalizedStatus === 'redefend' || normalizedStatus === 'decline' || normalizedStatus === 'declined') {
+                            overallText = "Declined / Redefend";
+                            overallColor = "#991b1b"; // red
+                            overallBg = "#fee2e2";
+                            overallBorder = "#fecaca";
+                            overallIcon = "cancel";
+                        } else {
+                            overallText = mayLynnStatus;
+                            overallColor = "#475569"; // slate
+                            overallBg = "#f1f5f9";
+                            overallBorder = "#cbd5e1";
+                            overallIcon = "info";
+                        }
+                    } else {
+                        overallText = "Pending May Lynn Farren Approval";
+                    }
+
+                    const overallStatusHtml = `
+                        <div class="status-badge-container" style="background:${overallBg}; color:${overallColor}; padding:12px; border-radius:8px; margin-bottom:12px; font-size:0.85rem; font-weight:600; display:flex; flex-direction:column; gap:6px; border:1px solid ${overallBorder};">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span class="material-icons-round" style="font-size: 20px;">${overallIcon}</span>
+                                <span>Overall Status: <strong>${overallText}</strong></span>
+                            </div>
+                            <div style="font-size:0.75rem; font-weight:400; color:#475569; margin-top:2px;">
+                                <em>Approval Basis: May Lynn Farren</em>
+                            </div>
+                        </div>
+                    `;
+
+                    let panelReviewsHtml = '';
+                    const panelNames = Object.keys({ ...panelStatuses, ...panelRemarks });
+                    if (panelNames.length > 0) {
+                        let listItems = '';
+                        panelNames.forEach(name => {
+                            const statusVal = panelStatuses[name] || 'Pending';
+                            const remarkVal = panelRemarks[name] || '';
+                            let badgeBg = '#f1f5f9';
+                            let badgeColor = '#475569';
+                            
+                            const sLower = statusVal.toLowerCase().trim();
+                            if (sLower.includes('approve') && sLower.includes('revision')) {
+                                badgeBg = '#fffbeb'; badgeColor = '#b45309';
+                            } else if (sLower === 'approve' || sLower === 'approved') {
+                                badgeBg = '#dcfce7'; badgeColor = '#166534';
+                            } else if (sLower === 'rejected' || sLower === 'redefend' || sLower === 'decline' || sLower === 'declined') {
+                                badgeBg = '#fee2e2'; badgeColor = '#991b1b';
+                            }
+
+                            const isMLF = name.toLowerCase().trim() === normalizedTarget;
+                            const displayName = isMLF ? `<strong>${name} (Basis of Approval)</strong>` : name;
+
+                            listItems += `
+                                <div style="display:flex; flex-direction:column; gap:4px; padding:10px 0; border-bottom:1px solid #f1f5f9;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                        <span style="font-size:0.8rem; color:#1e293b; font-weight:500;">${displayName}</span>
+                                        <span style="background:${badgeBg}; color:${badgeColor}; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:12px; text-transform:uppercase;">${statusVal}</span>
+                                    </div>
+                                    ${remarkVal ? `<div style="font-size:0.75rem; color:#475569; padding:6px; background:#f8fafc; border-radius:4px; border-left:2px solid #cbd5e1; margin-top:2px;">${remarkVal}</div>` : ''}
+                                </div>
+                            `;
+                        });
+
+                        panelReviewsHtml = `
+                            <div class="remarks-list-container" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: white; margin-bottom: 15px;">
+                                <div style="font-size:0.8rem; font-weight:700; color:#334155; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                                    <span class="material-icons-round" style="font-size:18px; color:#64748b;">rate_review</span>
+                                    Panel Reviews
+                                </div>
+                                <div style="display:flex; flex-direction:column;">
+                                    ${listItems}
+                                </div>
+                            </div>
+                        `;
+                    }
+
                     const headerHtml = `
                         <div class="view-doc-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                             <span style="font-size: 0.85rem; font-weight: 700; color: #475569;">Submission Link</span>
@@ -257,7 +371,7 @@ async function loadSubmissionData() {
                         </div>
                     `;
                     const targetNode = el.closest('.input-with-action') || el;
-                    targetNode.insertAdjacentHTML('beforebegin', headerHtml);
+                    targetNode.insertAdjacentHTML('beforebegin', overallStatusHtml + panelReviewsHtml + headerHtml);
                 }
                 el.value = val || '';
                 const revEl = document.getElementById(elementId + '_revised');
