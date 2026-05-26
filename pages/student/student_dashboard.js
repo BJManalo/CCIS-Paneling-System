@@ -436,14 +436,20 @@ function updateSaveButtonState(tabId) {
         let statusHtml = '';
         if (isSubmitted) {
             if (adviserStatus === 'Approved') {
-                statusHtml = `<div class="adviser-status-badge" style="background:#dcfce7; color:#166534; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid #bbf7d0;"><span class="material-icons-round">check_circle</span> Approved by Adviser. ${isScheduled ? 'Schedule is set.' : 'Waiting for Instructor to Schedule.'}</div>`;
+                statusHtml = `<div class="adviser-status-badge" style="background:#dcfce7; color:#166534; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; flex-direction:column; gap:4px; border:1px solid #bbf7d0;">
+                    <div style="display:flex; align-items:center; gap:8px;"><span class="material-icons-round">check_circle</span> Approved by Adviser. ${isScheduled ? 'Schedule is set.' : 'Waiting for Instructor to Schedule.'}</div>
+                    ${adviserRemarks ? `<div style="font-size:0.75rem; font-weight:400; background:rgba(255,255,255,0.5); padding:8px; border-radius:4px; margin-top:4px;"><strong>Remarks:</strong> ${adviserRemarks}</div>` : ''}
+                </div>`;
             } else if (adviserStatus === 'Declined') {
                 statusHtml = `<div class="adviser-status-badge" style="background:#fee2e2; color:#991b1b; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; flex-direction:column; gap:4px; border:1px solid #fecaca;">
                     <div style="display:flex; align-items:center; gap:8px;"><span class="material-icons-round">error</span> Declined by Adviser. Please revise and re-upload.</div>
                     ${adviserRemarks ? `<div style="font-size:0.75rem; font-weight:400; background:rgba(255,255,255,0.5); padding:8px; border-radius:4px; margin-top:4px;"><strong>Remarks:</strong> ${adviserRemarks}</div>` : ''}
                 </div>`;
             } else {
-                statusHtml = `<div class="adviser-status-badge" style="background:#eff6ff; color:#1e40af; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid #bfdbfe;"><span class="material-icons-round">check_circle</span> Submitted for Adviser Approval</div>`;
+                statusHtml = `<div class="adviser-status-badge" style="background:#eff6ff; color:#1e40af; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; flex-direction:column; gap:4px; border:1px solid #bfdbfe;">
+                    <div style="display:flex; align-items:center; gap:8px;"><span class="material-icons-round">check_circle</span> Submitted for Adviser Approval</div>
+                    ${adviserRemarks ? `<div style="font-size:0.75rem; font-weight:400; background:rgba(255,255,255,0.5); padding:8px; border-radius:4px; margin-top:4px;"><strong>Remarks:</strong> ${adviserRemarks}</div>` : ''}
+                </div>`;
             }
         } else {
             statusHtml = `<div class="adviser-status-badge" style="background:#f8fafc; color:#64748b; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid #e2e8f0; border-style:dashed;"><span class="material-icons-round">info</span> Upload document for Adviser Review</div>`;
