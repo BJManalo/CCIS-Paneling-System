@@ -131,9 +131,21 @@
             </button>
         </header>
 
-        <!-- Role Context Tabs (Hidden for Instructor if they only have one role, but requested to copy panel logic) -->
-        <!-- Panel/Adviser Logic COPY -->
-        <!-- Role Toggle Removed -->
+        <!-- Role Context Tabs -->
+        <div style="display: flex; gap: 15px; margin: 25px 0 0 0; padding-left: 20px;">
+            <button class="role-filter-btn active" onclick="switchRole('All')" id="role-All">
+                <span class="material-icons-round">list</span>
+                All Groups
+            </button>
+            <button class="role-filter-btn" onclick="switchRole('Panel')" id="role-Panel">
+                <span class="material-icons-round">groups</span>
+                Panel
+            </button>
+            <button class="role-filter-btn" onclick="switchRole('Adviser')" id="role-Adviser">
+                <span class="material-icons-round">school</span>
+                Adviser
+            </button>
+        </div>
 
         <!-- Defense Stage Tabs -->
         <div class="role-tabs"
