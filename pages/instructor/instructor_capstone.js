@@ -11,6 +11,36 @@ let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
 let currentStatusFilter = 'ALL';
 let currentPage = 1;
 const rowsPerPage = 15;
+
+function showToast(message, type = 'info') {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.innerHTML = `<span id="toastIcon" class="material-icons-round">info</span><span id="toastMessage"></span>`;
+        toast.style = "position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #334155; color: white; padding: 12px 24px; border-radius: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; font-weight: 600; display: none;";
+        document.body.appendChild(toast);
+    }
+    
+    document.getElementById('toastMessage').textContent = message;
+    
+    // Optional: change icon/color based on type
+    const icon = document.getElementById('toastIcon');
+    if (type === 'success') {
+        icon.textContent = 'check_circle';
+        toast.style.background = '#10b981'; // Green
+    } else if (type === 'error') {
+        icon.textContent = 'error';
+        toast.style.background = '#ef4444'; // Red
+    } else {
+        icon.textContent = 'info';
+        toast.style.background = '#334155'; // Slate
+    }
+    
+    toast.style.display = 'flex';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
 function formatTime12Hour(timeStr) {
     if (!timeStr) return '';
     const parts = timeStr.split(':');
