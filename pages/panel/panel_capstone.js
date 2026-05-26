@@ -857,7 +857,7 @@ window.openFileModal = (groupId) => {
                                 style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; min-height: 50px; resize: vertical; margin-bottom: 6px;">${currentAdvRemarks}</textarea>
                             <button onclick="saveAdviserRemarks(${group.id}, '${label}')" 
                                     style="width: 100%; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                                    Save Only
+                                    Save
                             </button>
                         </div>
                     </div>
