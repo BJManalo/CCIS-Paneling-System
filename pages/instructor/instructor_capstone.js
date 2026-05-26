@@ -813,7 +813,7 @@ window.openFileModal = (groupId) => {
                                 style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; min-height: 50px; resize: vertical; margin-bottom: 6px;">${currentAdvRemarks}</textarea>
                             <button onclick="saveAdviserRemarks(${group.id}, '${label}')" 
                                     style="width: 100%; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                                    Save Remarks Only
+                                    Save Only
                             </button>
                         </div>
                     </div>
@@ -1392,11 +1392,19 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
         if (error) throw error;
 
         group.adviser_remarks = currentRemarks;
-        alert('Remarks saved successfully.');
+        if (typeof showToast === 'function') {
+            showToast('Remarks saved successfully.', 'success');
+        } else {
+            alert('Remarks saved successfully.');
+        }
 
     } catch (err) {
         console.error('Error saving adviser remarks:', err);
-        alert('Failed to save remarks.');
+        if (typeof showToast === 'function') {
+            showToast('Failed to save remarks.', 'error');
+        } else {
+            alert('Failed to save remarks.');
+        }
     }
 };
 
