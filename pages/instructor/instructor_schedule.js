@@ -713,6 +713,32 @@ async function saveSchedule(e) {
         schedule_venue: document.getElementById('schedVenue').value
     };
 
+    // --- Validate if Sent to Panel (Automated by Adviser Approval) ---
+    const { data: groupData, error: groupErr } = await supabaseClient
+        .from('student_groups')
+        .select('adviser_status')
+        .eq('id', scheduleData.group_id)
+        .single();
+        
+    if (groupErr) {
+        showToast('Error validating group status.');
+        return;
+    }
+
+    const adviserStatus = groupData.adviser_status || {};
+    let requiredKeys = [];
+    const norm = scheduleData.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (norm.includes('title')) requiredKeys = ['title1', 'title2', 'title3'];
+    else if (norm.includes('preoral')) requiredKeys = ['ch1', 'ch2', 'ch3'];
+    else if (norm.includes('final')) requiredKeys = ['ch4', 'ch5'];
+
+    const isApproved = requiredKeys.length > 0 && requiredKeys.every(key => adviserStatus[key] === 'Approved');
+
+    if (!isApproved) {
+        showToast(`Cannot schedule: All ${requiredKeys.length} required documents must be Approved by the Adviser first.`);
+        return;
+    }
+
     // --- Conflict Validation ---
     const newPanels = [
         scheduleData.panel1,

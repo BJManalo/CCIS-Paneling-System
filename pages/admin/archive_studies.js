@@ -3,7 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 let archiveData = [];
-
+let filteredArchiveData = [];
+let currentPage = 1;
+const rowsPerPage = 15;
 async function loadArchives() {
     const tableBody = document.getElementById('archiveTableBody');
     const emptyState = document.getElementById('emptyState');
@@ -31,7 +33,8 @@ async function loadArchives() {
         }
 
         emptyState.style.display = 'none';
-        renderArchiveTable(archiveData);
+        filteredArchiveData = [...archiveData];
+        renderArchiveTable();
 
     } catch (err) {
         console.error("Archive Load Error:", err);
@@ -213,11 +216,20 @@ async function archiveProject(groupId) {
     }
 }
 
-function renderArchiveTable(data) {
+function renderArchiveTable() {
+    const data = filteredArchiveData;
     const tableBody = document.getElementById('archiveTableBody');
     tableBody.innerHTML = '';
 
-    data.forEach(item => {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(data.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedData = data.slice(startIndex, startIndex + rowsPerPage);
+
+    paginatedData.forEach(item => {
         const row = document.createElement('tr');
         row.className = 'archive-row';
         row.style.cursor = 'pointer';
@@ -301,7 +313,43 @@ function renderArchiveTable(data) {
         `;
         tableBody.appendChild(detailRow);
     });
+
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    let paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) {
+        // Create if it doesn't exist
+        const tableContainer = document.querySelector('.table-container');
+        if (tableContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            tableContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderArchiveTable();
+};
 
 function toggleRow(id) {
     const row = document.getElementById(id);
@@ -445,7 +493,7 @@ function closeModal() {
 
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
-    const filtered = archiveData.filter(item => {
+    filteredArchiveData = archiveData.filter(item => {
         const members = Array.isArray(item.members) ? item.members : JSON.parse(item.members || '[]');
         return (
             (item.project_title || '').toLowerCase().includes(term) ||
@@ -453,7 +501,8 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
             members.some(m => m.toLowerCase().includes(term))
         );
     });
-    renderArchiveTable(filtered);
+    currentPage = 1;
+    renderArchiveTable();
 });
 
 window.logout = function () {

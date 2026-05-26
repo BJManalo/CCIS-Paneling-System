@@ -7,6 +7,8 @@ var supabaseClient = supabaseClient || window.supabase.createClient(PROJECT_URL,
 let allData = [];
 let loadedEvaluations = [];
 let currentStatusFilter = 'pending'; // Default view: To Be Evaluated
+let currentPage = 1;
+const rowsPerPage = 15;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
@@ -277,6 +279,7 @@ function parseMembers(members) {
 
 window.applyStatusFilter = (status) => {
     currentStatusFilter = status;
+    currentPage = 1;
 
     // Update button styles
     document.getElementById('btnPending').classList.toggle('active', status === 'pending');
@@ -308,10 +311,19 @@ function renderAccordions(evaluations) {
                 <p style="margin-top: 10px; color: #9ca3af;">${msg}</p>
             </div>
         `;
+        updatePaginationUI(0);
         return;
     }
 
-    filtered.forEach(evalItem => {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(filtered.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedItems = filtered.slice(startIndex, startIndex + rowsPerPage);
+
+    paginatedItems.forEach(evalItem => {
         const card = document.createElement('div');
         card.className = 'evaluation-card';
 
@@ -338,7 +350,43 @@ function renderAccordions(evaluations) {
          `;
         container.appendChild(card);
     });
+
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    let paginationContainer = document.getElementById('evaluationPagination');
+    if (!paginationContainer) {
+        const container = document.getElementById('accordionContainer');
+        if (container) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'evaluationPagination';
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            container.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderAccordions(loadedEvaluations);
+};
 
 function getCardContent(evalItem) {
     const type = (evalItem.defenseType || '').toLowerCase();

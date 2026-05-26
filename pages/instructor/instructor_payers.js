@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 let allPayments = [];
+let currentPage = 1;
+const rowsPerPage = 15;
 
 async function loadPayers() {
     const tableBody = document.getElementById('payersTableBody');
@@ -59,10 +61,19 @@ function renderPayers(payments) {
 
     if (!payments || payments.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px;">No records found.</td></tr>';
+        updatePaginationUI(0, payments);
         return;
     }
 
-    payments.forEach(p => {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(payments.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedPayments = payments.slice(startIndex, startIndex + rowsPerPage);
+
+    paginatedPayments.forEach(p => {
         const rawDate = p.payment_date || p.created_at;
         const date = new Date(rawDate).toLocaleDateString();
         const program = (p.program || '').toUpperCase();
@@ -145,7 +156,47 @@ function renderPayers(payments) {
         `;
         tableBody.appendChild(detailsRow);
     });
+
+    updatePaginationUI(totalPages, payments);
 }
+
+// Attach currentPayments to window so changePage can access it
+let currentFilteredPayments = [];
+
+function updatePaginationUI(totalPages, payments) {
+    currentFilteredPayments = payments;
+    let paginationContainer = document.getElementById('payersPagination');
+    if (!paginationContainer) {
+        const tableContainer = document.querySelector('.table-container') || document.querySelector('#payersTableBody').parentElement;
+        if (tableContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'payersPagination';
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            tableContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderPayers(currentFilteredPayments);
+};
 
 // Toggle Function
 window.togglePayerRow = function (id) {
@@ -159,9 +210,10 @@ window.togglePayerRow = function (id) {
 }
 
 function filterPayers() {
-    const typeFilter = document.getElementById('filterDefenseType').value;
-    const sectionFilter = document.getElementById('filterSection').value;
-    const programFilter = document.getElementById('filterProgram').value;
+    currentPage = 1;
+    const typeFilter = document.getElementById('filterDefenseType') ? document.getElementById('filterDefenseType').value : '';
+    const sectionFilter = document.getElementById('filterSection') ? document.getElementById('filterSection').value : '';
+    const programFilter = document.getElementById('filterProgram') ? document.getElementById('filterProgram').value : '';
     const searchFilter = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
 
     const filtered = allPayments.filter(p => {

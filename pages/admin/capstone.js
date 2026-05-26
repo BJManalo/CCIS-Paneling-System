@@ -17,7 +17,8 @@ let filteredGroups = [];
 let currentProgramFilter = 'ALL';
 let adminName = '';
 let displayRows = [];
-
+let currentPage = 1;
+const rowsPerPage = 15;
 // PDF Viewer State
 let currentAdobeView = null;
 let currentViewerFileKey = null;
@@ -94,6 +95,7 @@ function updateUI() {
 }
 
 window.filterTable = (program) => {
+    currentPage = 1;
     const filterBtns = document.querySelectorAll('.filter-btn');
     if (currentProgramFilter === program) {
         currentProgramFilter = 'ALL';
@@ -108,6 +110,7 @@ window.filterTable = (program) => {
 };
 
 function applyFilters() {
+    currentPage = 1;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     displayRows = [];
 
@@ -170,13 +173,22 @@ function renderTable() {
     const emptyState = document.getElementById('emptyState');
     tableBody.innerHTML = '';
 
-    if (displayRows.length === 0) {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(displayRows.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedRows = displayRows.slice(startIndex, startIndex + rowsPerPage);
+
+    if (paginatedRows.length === 0) {
         emptyState.style.display = 'flex';
+        updatePaginationUI(totalPages);
         return;
     }
     emptyState.style.display = 'none';
 
-    displayRows.forEach(row => {
+    paginatedRows.forEach(row => {
         const tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
         tr.onclick = () => openFileModal(row.id);
@@ -197,7 +209,32 @@ function renderTable() {
         `;
         tableBody.appendChild(tr);
     });
+
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    const paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) return;
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderTable();
+};
 
 
 // Helper: Get Title

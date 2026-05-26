@@ -233,8 +233,24 @@ async function loadCapstoneData() {
                 if (!sched && !hasFiles) return;
 
                 // 4. Construct Data Object
-                // Adviser Check: Check if current user is the adviser
-                const isAdviser = (group.adviser && group.adviser.includes(userName)) || (user.role === 'Instructor/Adviser' && group.adviser === userName);
+                const userNameNormalized = String(user.name || user.full_name || 'Instructor').trim().toLowerCase();
+                const userEmailNormalized = String(user.email || '').trim().toLowerCase();
+
+                const robustMatch = (nameA, nameB) => {
+                    const nA = String(nameA || "").trim().toLowerCase();
+                    const nB = String(nameB || "").trim().toLowerCase();
+                    if (!nA || !nB) return false;
+                    if (nA === nB) return true;
+                    // Check if one includes the other (e.g. Sonny in Sonny@gmail.com)
+                    if (nA.includes(nB) || nB.includes(nA)) return true;
+                    const wA = nA.split(/\s+/).filter(w => w);
+                    const wB = nB.split(/\s+/).filter(w => w);
+                    if (wA.length <= wB.length && wA.length > 0) return wA.every(word => wB.includes(word));
+                    if (wB.length > 0) return wB.every(word => wA.includes(word));
+                    return false;
+                };
+
+                const isAdviser = robustMatch(group.adviser, userNameNormalized) || robustMatch(group.adviser, userEmailNormalized);
                 // Flexible check for partial name match or exact match depending on data quality
 
                 let panelList = [];
@@ -251,7 +267,8 @@ async function loadCapstoneData() {
                     panelList = Array.from(allPanels);
                 }
 
-                const isPanelist = panelList.includes(userName);
+                // Check panelist match with fuzzy logic
+                const isPanelist = panelList.some(p => robustMatch(p, userNameNormalized) || robustMatch(p, userEmailNormalized));
 
                 // Get Merged Feedback (Legacy + New Table)
                 const feedbackRes = getMergedFeedback(group.id, normType);
@@ -798,6 +815,23 @@ window.openFileModal = (groupId) => {
             const canGrade = (currentRole === 'Panel' || (currentRole === 'All' && group.isPanelist));
 
             if (canGrade) {
+                const groupAdviserStatus = groupData.adviser_status || {};
+                let requiredKeys = [];
+                const norm = currentTab.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (norm.includes('title')) requiredKeys = ['title1', 'title2', 'title3'];
+                else if (norm.includes('preoral')) requiredKeys = ['ch1', 'ch2', 'ch3'];
+                else if (norm.includes('final')) requiredKeys = ['ch4', 'ch5'];
+
+                const isSentToPanel = requiredKeys.length > 0 && requiredKeys.every(key => groupAdviserStatus[key] === 'Approved');
+
+                if (currentRole === 'Panel' && !isSentToPanel) {
+                    interactiveControls = `
+                        <div style="padding: 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; color: #b45309; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
+                            <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">hourglass_empty</span>
+                            Waiting for Adviser to approve all required documents before Panel Evaluation.
+                        </div>
+                    `;
+                } else {
                 interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
@@ -821,6 +855,7 @@ window.openFileModal = (groupId) => {
                     </button>
                 </div>
                 `;
+                }
             } else if (group.isAdviser) {
                 // Get Adviser Status for this specific FILE (granular)
                 const groupAdviserStatus = groupData.adviser_status || {};
@@ -844,15 +879,19 @@ window.openFileModal = (groupId) => {
                                 <span class="material-icons-round" style="font-size: 16px;">cancel</span> Decline
                             </button>
                         </div>
-                        <div id="adviser-remarks-container-${label}" style="display: ${currentAdvStatus === 'Declined' ? 'block' : 'none'};">
+                        <div id="adviser-remarks-container-${group.id}-${label}" style="display: ${currentAdvStatus === 'Declined' ? 'block' : 'none'};">
                             <div style="font-size: 11px; color: #64748b; font-weight: 600; margin-bottom: 4px;">REVISION REMARKS:</div>
-                            <textarea id="adviser-remarks-${label}" placeholder="Reason for declining..." 
+                            <textarea id="adviser-remarks-${group.id}-${label}" placeholder="Reason for declining..." 
                                 style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; min-height: 50px; resize: vertical; margin-bottom: 6px;">${currentAdvRemarks}</textarea>
                             <button onclick="saveAdviserRemarks(${group.id}, '${label}')" 
-                                    style="width: 100%; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                                    Save
+                                style="width: 100%; background: #0ea5e9; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-icons-round" style="font-size: 16px;">save</span> Save
                             </button>
                         </div>
+                        <div id="send-to-panel-container-${group.id}" style="margin-top: 10px; display: none;">
+                            <button onclick="sendToPanel(${group.id})" style="width: 100%; background: #6366f1; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;">Send to Panel</button>
+                        </div>
+                        <script>setTimeout(() => checkSendToPanelButton(${group.id}), 100);</script>
                     </div>
                 `;
             } else {
@@ -1341,7 +1380,7 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
 window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
     try {
          // Show remarks box immediately if declining
-         const remarksBox = document.getElementById(`adviser-remarks-container-${fileKey}`);
+         const remarksBox = document.getElementById(`adviser-remarks-container-${groupId}-${fileKey}`);
          if (newStatus === 'Declined' && remarksBox) {
              remarksBox.style.display = 'block';
          } else if (newStatus === 'Approved' && remarksBox) {
@@ -1351,8 +1390,10 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         const group = allData.find(g => g.id == groupId);
         if (!group) return;
 
-        const btnApprove = document.querySelector(`button[onclick*="'Approved'"][onclick*="'${fileKey}'"]`);
-        const btnDecline = document.querySelector(`button[onclick*="'Declined'"][onclick*="'${fileKey}'"]`);
+        // Use more specific selector by finding the button within the modal
+        const modalContent = document.getElementById('fileModalContent');
+        const btnApprove = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Approved')"]`);
+        const btnDecline = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Declined')"]`);
         
         if (btnApprove) {
             btnApprove.disabled = true;
@@ -1378,7 +1419,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         const currentStatus = group.adviser_status || {};
         const currentRemarks = group.adviser_remarks || {};
         
-        const remarksValue = document.getElementById(`adviser-remarks-${fileKey}`)?.value.trim() || '';
+        const remarksValue = document.getElementById(`adviser-remarks-${groupId}-${fileKey}`)?.value.trim() || '';
 
         currentStatus[fileKey] = newStatus;
         currentRemarks[fileKey] = remarksValue;
@@ -1405,6 +1446,9 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         // Refresh UI (only the background table, do NOT re-open modal to avoid resetting the PDF viewer)
         renderTable();
 
+        // Refresh Send to Panel button state
+        checkSendToPanelButton(groupId);
+
     } catch (err) {
         console.error('Error updating adviser status:', err);
         alert('Failed to update status: ' + err.message);
@@ -1412,33 +1456,31 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 };
 
 window.saveAdviserRemarks = async (groupId, fileKey) => {
-    const textarea = document.getElementById(`adviser-remarks-${fileKey}`);
+    const textarea = document.getElementById(`adviser-remarks-${groupId}-${fileKey}`);
     const btn = textarea ? textarea.nextElementSibling : null;
     
     if (btn) {
         btn.disabled = true;
-        btn.innerText = 'Saving...';
+        btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">hourglass_empty</span> Saving...';
     }
 
     try {
         const group = allData.find(g => g.id == groupId);
-        if (!group) return;
+        if (!group) throw new Error("Group not found");
 
-        const currentRemarks = group.adviser_remarks || {};
         const remarksValue = textarea?.value.trim() || '';
-
+        
+        const currentRemarks = group.adviser_remarks || {};
         currentRemarks[fileKey] = remarksValue;
 
         const { error } = await supabaseClient
             .from('student_groups')
-            .update({
-                adviser_remarks: currentRemarks
-            })
+            .update({ adviser_remarks: currentRemarks })
             .eq('id', groupId);
 
         if (error) throw error;
-
         group.adviser_remarks = currentRemarks;
+
         if (typeof showToast === 'function') {
             showToast('Remarks saved successfully.', 'success');
         } else {
@@ -1446,28 +1488,92 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
         }
 
         if (btn) {
-            btn.innerText = 'Saved';
-            btn.style.background = '#dcfce7';
-            btn.style.color = '#166534';
-            btn.style.borderColor = '#bbf7d0';
-            btn.disabled = true;
-            btn.style.cursor = 'not-allowed';
+            btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">check</span> Saved';
+            // Keep disabled as requested
+            btn.style.background = '#10b981'; // Green to indicate success
         }
 
     } catch (err) {
-        console.error('Error saving adviser remarks:', err);
+        console.error('Error saving remarks:', err);
         if (typeof showToast === 'function') {
             showToast('Failed to save remarks.', 'error');
         } else {
             alert('Failed to save remarks.');
         }
-
         if (btn) {
             btn.disabled = false;
-            btn.innerText = 'Save';
-            btn.style.background = '#f8fafc';
-            btn.style.color = '#475569';
+            btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">save</span> Save';
         }
+    }
+};
+
+window.checkSendToPanelButton = (groupId) => {
+    const group = allData.find(g => g.id == groupId);
+    if (!group) return;
+
+    const btnContainer = document.getElementById(`send-to-panel-container-${groupId}`);
+    if (!btnContainer) return;
+
+    const statuses = group.adviser_status || {};
+    const approvedCount = Object.values(statuses).filter(s => s === 'Approved').length;
+
+    // Must have at least 3 approved documents
+    if (approvedCount >= 3) {
+        btnContainer.style.display = 'block';
+        const btn = btnContainer.querySelector('button');
+        
+        if (statuses['SEND_TO_PANEL']) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">check_circle</span> Sent to Panel';
+            btn.style.background = '#10b981';
+            btn.style.cursor = 'default';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = 'Send to Panel';
+            btn.style.background = '#6366f1';
+            btn.style.cursor = 'pointer';
+        }
+    } else {
+        btnContainer.style.display = 'none';
+    }
+};
+
+window.sendToPanel = async (groupId) => {
+    try {
+        const group = allData.find(g => g.id == groupId);
+        if (!group) return;
+
+        const currentStatus = group.adviser_status || {};
+        currentStatus['SEND_TO_PANEL'] = true;
+
+        const btn = document.querySelector(`#send-to-panel-container-${groupId} button`);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">hourglass_empty</span> Sending...';
+        }
+
+        const { error } = await supabaseClient
+            .from('student_groups')
+            .update({ adviser_status: currentStatus })
+            .eq('id', groupId);
+
+        if (error) throw error;
+        
+        group.adviser_status = currentStatus;
+        
+        if (typeof showToast === 'function') {
+            showToast('Group sent to panel successfully!', 'success');
+        } else {
+            alert('Group sent to panel successfully!');
+        }
+
+        checkSendToPanelButton(groupId);
+        renderTable();
+
+    } catch (err) {
+        console.error('Error sending to panel:', err);
+        alert('Failed to send to panel: ' + err.message);
+        checkSendToPanelButton(groupId);
     }
 };
 

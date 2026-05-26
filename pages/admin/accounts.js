@@ -8,7 +8,9 @@ var supabaseClient = supabaseClient || window.supabase.createClient(PROJECT_URL,
 
 // State
 let allAccounts = [];
-
+let filteredAccounts = [];
+let currentPage = 1;
+const rowsPerPage = 15;
 document.addEventListener('DOMContentLoaded', () => {
     loadAccounts();
     setupSearch();
@@ -42,19 +44,30 @@ async function loadAccounts() {
     tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">Loading accounts...</td></tr>';
 
     allAccounts = await getAccounts();
-    renderAccounts(allAccounts);
+    filteredAccounts = [...allAccounts];
+    renderAccounts();
 }
 
-function renderAccounts(accounts) {
+function renderAccounts() {
+    const accounts = filteredAccounts;
     const tableBody = document.getElementById('accountsTableBody');
     tableBody.innerHTML = '';
 
-    if (!accounts || accounts.length === 0) {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(accounts.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedAccounts = accounts.slice(startIndex, startIndex + rowsPerPage);
+
+    if (!paginatedAccounts || paginatedAccounts.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No accounts found.</td></tr>';
+        updatePaginationUI(totalPages);
         return;
     }
 
-    accounts.forEach(acc => {
+    paginatedAccounts.forEach(acc => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><span class="status-badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">${acc.role}</span></td>
@@ -74,7 +87,43 @@ function renderAccounts(accounts) {
         `;
         tableBody.appendChild(row);
     });
+
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    let paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) {
+        // Create if it doesn't exist
+        const tableContainer = document.querySelector('.table-container');
+        if (tableContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            tableContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderAccounts();
+};
 
 function setupSearch() {
     const searchInput = document.getElementById('searchInput');
@@ -82,12 +131,13 @@ function setupSearch() {
 
     searchInput.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase();
-        const filtered = allAccounts.filter(acc =>
+        filteredAccounts = allAccounts.filter(acc =>
             (acc.name || '').toLowerCase().includes(term) ||
             (acc.email || '').toLowerCase().includes(term) ||
             (acc.role || '').toLowerCase().includes(term)
         );
-        renderAccounts(filtered);
+        currentPage = 1;
+        renderAccounts();
     });
 }
 

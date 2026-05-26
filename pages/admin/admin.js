@@ -18,7 +18,8 @@ let filteredGroups = [];
 let currentCategory = 'ALL'; // 'ALL', 'APPROVED', 'REJECTED', 'COMPLETED'
 let adminName = '';
 let displayRows = [];
-
+let currentPage = 1;
+const rowsPerPage = 15;
 // PDF Viewer State
 let currentAdobeView = null;
 let currentViewerFileKey = null;
@@ -135,6 +136,7 @@ window.setCategoryFilter = (category) => {
 };
 
 window.applyDashboardFilters = () => {
+    currentPage = 1;
     const program = document.getElementById('programFilter').value;
     const section = document.getElementById('sectionFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -326,13 +328,22 @@ async function renderTable() {
     if (!tableBody) return;
     tableBody.innerHTML = '';
 
-    if (displayRows.length === 0) {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(displayRows.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedRows = displayRows.slice(startIndex, startIndex + rowsPerPage);
+
+    if (paginatedRows.length === 0) {
         if (emptyState) emptyState.style.display = 'block';
+        updatePaginationUI(totalPages);
         return;
     }
     if (emptyState) emptyState.style.display = 'none';
 
-    displayRows.forEach(row => {
+    paginatedRows.forEach(row => {
         const program = (row.program || '').toUpperCase();
         let progClass = 'prog-unknown';
         if (program.includes('BSIS')) progClass = 'prog-bsis';
@@ -356,7 +367,32 @@ async function renderTable() {
         `;
         tableBody.appendChild(tr);
     });
+
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    const paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) return;
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderTable();
+};
 
 // --- FILE MODAL LOGIC ---
 window.openFileModal = async (groupId) => {

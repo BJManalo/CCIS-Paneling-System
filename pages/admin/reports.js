@@ -11,6 +11,8 @@ let allSchedules = [];
 let allGrades = [];
 let filteredRows = [];
 let currentTab = 'pass'; // 'pass' or 'failed'
+let currentPage = 1;
+const rowsPerPage = 15;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
@@ -76,6 +78,7 @@ window.switchReportTab = (tab) => {
 };
 
 window.applyFilters = () => {
+    currentPage = 1;
     const phase = document.getElementById('defenseFilter').value;
     const program = document.getElementById('programFilter').value;
     const section = document.getElementById('sectionFilter').value;
@@ -173,7 +176,17 @@ function renderTable() {
         groups[row.group_id].students.push(row);
     });
 
-    Object.keys(groups).forEach(groupId => {
+    const groupKeys = Object.keys(groups);
+
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(groupKeys.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedKeys = groupKeys.slice(startIndex, startIndex + rowsPerPage);
+
+    paginatedKeys.forEach(groupId => {
         const group = groups[groupId];
         const collapseId = `collapse-${groupId}`;
 
@@ -234,7 +247,43 @@ function renderTable() {
         `;
         tableBody.appendChild(childTr);
     });
+
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    let paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) {
+        // Create if it doesn't exist
+        const tableContainer = document.querySelector('.table-container');
+        if (tableContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            tableContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderTable();
+};
 
 window.toggleRow = (id) => {
     const el = document.getElementById(id);

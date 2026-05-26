@@ -8,6 +8,8 @@ var PUBLIC_KEY = PUBLIC_KEY || 'sb_publishable_mILyigCa_gB27xjtNZdVsg_WBDt9cLI';
 var supabaseClient = supabaseClient || window.supabase.createClient(PROJECT_URL, PUBLIC_KEY);
 
 let allGroups = [];
+let currentPage = 1;
+const rowsPerPage = 15;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
@@ -213,10 +215,19 @@ function renderGroups(groups) {
 
     if (!groups || groups.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">No student groups found.</td></tr>';
+        updatePaginationUI(0, groups);
         return;
     }
 
-    groups.forEach(group => {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(groups.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedGroups = groups.slice(startIndex, startIndex + rowsPerPage);
+
+    paginatedGroups.forEach(group => {
         const program = (group.program || '').toUpperCase();
         let progClass = 'prog-unknown';
         if (program.includes('BSIS')) progClass = 'prog-bsis';
@@ -251,7 +262,46 @@ function renderGroups(groups) {
         `;
         tableBody.appendChild(row);
     });
+
+    updatePaginationUI(totalPages, groups);
 }
+
+let currentFilteredGroups = [];
+
+function updatePaginationUI(totalPages, groups) {
+    currentFilteredGroups = groups;
+    let paginationContainer = document.getElementById('accountsPagination');
+    if (!paginationContainer) {
+        const tableContainer = document.querySelector('.table-container') || document.querySelector('#groupsTableBody').parentElement;
+        if (tableContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'accountsPagination';
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            tableContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderGroups(currentFilteredGroups);
+};
 
 // --- Group Actions ---
 async function openAddGroupModal() {
@@ -443,6 +493,7 @@ function showToast(message) {
 
 // --- Search Filter ---
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
+    currentPage = 1;
     const term = e.target.value.toLowerCase();
     const filtered = allGroups.filter(g =>
         g.group_name.toLowerCase().includes(term) ||

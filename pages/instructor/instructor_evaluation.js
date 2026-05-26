@@ -9,7 +9,10 @@ let loadedEvaluations = [];
 let currentTypeFilter = 'ALL';
 let rawGroups = [];
 let allDefenseStatuses = [];
-
+let currentPageAdvisory = 1;
+const rowsPerPageAdvisory = 15;
+let currentPageEval = 1;
+const rowsPerPageEval = 15;
 document.addEventListener('DOMContentLoaded', () => {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
     const rawRole = (loginUser && loginUser.role) ? loginUser.role.toString().toLowerCase() : '';
@@ -309,7 +312,7 @@ function renderAdvisoryTable() {
         return;
     }
 
-    let hasGlobalData = false;
+    let filteredGroups = [];
 
     myAdviseeGroups.forEach(group => {
         const schedules = group.schedules || [];
@@ -341,8 +344,6 @@ function renderAdvisoryTable() {
             }
         }
 
-        hasGlobalData = true; // Found at least one item
-
         let displayStatus = 'Not Scheduled';
         if (targetSched) {
             const statusRecord = allDefenseStatuses.find(ds => ds.schedule_id === targetSched.id);
@@ -372,25 +373,81 @@ function renderAdvisoryTable() {
         // Truncate title if clean
         if (title && title.length > 50) title = title.substring(0, 50) + '...';
 
+        filteredGroups.push({
+            title: title || 'Untitled',
+            group_name: group.group_name,
+            students: group.students || [],
+            displayType: displayType || 'N/A',
+            displayStatus: displayStatus
+        });
+    });
+
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(filteredGroups.length / rowsPerPageAdvisory);
+    if (currentPageAdvisory > totalPages && totalPages > 0) currentPageAdvisory = totalPages;
+    if (currentPageAdvisory < 1) currentPageAdvisory = 1;
+
+    const startIndex = (currentPageAdvisory - 1) * rowsPerPageAdvisory;
+    const paginatedGroups = filteredGroups.slice(startIndex, startIndex + rowsPerPageAdvisory);
+
+    if (paginatedGroups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No records found for this filter.</td></tr>';
+        updatePaginationUIAdvisory(totalPages);
+        return;
+    }
+
+    paginatedGroups.forEach(item => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td><span style="font-weight:600; color:var(--primary-color);">${title || 'Untitled'}</span></td>
-            <td>${group.group_name}</td>
+            <td><span style="font-weight:600; color:var(--primary-color);">${item.title}</span></td>
+            <td>${item.group_name}</td>
             <td>
                 <div class="chips-container">
-                    ${(group.students || []).map(m => `<span class="chip">${m.full_name}</span>`).join('')}
+                    ${item.students.map(m => `<span class="chip">${m.full_name}</span>`).join('')}
                 </div>
             </td>
-            <td><span class="type-badge ${getTypeClass(displayType || 'Defense')}">${displayType || 'N/A'}</span></td>
-            <td><span class="status-badge ${displayStatus === 'Not Scheduled' ? 'rejected' : 'pending'}">${displayStatus}</span></td>
+            <td><span class="type-badge ${getTypeClass(item.displayType)}">${item.displayType}</span></td>
+            <td><span class="status-badge ${item.displayStatus === 'Not Scheduled' ? 'rejected' : 'pending'}">${item.displayStatus}</span></td>
         `;
         tbody.appendChild(row);
     });
 
-    if (!hasGlobalData) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No records found for this filter.</td></tr>';
-    }
+    updatePaginationUIAdvisory(totalPages);
 }
+
+function updatePaginationUIAdvisory(totalPages) {
+    let paginationContainer = document.getElementById('advisoryPagination');
+    if (!paginationContainer) {
+        const tableContainer = document.querySelector('#advisoryTableBody').closest('.table-container') || document.querySelector('#advisoryTableBody').parentElement;
+        if (tableContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'advisoryPagination';
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            tableContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPageAdvisory === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePageAdvisory(${currentPageAdvisory - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPageAdvisory}</span>
+        <button class="page-btn next" ${currentPageAdvisory === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePageAdvisory(${currentPageAdvisory + 1})"`}>Next</button>
+    `;
+}
+
+window.changePageAdvisory = (newPage) => {
+    currentPageAdvisory = newPage;
+    renderAdvisoryTable();
+};
 
 function getTypeClass(type) {
     type = type.toLowerCase();
@@ -414,8 +471,10 @@ window.setFilter = (type, btn) => {
     if (btn) btn.classList.add('active');
 
     if (currentMainTab === 'Advisory') {
+        currentPageAdvisory = 1;
         renderAdvisoryTable();
     } else {
+        currentPageEval = 1;
         applyFilters();
     }
 };
@@ -472,7 +531,21 @@ function renderAccordions(evaluations) {
     const container = document.getElementById('accordionContainer');
     container.innerHTML = '';
 
-    evaluations.forEach(evalItem => {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(evaluations.length / rowsPerPageEval);
+    if (currentPageEval > totalPages && totalPages > 0) currentPageEval = totalPages;
+    if (currentPageEval < 1) currentPageEval = 1;
+
+    const startIndex = (currentPageEval - 1) * rowsPerPageEval;
+    const paginatedEvaluations = evaluations.slice(startIndex, startIndex + rowsPerPageEval);
+
+    if (paginatedEvaluations.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding: 20px; color:#64748b;">No evaluations match your search.</p>';
+        updatePaginationUIEval(totalPages, evaluations);
+        return;
+    }
+
+    paginatedEvaluations.forEach(evalItem => {
         const card = document.createElement('div');
         card.className = 'evaluation-card';
 
@@ -518,7 +591,48 @@ function renderAccordions(evaluations) {
          `;
         container.appendChild(card);
     });
+
+    updatePaginationUIEval(totalPages, evaluations);
 }
+
+// Attach currentEvaluations to window so changePage can access it, or re-run applyFilters
+let currentFilteredEvaluations = [];
+
+function updatePaginationUIEval(totalPages, evaluations) {
+    currentFilteredEvaluations = evaluations; // Save state for changePageEval
+    let paginationContainer = document.getElementById('evalPagination');
+    if (!paginationContainer) {
+        const accordionContainer = document.getElementById('accordionContainer');
+        if (accordionContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'evalPagination';
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            paginationContainer.style.marginTop = '20px';
+            accordionContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPageEval === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePageEval(${currentPageEval - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPageEval}</span>
+        <button class="page-btn next" ${currentPageEval === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePageEval(${currentPageEval + 1})"`}>Next</button>
+    `;
+}
+
+window.changePageEval = (newPage) => {
+    currentPageEval = newPage;
+    renderAccordions(currentFilteredEvaluations);
+};
 
 function getCardContent(evalItem) {
     const type = (evalItem.defenseType || '').toLowerCase();

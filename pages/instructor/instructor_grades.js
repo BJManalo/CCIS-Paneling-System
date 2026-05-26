@@ -11,6 +11,8 @@ var supabaseClient = supabaseClient || window.supabase.createClient(PROJECT_URL,
 let allGradesData = [];
 let fetchedGroups = [];
 let currentMainTab = 'Manage'; // Default to All Grades
+let currentPage = 1;
+const rowsPerPage = 15;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Check Login
@@ -119,7 +121,7 @@ async function loadGrades() {
 }
 
 // --- Render Grades Table with Filters ---
-function renderGrades() {
+function renderGrades(resetPage = true) {
     const tableBody = document.getElementById('gradesTableBody');
     const fab = document.querySelector('.fab-btn');
 
@@ -139,13 +141,15 @@ function renderGrades() {
     const userName = (user ? (user.name || user.full_name || '') : '').toLowerCase().trim();
 
     tableBody.innerHTML = '';
+    if (resetPage) currentPage = 1;
 
     if (!allGradesData || allGradesData.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No scheduled groups found.</td></tr>';
+        updatePaginationUI(0);
         return;
     }
 
-    let hasVisibleData = false;
+    let displayRows = [];
 
     allGradesData.forEach(group => {
         // Search Filter (Group Name or Student Names)
@@ -199,9 +203,6 @@ function renderGrades() {
 
             const gradedCount = gradedStudents.filter(s => s.hasGrade).length;
             
-            // NEW: Instead of hiding ungraded groups, we show them with "Pending" status
-            hasVisibleData = true;
-
             let status = 'Pending';
             let statusClass = 'badge-partial';
             let statusIcon = 'pending';
@@ -246,51 +247,84 @@ function renderGrades() {
             // Create unique ID for collapse
             const collapseId = `collapse-${group.id}-${schedType.replace(/\s+/g, '')}`;
 
-            // --- PARENT ROW ---
-            const row = document.createElement('tr');
-            row.style.cursor = 'pointer';
-            row.onclick = () => toggleRow(collapseId);
-            row.innerHTML = `
-                <td style="font-weight:700; color:var(--primary-dark);">
+            displayRows.push({
+                group: group,
+                schedType: schedType,
+                program: program,
+                progClass: progClass,
+                typeClass: typeClass,
+                status: status,
+                statusClass: statusClass,
+                statusIcon: statusIcon,
+                statusTooltip: statusTooltip,
+                gradedCount: gradedCount,
+                totalStudents: totalStudents,
+                gradedStudents: gradedStudents,
+                collapseId: collapseId
+            });
+        });
+    });
+
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(displayRows.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedRows = displayRows.slice(startIndex, startIndex + rowsPerPage);
+
+    if (paginatedRows.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No grades found matching your criteria.</td></tr>';
+        updatePaginationUI(totalPages);
+        return;
+    }
+
+    paginatedRows.forEach(item => {
+        // --- PARENT ROW ---
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.onclick = () => toggleRow(item.collapseId);
+        row.innerHTML = `
+            <td style="font-weight:700; color:var(--primary-dark);">
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span class="material-icons-round" style="font-size: 18px; color:var(--text-light); transition: transform 0.2s;" id="icon-${collapseId}">chevron_right</span>
-                        ${group.group_name}
+                        <span class="material-icons-round" style="font-size: 18px; color:var(--text-light); transition: transform 0.2s;" id="icon-${item.collapseId}">chevron_right</span>
+                        ${item.group.group_name}
                     </div>
                 </td>
-                <td><span class="type-badge ${typeClass}">${schedType}</span></td>
-                <td><span class="prog-badge ${progClass}">${program}</span></td>
+                <td><span class="type-badge ${item.typeClass}">${item.schedType}</span></td>
+                <td><span class="prog-badge ${item.progClass}">${item.program}</span></td>
                 <td>
-                    <span class="badge ${statusClass}" title="${statusTooltip}">
-                        <span class="material-icons-round" style="font-size:14px;">${statusIcon}</span>
-                        ${status} (${gradedCount}/${totalStudents})
+                    <span class="badge ${item.statusClass}" title="${item.statusTooltip}">
+                        <span class="material-icons-round" style="font-size:14px;">${item.statusIcon}</span>
+                        ${item.status} (${item.gradedCount}/${item.totalStudents})
                     </span>
                 </td>
                 <td>
                     <div style="display:flex; gap: 5px;">
                         ${(currentMainTab === 'Manage') ? `
-                        <button class="action-btn ${gradedCount > 0 ? 'edit' : 'add'}" 
-                                onclick="event.stopPropagation(); openGradeModalForEdit(${group.id}, '${schedType}')" 
-                                title="${gradedCount > 0 ? 'Edit Grades' : 'Input Grades'}"
-                                style="${status === 'Ready' ? 'background: #dcfce7; color: #166534;' : (gradedCount === 0 ? 'background: #f1f5f9; color: #64748b;' : '')}">
-                            <span class="material-icons-round">${gradedCount > 0 ? 'edit' : 'add_task'}</span>
+                        <button class="action-btn ${item.gradedCount > 0 ? 'edit' : 'add'}" 
+                                onclick="event.stopPropagation(); openGradeModalForEdit(${item.group.id}, '${item.schedType}')" 
+                                title="${item.gradedCount > 0 ? 'Edit Grades' : 'Input Grades'}"
+                                style="${item.status === 'Ready' ? 'background: #dcfce7; color: #166534;' : (item.gradedCount === 0 ? 'background: #f1f5f9; color: #64748b;' : '')}">
+                            <span class="material-icons-round">${item.gradedCount > 0 ? 'edit' : 'add_task'}</span>
                         </button>` : ''}
-                        <button class="action-btn" onclick="event.stopPropagation(); printGroup(${group.id}, '${schedType}')" title="Print Group Grades" style="color: var(--primary-color); background: #eff6ff;">
+                        <button class="action-btn" onclick="event.stopPropagation(); printGroup(${item.group.id}, '${item.schedType}')" title="Print Group Grades" style="color: var(--primary-color); background: #eff6ff;">
                             <span class="material-icons-round">print</span>
                         </button>
                     </div>
                 </td>
             `;
-            tableBody.appendChild(row);
+        tableBody.appendChild(row);
 
-            // --- CHILD ROW (DETAILS) ---
-            const detailRow = document.createElement('tr');
-            detailRow.id = collapseId;
-            detailRow.className = 'detail-row';
-            detailRow.style.display = 'none'; // Hidden by default
-            detailRow.style.background = '#f8fafc';
+        // --- CHILD ROW (DETAILS) ---
+        const detailRow = document.createElement('tr');
+        detailRow.id = item.collapseId;
+        detailRow.className = 'detail-row';
+        detailRow.style.display = 'none'; // Hidden by default
+        detailRow.style.background = '#f8fafc';
 
-            // Construct student list HTML
-            const studentListHtml = gradedStudents.map(s => `
+        // Construct student list HTML
+        const studentListHtml = item.gradedStudents.map(s => `
                 <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid #edf2f7;">
                     <span style="font-weight:500; color:#4a5568;">${s.name}</span>
                     <span style="font-weight:700; color:var(--primary-color); background:#ebf4ff; padding:2px 10px; border-radius:6px; min-width:50px; text-align:center;">${s.grade !== null ? parseFloat(s.grade) : '-'}</span>
@@ -310,14 +344,62 @@ function renderGrades() {
                     </div>
                 </td>
             `;
-            tableBody.appendChild(detailRow);
-        });
+        tableBody.appendChild(detailRow);
     });
 
-    if (!hasVisibleData) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No grades found matching your criteria.</td></tr>';
-    }
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    let paginationContainer = document.getElementById('gradesPagination');
+    if (!paginationContainer) {
+        const tableContainer = document.querySelector('#gradesTableBody').closest('.table-container') || document.querySelector('#gradesTableBody').parentElement;
+        if (tableContainer) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'gradesPagination';
+            paginationContainer.className = 'pagination';
+            paginationContainer.style.justifyContent = 'flex-end';
+            tableContainer.after(paginationContainer);
+        } else {
+            return;
+        }
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    // We can't just call renderGrades() directly without keeping displayRows,
+    // but renderGrades rebuilds displayRows based on filters.
+    // However, applyFilters isn't separated. So we need to ensure renderGrades() doesn't reset currentPage.
+    // Wait, we reset currentPage = 1 inside renderGrades. That's a bug if we do it there!
+    
+    // I need to adjust renderGrades!
+    // Since we call renderGrades() on input, we can keep the reset outside or use a flag.
+    // I will extract the reset.
+    renderGradesPaginated(newPage);
+};
+
+function renderGradesPaginated(newPage) {
+    currentPage = newPage;
+    renderGrades(false);
+}
+
+// Modify the start of renderGrades slightly so we don't reset to 1 if we pass false
+// See next step.
+
 
 //Helper to toggle rows
 function toggleRow(id) {
