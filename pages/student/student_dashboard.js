@@ -861,6 +861,7 @@ window.saveSubmissions = async function (specificField) {
             // Reset to Pending and clear remarks because student re-uploaded
             currentStatus[specificField] = 'Pending';
             currentRemarks[specificField] = '';
+            delete currentStatus['SEND_TO_PANEL'];
             
             updates.adviser_status = currentStatus;
             updates.adviser_remarks = currentRemarks;

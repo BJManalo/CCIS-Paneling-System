@@ -1464,6 +1464,31 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         currentStatus[fileKey] = newStatus;
         currentRemarks[fileKey] = remarksValue;
 
+        // Auto Send to Panel Logic:
+        const checkStageApproved = (keys) => keys.every(k => currentStatus[k] === 'Approved');
+        let shouldAutoSend = false;
+
+        if (['title1', 'title2', 'title3'].includes(fileKey)) {
+            shouldAutoSend = checkStageApproved(['title1', 'title2', 'title3']);
+        } else if (['ch1', 'ch2', 'ch3'].includes(fileKey)) {
+            shouldAutoSend = checkStageApproved(['ch1', 'ch2', 'ch3']);
+        } else if (['ch4', 'ch5'].includes(fileKey)) {
+            shouldAutoSend = checkStageApproved(['ch4', 'ch5']);
+        }
+
+        if (shouldAutoSend) {
+            currentStatus['SEND_TO_PANEL'] = true;
+        } else {
+            // If the change leaves any current stage file unapproved, remove SEND_TO_PANEL
+            if (['title1', 'title2', 'title3'].includes(fileKey) && !checkStageApproved(['title1', 'title2', 'title3'])) {
+                delete currentStatus['SEND_TO_PANEL'];
+            } else if (['ch1', 'ch2', 'ch3'].includes(fileKey) && !checkStageApproved(['ch1', 'ch2', 'ch3'])) {
+                delete currentStatus['SEND_TO_PANEL'];
+            } else if (['ch4', 'ch5'].includes(fileKey) && !checkStageApproved(['ch4', 'ch5'])) {
+                delete currentStatus['SEND_TO_PANEL'];
+            }
+        }
+
         const { error } = await supabaseClient
             .from('student_groups')
             .update({
