@@ -779,6 +779,33 @@ window.saveSubmissions = async function (specificField) {
             return;
         }
 
+        // Fetch current group data to reset adviser status for this specific file
+        const { data: currentGroupData } = await supabaseClient
+            .from('student_groups')
+            .select('adviser_status, adviser_remarks')
+            .eq('id', loginUser.id)
+            .single();
+            
+        if (currentGroupData) {
+            let currentStatus = currentGroupData.adviser_status || {};
+            let currentRemarks = currentGroupData.adviser_remarks || {};
+            
+            // Reset to Pending and clear remarks because student re-uploaded
+            currentStatus[specificField] = 'Pending';
+            currentRemarks[specificField] = '';
+            
+            updates.adviser_status = currentStatus;
+            updates.adviser_remarks = currentRemarks;
+            
+            // Update localStorage immediately so UI re-renders correctly on next tick
+            try {
+                const lsGroup = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
+                lsGroup.adviser_status = currentStatus;
+                lsGroup.adviser_remarks = currentRemarks;
+                localStorage.setItem('lastGroupData', JSON.stringify(lsGroup));
+            } catch (e) {}
+        }
+
         const { error } = await supabaseClient
             .from('student_groups')
             .update(updates)
