@@ -126,10 +126,9 @@ async function loadCapstoneData() {
             capstoneFeedback = cfRes.data || [];
             capstoneAnnotations = caRes.data || [];
             console.log('LOAD SUCCESS:', { statuses: defStatuses.length, feedback: capstoneFeedback.length, annotations: capstoneAnnotations.length });
-            console.log('LOAD SUCCESS:', { statuses: defStatuses.length, feedback: capstoneFeedback.length });
         } catch (e) {
             console.error('Critical Fetch Error:', e);
-            alert('Critical database fetch error. Check console and SQL setup.');
+            showToast('Critical database fetch error. Check console and SQL setup.', 'error');
         }
 
         // Helper to get merged status/remarks for a specific group/type
@@ -246,13 +245,6 @@ async function loadCapstoneData() {
 
                 // Check panelist match with fuzzy logic
                 const isPanelist = panelList.some(p => robustMatch(p, userNameNormalized) || robustMatch(p, userEmailNormalized));
-
-                // DEBUG LOG: Help identify why groups are hidden
-                if (group.id === 1 || panelList.length > 0 || group.adviser) {
-                    console.log(`Checking Visibility for Group: ${group.group_name} | Stage: ${defType}`);
-                    console.log(`- User: "${userNameNormalized}" | Adviser: "${group.adviser}" | isAdviser: ${isAdviser}`);
-                    console.log(`- Panels:`, panelList, `| isPanelist: ${isPanelist}`);
-                }
 
                 const feedbackRes = getMergedFeedback(group.id, normType);
                 const currentStatuses = feedbackRes.statuses;
@@ -581,8 +573,6 @@ window.changePage = (newPage) => {
     renderTable();
 };
 
-// Global functions for Modal (Reusing existing logic roughly, but checking context)
-// Global functions for Modal (Reusing existing logic roughly, but checking context)
 window.openFileModal = (groupId) => {
     console.log('Opening Modal for Group ID:', groupId);
     const stringGroupId = String(groupId);
@@ -597,8 +587,8 @@ window.openFileModal = (groupId) => {
     }
 
     if (!group) {
-        console.error('Group not found in allData:', { stringGroupId, normTab });
-        alert('Data Error: Could not find group information. Try refreshing the page.');
+        console.error("Cannot toggle files: Group not found in filteredData for ID", groupId);
+        showToast('Data Error: Could not find group information. Try refreshing the page.', 'error');
         return;
     }
 
@@ -736,11 +726,6 @@ window.openFileModal = (groupId) => {
                 itemContainer.appendChild(revItem);
             }
 
-            // Approval Controls logic (same as before)
-            // ... (We assume the status/remarks update logic remains valid)
-            // Re-implement simplified version here to save space or reuse if function available
-
-            // To ensure it works, I'll inject the controls logic directly again (safest)
             const userJson = localStorage.getItem('loginUser');
             const user = userJson ? JSON.parse(userJson) : null;
             const userName = user ? (user.name || user.full_name || 'Panel') : 'Panel';
@@ -760,8 +745,6 @@ window.openFileModal = (groupId) => {
             }
 
             // --- Multi-Panel Logic ---
-            // If the map value is a string (old version), we ignore it for multi-panel or try to adapt.
-            // New structure: currentStatusMap[label] = { "Panel Name": "Status" }
             const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
             const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
 
@@ -770,7 +753,6 @@ window.openFileModal = (groupId) => {
             if (myStatus === 'Approve with Revisions') myStatus = 'Approved with Revisions';
             const myRemarks = fileRemarks[userName] || '';
 
-            // ... (Controls Rendering Code) ...
             const controls = document.createElement('div');
             controls.style.padding = '12px';
             controls.style.background = '#f8fafc';
@@ -792,7 +774,6 @@ window.openFileModal = (groupId) => {
             }
 
             let optionsHtml = '';
-            // ... (option generation omitted for brevity if not used in read-only)
 
             if (categoryKey === 'titles') {
                 optionsHtml = `
@@ -813,13 +794,7 @@ window.openFileModal = (groupId) => {
                 `;
             }
 
-            // Other Panel Feedback HTML (Visible to everyone)
             let otherFeedbackHtml = '';
-            // For Adviser, we want to see ALL panel feedback, not just "others".
-            // Since Adviser name isn't in the status map as a KEY usually (unless they are also a panel), 
-            // "others" logic works fine if we consider Adviser is not a panel key.
-            // But if currentRole is Adviser, we want to see ALL entries in fileStatuses.
-
             let panelsToDisplay = [];
             if (currentRole === 'Adviser') {
                 panelsToDisplay = Object.keys(fileStatuses);
@@ -863,7 +838,7 @@ window.openFileModal = (groupId) => {
                 } else {
                 interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
+                    <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Your Status</span>
                     <div id="status-badge-${categoryKey}-${label}" style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
                         <span class="material-icons-round" style="font-size: 14px;">${iconText}</span>
                         ${myStatus}
@@ -924,7 +899,6 @@ window.openFileModal = (groupId) => {
                     </div>
                 `;
             } else {
-                // Actual Read Only view
                 interactiveControls = `
                     <div style="padding: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; border-radius: 6px; color: #64748b; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
                         <span class="material-icons-round" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">visibility</span>
@@ -943,15 +917,6 @@ window.openFileModal = (groupId) => {
 
         fileList.appendChild(section);
     };
-
-    // Filter which sections to show based on locking/tab? 
-    // Usually if I open the "Title Defense" group row, I might want to see ONLY Title files?
-    // Or see all history?
-    // Let's show ONLY the current tab's files to be focused. 
-    // Or allow seeing previous approved ones?
-    // Generally, context is "grading this stage".
-    // I will show ALL for context, but maybe collapse others?
-    // For simplicity, showing all is safer so they can reference previous docs.
 
     if (normTab.includes('title')) {
         createSection('Title Defense', group.files.titles, 'article', 'titles');
@@ -990,10 +955,6 @@ window.closeFileModal = () => {
     if (frame) frame.src = '';
 };
 
-// Re-attach other globals (updateStatus, saveRemarks, loadViewer, etc.)
-// They remain largely checking 'allData' which we update.
-// NOTE: I am keeping them as defined in previous file version but ensuring they use the new data structure.
-
 window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
     if (newStatus === 'Pending') return;
 
@@ -1027,7 +988,6 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
         }
 
         // 2. Update Legacy/Group Status mapping (for table view)
-        // We must fetch the current row first to avoid overwriting other file keys!
         const { data: existingRow } = await supabaseClient
             .from('defense_statuses')
             .select('statuses')
@@ -1084,7 +1044,6 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
             select.style.borderColor = '#22c55e';
         }
 
-        // Refresh the badges and main table
         renderTable();
         console.log('Status saved successfully for:', userName);
 
@@ -1093,8 +1052,8 @@ window.updateStatus = async (groupId, categoryKey, fileKey, newStatus) => {
             archiveProject(groupId);
         }
     } catch (err) {
-        console.error('Update Status Critical Error:', err);
-        alert('❌ FAILED TO SAVE STATUS: ' + err.message + '\n\nMake sure the capstone_feedback table exists in Supabase!');
+        console.error('Error saving individual feedback:', err);
+        showToast('❌ FAILED TO SAVE STATUS: ' + err.message + '\n\nMake sure the capstone_feedback table exists in Supabase!', 'error');
         if (select) {
             select.disabled = false;
             select.style.opacity = '1';
@@ -1113,7 +1072,7 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     const btn = textarea ? textarea.nextElementSibling : null;
     const newText = textarea ? textarea.value.trim() : '';
 
-    if (!newText) { alert('Please enter remarks.'); return; }
+    if (!newText) { showToast('Please enter remarks.', 'warning'); return; }
     if (btn) { btn.disabled = true; btn.innerText = 'Saving...'; }
 
     try {
@@ -1140,7 +1099,6 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
         if (fError) throw fError;
 
         // 2. Sync Legacy/Group Status mapping
-        // Fetch fresh data to merge properly
         const { data: existingRow } = await supabaseClient
             .from('defense_statuses')
             .select('statuses, remarks')
@@ -1168,12 +1126,9 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
                 updated_at: new Date()
             }, { onConflict: 'group_id, defense_type' });
 
-        // Update local state to reflect changes immediately
         group.currentStatusJson = mergedStatuses;
         group.currentRemarksJson = mergedRemarks;
 
-        // Success Feedback
-        // Update specific view maps as well for immediate render
         if (normTab.includes('title')) {
             group.titleStatus = mergedStatuses;
             group.titleRemarks = mergedRemarks;
@@ -1196,12 +1151,11 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
                 btn.style.color = '';
             }, 2000);
         }
-        // Refresh the table UI
         renderTable();
 
     } catch (e) {
-        console.error('SAVE ERROR:', e);
-        alert('Could not save remarks. Please check your connection.');
+        console.error('Error saving panel remarks:', e);
+        showToast('Could not save remarks. Please check your connection.', 'error');
         if (btn) {
             btn.disabled = false;
             btn.innerText = 'Update Remarks';
@@ -1211,7 +1165,6 @@ window.saveRemarks = async (groupId, categoryKey, fileKey) => {
     }
 };
 
-// --- PDF.js Integration Variables ---
 let currentPdf = null;
 let currentPageNum = 1;
 let pdfScale = 1.5;
@@ -1248,14 +1201,12 @@ window.closeFileModal = () => {
     currentHighlightedText = "";
 };
 
-// --- PDF.js CORE VIEWER ---
 window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (!url) {
         console.error("loadViewer: No URL provided");
         return;
     }
 
-    // Revoke previous blob if exists
     if (currentBlobUrl) {
         URL.revokeObjectURL(currentBlobUrl);
         currentBlobUrl = null;
@@ -1286,7 +1237,6 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
     if (container) container.style.display = 'none';
     if (saveBtn) saveBtn.style.display = 'none';
 
-    // Resolve URL (check for existing annotations)
     let finalUrl = url.trim();
     if (!finalUrl.startsWith('http') && !finalUrl.startsWith('//')) finalUrl = 'https://' + finalUrl;
 
@@ -1319,7 +1269,6 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 
     try {
         if (isPDF) {
-            console.log("Loading PDF via PDF.js...");
             const response = await fetch(finalUrl);
             if (!response.ok) throw new Error("Fetch failed");
             const blob = await response.blob();
@@ -1332,13 +1281,11 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             if (placeholder) placeholder.style.display = 'none';
             pdfFrame.src = viewerUrl;
 
-            // Enable Auto-save for PDFs ONLY
             if (autoSaveInterval) clearInterval(autoSaveInterval);
             autoSaveInterval = setInterval(() => { saveAnnotatedPDF(true); }, 2000);
             if (saveBtn) saveBtn.style.display = 'block';
 
         } else if (isDrive) {
-            console.log("Loading Google Drive link...");
             const fileIdMatch = finalUrl.match(/\/d\/([^\/]+)/) || finalUrl.match(/id=([^\&]+)/);
             const drivePreview = fileIdMatch ? `https://drive.google.com/file/d/${fileIdMatch[1]}/preview` : finalUrl;
 
@@ -1350,7 +1297,6 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             if (saveBtn) saveBtn.style.display = 'none';
 
         } else {
-            console.log("Loading generic link...");
             if (container) container.style.display = 'block';
             if (placeholder) placeholder.style.display = 'none';
             pdfFrame.src = finalUrl;
@@ -1360,11 +1306,9 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
         }
 
     } catch (e) {
-        console.warn("Enhanced loading failed, falling back to basic display:", e);
         if (container) container.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
 
-        // Final fallback: try Google Docs viewer for any link
         if (!isDrive && !isPDF) {
             pdfFrame.src = `https://docs.google.com/viewer?url=${encodeURIComponent(finalUrl)}&embedded=true`;
         } else {
@@ -1377,7 +1321,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 };
 
 async function saveAnnotatedPDF(isAuto = false) {
-    if (isSaving) return; // Prevent concurrent saves
+    if (isSaving) return; 
 
     const frame = document.getElementById('pdfFrame');
     const viewerApp = frame ? frame.contentWindow.PDFViewerApplication : null;
@@ -1396,18 +1340,13 @@ async function saveAnnotatedPDF(isAuto = false) {
             statusIcon.style.animation = "viewer-spin 1s linear infinite";
         }
 
-        // 1. Get the annotated PDF bytes from PDF.js
         const data = await viewerApp.pdfDocument.saveDocument();
-
-        // 2. Prepare file metadata
         const userJson = localStorage.getItem('loginUser');
-        const user = JSON.parse(userJson || '{}');
+        const user = userJson ? JSON.parse(userJson || '{}') : {};
         const userName = user.name || user.full_name || 'Panel';
-        // Stable filename to overwrite instead of creating new files
         const cleanName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
         const fileName = `annotated_${currentViewerGroupId}_${currentViewerFileKey}_${cleanName}.pdf`;
 
-        // 3. Upload to Supabase Storage (upsert: true to overwrite)
         const { data: uploadData, error: uploadError } = await supabaseClient.storage
             .from('project-submissions')
             .upload(`submissions/annotations/${fileName}`, data, {
@@ -1417,12 +1356,10 @@ async function saveAnnotatedPDF(isAuto = false) {
 
         if (uploadError) throw uploadError;
 
-        // 4. Get the Public URL
         const { data: { publicUrl } } = supabaseClient.storage
             .from('project-submissions')
             .getPublicUrl(`submissions/annotations/${fileName}`);
 
-        // 5. Save the link to the 'capstone_annotations' table (New Separate Table)
         const { error: dbError } = await supabaseClient
             .from('capstone_annotations')
             .upsert({
@@ -1434,12 +1371,8 @@ async function saveAnnotatedPDF(isAuto = false) {
                 updated_at: new Date().toISOString()
             }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
-        if (dbError) {
-            console.error("Database upsert failed:", dbError);
-            throw dbError;
-        }
+        if (dbError) throw dbError;
 
-        // --- Local Sync: Ensure the current session knows about the save ---
         if (allData && currentViewerGroupId) {
             const normTab = normalizeType(currentTab);
             const groupEntry = allData.find(g => String(g.id) === String(currentViewerGroupId) && g.normalizedType === normTab);
@@ -1454,7 +1387,6 @@ async function saveAnnotatedPDF(isAuto = false) {
                     if (!groupEntry[annotKey]) groupEntry[annotKey] = {};
                     if (!groupEntry[annotKey][currentViewerFileKey]) groupEntry[annotKey][currentViewerFileKey] = {};
                     groupEntry[annotKey][currentViewerFileKey][userName] = publicUrl;
-                    console.log(`Synced ${annotKey} locally:`, publicUrl);
                 }
             }
         }
@@ -1477,11 +1409,6 @@ async function saveAnnotatedPDF(isAuto = false) {
     }
 }
 
-// --- (Obsolete manual rendering functions removed) ---
-
-// --- HIGHLIGHT DETECTION (Real-time Sync & Clean Version) ---
-// --- (Global mouseup listener removed, handled by iframe) ---
-
 window.filterTable = (program) => {
     currentPage = 1;
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
@@ -1503,31 +1430,19 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
 
 async function archiveProject(groupId) {
     try {
-        console.log("Starting archival process for Group ID:", groupId);
-
-        // 1. Fetch Group Details
         const { data: group, error: gError } = await supabaseClient
             .from('student_groups')
             .select('*')
             .eq('id', groupId)
             .single();
 
-        if (gError || !group) {
-            console.error("Archival Error: Group not found", gError);
-            return;
-        }
+        if (gError || !group) return;
 
-        // 2. Fetch Members
         const { data: members, error: mError } = await supabaseClient
             .from('students')
             .select('name')
             .eq('group_id', groupId);
 
-        if (mError) {
-            console.warn("Archival Warning: Could not fetch members", mError);
-        }
-
-        // 3. Fetch Panelists from Schedules
         const { data: schedules, error: sError } = await supabaseClient
             .from('schedules')
             .select('panel1, panel2, panel3, panel4, panel5')
@@ -1536,25 +1451,15 @@ async function archiveProject(groupId) {
         const panelSet = new Set();
         if (schedules) {
             schedules.forEach(s => {
-                if (s.panel1) panelSet.add(s.panel1);
-                if (s.panel2) panelSet.add(s.panel2);
-                if (s.panel3) panelSet.add(s.panel3);
-                if (s.panel4) panelSet.add(s.panel4);
-                if (s.panel5) panelSet.add(s.panel5);
+                [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].forEach(p => { if (p) panelSet.add(p); });
             });
         }
 
-        // 4. Fetch All Annotations
         const { data: annotations, error: aError } = await supabaseClient
             .from('capstone_annotations')
             .select('*')
             .eq('group_id', groupId);
 
-        if (aError) {
-            console.warn("Archival Warning: Could not fetch annotations", aError);
-        }
-
-        // 5. Build Submissions Map
         const submissions = {
             title_link: group.title_link,
             pre_oral_link: group.pre_oral_link,
@@ -1562,7 +1467,6 @@ async function archiveProject(groupId) {
             project_title: group.project_title
         };
 
-        // 6. Build Annotations Map
         const annotationsMap = {};
         if (annotations) {
             annotations.forEach(a => {
@@ -1575,8 +1479,7 @@ async function archiveProject(groupId) {
             });
         }
 
-        // 7. Insert into archived_projects
-        const { error: archError } = await supabaseClient
+        await supabaseClient
             .from('archived_projects')
             .upsert({
                 group_id: groupId,
@@ -1589,12 +1492,6 @@ async function archiveProject(groupId) {
                 completed_at: new Date().toISOString()
             }, { onConflict: 'group_id' });
 
-        if (archError) {
-            console.error("Archival Upsert Failed:", archError);
-            throw archError;
-        }
-
-        console.log("Archive for Group " + groupId + " saved successfully!");
     } catch (err) {
         console.error("Critical Archival Failure:", err);
     }
@@ -1602,7 +1499,6 @@ async function archiveProject(groupId) {
 
 window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
     try {
-        // Show remarks box immediately if declining
         const remarksBox = document.getElementById(`adviser-remarks-container-${groupId}-${fileKey}`);
         if (newStatus === 'Declined' && remarksBox) {
             remarksBox.style.display = 'block';
@@ -1645,7 +1541,6 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 
         const currentStatus = group.adviser_status || {};
         const currentRemarks = group.adviser_remarks || {};
-        
         const remarksValue = document.getElementById(`adviser-remarks-${groupId}-${fileKey}`)?.value.trim() || '';
 
         currentStatus[fileKey] = newStatus;
@@ -1661,25 +1556,19 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 
         if (error) throw error;
 
-        // Update local global state so UI reflects change immediately
         const localGroup = allData.find(g => String(g.id) === String(groupId));
         if (localGroup) {
             localGroup.adviserStatus = currentStatus;
             localGroup.adviserRemarks = currentRemarks;
         }
 
-        const toastType = newStatus === 'Approved' ? 'success' : 'error';
-        if (typeof window.showToast === 'function') {
-            window.showToast(`Status updated to ${newStatus}.`, toastType);
-        }
-        
-        // Refresh UI
+        window.showToast(`Status updated to ${newStatus}.`, newStatus === 'Approved' ? 'success' : 'error');
         renderTable();
         checkSendToPanelButton(groupId);
 
     } catch (err) {
-        console.error('Error updating adviser status:', err);
-        alert('Failed to update status: ' + err.message);
+        console.error('Error updating status:', err);
+        showToast('Failed to update status: ' + err.message, 'error');
     }
 };
 
@@ -1702,7 +1591,6 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
         if (fetchError) throw fetchError;
 
         const remarksValue = textarea?.value.trim() || '';
-        
         const currentRemarks = group.adviser_remarks || {};
         currentRemarks[fileKey] = remarksValue;
 
@@ -1714,15 +1602,9 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
         if (error) throw error;
         
         const localGroup = allData.find(g => String(g.id) === String(groupId));
-        if (localGroup) {
-            localGroup.adviserRemarks = currentRemarks;
-        }
+        if (localGroup) localGroup.adviserRemarks = currentRemarks;
 
-        if (typeof window.showToast === 'function') {
-            window.showToast('Remarks saved successfully.', 'success');
-        } else {
-            alert('Remarks saved successfully.');
-        }
+        window.showToast('Remarks saved successfully.', 'success');
 
         if (btn) {
             btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">check</span> Saved';
@@ -1731,11 +1613,7 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
 
     } catch (err) {
         console.error('Error saving remarks:', err);
-        if (typeof window.showToast === 'function') {
-            window.showToast('Failed to send to panel.', 'error');
-        } else {
-            alert('Failed to save remarks.');
-        }
+        window.showToast('Failed to save remarks.', 'error');
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">save</span> Save';
@@ -1796,18 +1674,14 @@ window.sendToPanel = async (groupId) => {
         
         localGroup.adviserStatus = currentStatus;
         
-        if (typeof window.showToast === 'function') {
-            window.showToast('Group sent to panel successfully!', 'success');
-        } else {
-            alert('Group sent to panel successfully!');
-        }
+        window.showToast('Group sent to panel successfully!', 'success');
 
         checkSendToPanelButton(groupId);
         renderTable();
 
     } catch (err) {
         console.error('Error sending to panel:', err);
-        alert('Failed to send to panel: ' + err.message);
+        showToast('Failed to send to panel: ' + err.message, 'error');
         checkSendToPanelButton(groupId);
     }
 };
