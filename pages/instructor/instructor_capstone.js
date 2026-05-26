@@ -9,7 +9,8 @@ let currentProgram = 'ALL';
 let searchTerm = '';
 let groupGrades = {}; // Map: groupId -> Set of graded/evaluated types
 let currentStatusFilter = 'ALL';
-
+let currentPage = 1;
+const rowsPerPage = 15;
 function formatTime12Hour(timeStr) {
     if (!timeStr) return '';
     const parts = timeStr.split(':');
@@ -317,6 +318,7 @@ async function loadCapstoneData() {
 // --- Tab Switching ---
 window.switchTab = (tabName) => {
     currentTab = tabName;
+    currentPage = 1;
     updateTabStyles(tabName);
     renderTable();
 };
@@ -338,6 +340,7 @@ function updateTabStyles(activeTab) {
 
 window.filterStatus = (status) => {
     currentStatusFilter = status;
+    currentPage = 1;
     document.querySelectorAll('.status-btn').forEach(btn => {
         if (btn.id === `status-${status}`) {
             btn.style.opacity = '1';
@@ -430,14 +433,23 @@ function renderTable() {
         return currentStatusFilter === 'FINISHED' ? isFinished : !isFinished;
     });
 
-    if (filteredGroups.length === 0) {
+    // --- Pagination Logic ---
+    const totalPages = Math.ceil(filteredGroups.length / rowsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const paginatedGroups = filteredGroups.slice(startIndex, startIndex + rowsPerPage);
+
+    if (paginatedGroups.length === 0) {
         if (emptyState) emptyState.style.display = 'flex';
+        updatePaginationUI(totalPages);
         return;
     }
 
     if (emptyState) emptyState.style.display = 'none';
 
-    filteredGroups.forEach(g => {
+    paginatedGroups.forEach(g => {
         // --- LOCKING LOGIC ---
         let isLocked = false;
         let lockReason = '';
@@ -538,7 +550,32 @@ function renderTable() {
 
         tableBody.appendChild(row);
     });
+
+    updatePaginationUI(totalPages);
 }
+
+function updatePaginationUI(totalPages) {
+    const paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) return;
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
+window.changePage = (newPage) => {
+    currentPage = newPage;
+    renderTable();
+};
 
 // Global functions for Modal
 window.openFileModal = (groupId) => {
@@ -1283,6 +1320,7 @@ async function saveAnnotatedPDF(isAuto = false) {
 }
 
 window.filterTable = (program) => {
+    currentPage = 1;
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
     if (currentProgram === program) {
         currentProgram = 'ALL';
@@ -1295,7 +1333,8 @@ window.filterTable = (program) => {
 };
 
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
-    searchTerm = e.target.value;
+    searchTerm = e.target.value.trim();
+    currentPage = 1;
     renderTable();
 });
 
