@@ -246,13 +246,20 @@ async function loadSubmissionData() {
 
                 const val = linkMap[key];
                 const hasFile = val && typeof val === 'string' && val.trim() !== '';
-                const rawAnnotations = annotationsMap[key] || {};
-                const hasAnnotations = Object.keys(rawAnnotations).length > 0;
-
                 if (hasFile) {
+                    const rawAnnotations = annotationsMap[key] || {};
                     const tabData = key.startsWith('title') ? titleData : (['ch1', 'ch2', 'ch3'].includes(key) ? preOralData : finalData);
                     const panelStatuses = tabData.statuses[key] || {};
-                    
+                    const panelRemarks = tabData.remarks[key] || {};
+
+                    // Compile list of panels that submitted annotations or comments
+                    const panelNamesWithFeedback = Array.from(new Set([
+                        ...Object.keys(panelStatuses),
+                        ...Object.keys(panelRemarks),
+                        ...Object.keys(rawAnnotations)
+                    ]));
+                    const hasFeedback = panelNamesWithFeedback.length > 0;
+
                     let mayLynnStatus = null;
                     const normalizedTarget = "may lynn farren";
                     
@@ -317,10 +324,10 @@ async function loadSubmissionData() {
                     const headerHtml = `
                         <div class="view-doc-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                             <span style="font-size: 0.85rem; font-weight: 700; color: #475569;">Submission Link</span>
-                            <button type="button" onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: val, annotations: annotationsMap[key] || {} }))}', '${key}')" 
+                            <button type="button" onclick="window.prepareViewer('${encodeURIComponent(JSON.stringify({ draft: val, annotations: annotationsMap[key] || {}, feedbacks: panelNamesWithFeedback }))}', '${key}')" 
                                     style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
                                 <span class="material-icons-round" style="font-size: 16px;">visibility</span> 
-                                ${hasAnnotations ? 'View Document & Feedback' : 'View Document'}
+                                ${hasFeedback ? 'View Document & Feedback' : 'View Document'}
                             </button>
                         </div>
                     `;
@@ -937,8 +944,9 @@ window.prepareViewer = (encodedData, fileKey) => {
             selector.appendChild(opt);
         }
 
-        // 2. Add Annotation Options
-        Object.keys(data.annotations).forEach(panel => {
+        // 2. Add Annotation Options (from all feedbacks or annotations)
+        const feedbackPanels = data.feedbacks || Object.keys(data.annotations);
+        feedbackPanels.forEach(panel => {
             const opt = document.createElement('option');
             opt.value = panel;
             opt.innerText = `Feedback (${panel})`;
@@ -968,7 +976,7 @@ window.handlePanelSwitch = async (value) => {
     if (value === "draft") {
         targetUrl = currentViewerData.draft;
     } else {
-        targetUrl = currentViewerData.annotations[value];
+        targetUrl = currentViewerData.annotations[value] || currentViewerData.draft;
         panelName = value;
     }
 
