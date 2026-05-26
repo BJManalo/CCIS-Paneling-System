@@ -171,12 +171,13 @@ function renderCalendar() {
 
             evEl.style.cssText = `
                 font-size: 10px; padding: 4px 8px; border-radius: 6px; font-weight: 700;
-                background: ${bg}; color: ${color}; white-space: nowrap; 
+                background: ${bg}; color: ${color}; white-space: nowrap;
                 overflow: hidden; text-overflow: ellipsis; border: 1px solid rgba(0,0,0,0.05);
-                cursor: help;
+                cursor: pointer; transition: transform 0.1s;
             `;
             evEl.textContent = `${formatTime12Hour(sched.schedule_time)} ${sched.student_groups?.group_name || 'Group'}`;
-            evEl.title = `${sched.schedule_type}: ${sched.student_groups?.group_name}\nVenue: ${sched.schedule_venue}`;
+            evEl.title = `${sched.schedule_type}: ${sched.student_groups?.group_name}`;
+            evEl.onclick = () => openDetailsModal(sched);
             container.appendChild(evEl);
         });
     }
