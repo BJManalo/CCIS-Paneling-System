@@ -12,7 +12,7 @@ let currentStatusFilter = 'ALL';
 let currentPage = 1;
 const rowsPerPage = 15;
 
-function showToast(message, type = 'info') {
+window.showToast = function(message, type = 'info') {
     let toast = document.getElementById('toast');
     if (!toast) {
         toast = document.createElement('div');
@@ -1468,9 +1468,9 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         group.adviser_status = currentStatus;
         group.adviser_remarks = currentRemarks;
 
-        if (typeof showToast === 'function') {
+        if (typeof window.showToast === 'function') {
             const toastType = newStatus === 'Approved' ? 'success' : 'error';
-            showToast(`Status updated to ${newStatus}.`, toastType);
+            window.showToast(`Status updated to ${newStatus}.`, toastType);
         }
         
         // Refresh UI (only the background table, do NOT re-open modal to avoid resetting the PDF viewer)
@@ -1511,8 +1511,8 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
         if (error) throw error;
         group.adviser_remarks = currentRemarks;
 
-        if (typeof showToast === 'function') {
-            showToast('Remarks saved successfully.', 'success');
+        if (typeof window.showToast === 'function') {
+            window.showToast('Remarks saved successfully.', 'success');
         } else {
             alert('Remarks saved successfully.');
         }
@@ -1525,8 +1525,8 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
 
     } catch (err) {
         console.error('Error saving remarks:', err);
-        if (typeof showToast === 'function') {
-            showToast('Failed to save remarks.', 'error');
+        if (typeof window.showToast === 'function') {
+            window.showToast('Failed to save remarks.', 'error');
         } else {
             alert('Failed to save remarks.');
         }
@@ -1591,8 +1591,8 @@ window.sendToPanel = async (groupId) => {
         
         group.adviser_status = currentStatus;
         
-        if (typeof showToast === 'function') {
-            showToast('Group sent to panel successfully!', 'success');
+        if (typeof window.showToast === 'function') {
+            window.showToast('Group sent to panel successfully!', 'success');
         } else {
             alert('Group sent to panel successfully!');
         }

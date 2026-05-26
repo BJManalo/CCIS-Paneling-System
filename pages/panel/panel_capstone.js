@@ -1669,7 +1669,9 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         }
 
         const toastType = newStatus === 'Approved' ? 'success' : 'error';
-        showToast(`Status updated to ${newStatus}.`, toastType);
+        if (typeof window.showToast === 'function') {
+            window.showToast(`Status updated to ${newStatus}.`, toastType);
+        }
         
         // Refresh UI
         renderTable();
@@ -1716,8 +1718,8 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
             localGroup.adviserRemarks = currentRemarks;
         }
 
-        if (typeof showToast === 'function') {
-            showToast('Remarks saved successfully.', 'success');
+        if (typeof window.showToast === 'function') {
+            window.showToast('Remarks saved successfully.', 'success');
         } else {
             alert('Remarks saved successfully.');
         }
@@ -1729,8 +1731,8 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
 
     } catch (err) {
         console.error('Error saving remarks:', err);
-        if (typeof showToast === 'function') {
-            showToast('Failed to save remarks.', 'error');
+        if (typeof window.showToast === 'function') {
+            window.showToast('Failed to send to panel.', 'error');
         } else {
             alert('Failed to save remarks.');
         }
@@ -1794,8 +1796,8 @@ window.sendToPanel = async (groupId) => {
         
         localGroup.adviserStatus = currentStatus;
         
-        if (typeof showToast === 'function') {
-            showToast('Group sent to panel successfully!', 'success');
+        if (typeof window.showToast === 'function') {
+            window.showToast('Group sent to panel successfully!', 'success');
         } else {
             alert('Group sent to panel successfully!');
         }
@@ -1815,7 +1817,7 @@ function logout() {
     window.location.href = '../../';
 }
 
-function showToast(message, type = 'info') {
+window.showToast = function(message, type = 'info') {
     let toast = document.getElementById('toast');
     if (!toast) {
         toast = document.createElement('div');
