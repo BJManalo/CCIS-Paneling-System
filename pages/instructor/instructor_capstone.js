@@ -928,10 +928,10 @@ window.openFileModal = (groupId) => {
                                 <span class="material-icons-round" style="font-size: 16px;">save</span> Save
                             </button>
                         </div>
-                        <div id="send-to-panel-container-${group.id}" style="margin-top: 10px; display: none;">
-                            <button onclick="sendToPanel(${group.id})" style="width: 100%; background: #6366f1; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;">Send to Panel</button>
+                        <div id="send-to-panel-container-${group.id}-${label}" style="margin-top: 10px; display: none;">
+                            <button onclick="sendToPanel(${group.id}, '${label}')" style="width: 100%; background: #6366f1; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;">Send to Panel</button>
                         </div>
-                        <script>setTimeout(() => checkSendToPanelButton(${group.id}), 100);</script>
+                        <script>setTimeout(() => checkSendToPanelButton(${group.id}, '${label}'), 100);</script>
                     </div>
                 `;
             } else {
@@ -1512,7 +1512,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         renderTable();
 
         // Refresh Send to Panel button state
-        checkSendToPanelButton(groupId);
+        checkSendToPanelButton(groupId, fileKey);
 
     } catch (err) {
         console.error('Error updating adviser status:', err);
@@ -1572,18 +1572,26 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
     }
 };
 
-window.checkSendToPanelButton = (groupId) => {
+window.checkSendToPanelButton = (groupId, label) => {
     const group = allData.find(g => g.id == groupId);
     if (!group) return;
 
-    const btnContainer = document.getElementById(`send-to-panel-container-${groupId}`);
+    const btnContainer = document.getElementById(`send-to-panel-container-${groupId}-${label}`);
     if (!btnContainer) return;
 
     const statuses = group.adviser_status || {};
-    const approvedCount = Object.values(statuses).filter(s => s === 'Approved').length;
+    
+    // Check if the stage for this file is approved
+    let isStageApproved = false;
+    if (['title1', 'title2', 'title3'].includes(label)) {
+        isStageApproved = ['title1', 'title2', 'title3'].every(k => statuses[k] === 'Approved');
+    } else if (['ch1', 'ch2', 'ch3'].includes(label)) {
+        isStageApproved = ['ch1', 'ch2', 'ch3'].every(k => statuses[k] === 'Approved');
+    } else if (['ch4', 'ch5'].includes(label)) {
+        isStageApproved = ['ch4', 'ch5'].every(k => statuses[k] === 'Approved');
+    }
 
-    // Must have at least 3 approved documents
-    if (approvedCount >= 3) {
+    if (isStageApproved) {
         btnContainer.style.display = 'block';
         const btn = btnContainer.querySelector('button');
         
@@ -1603,7 +1611,7 @@ window.checkSendToPanelButton = (groupId) => {
     }
 };
 
-window.sendToPanel = async (groupId) => {
+window.sendToPanel = async (groupId, label) => {
     try {
         const group = allData.find(g => g.id == groupId);
         if (!group) return;
@@ -1611,7 +1619,7 @@ window.sendToPanel = async (groupId) => {
         const currentStatus = group.adviser_status || {};
         currentStatus['SEND_TO_PANEL'] = true;
 
-        const btn = document.querySelector(`#send-to-panel-container-${groupId} button`);
+        const btn = document.querySelector(`#send-to-panel-container-${groupId}-${label} button`);
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">hourglass_empty</span> Sending...';
@@ -1632,13 +1640,20 @@ window.sendToPanel = async (groupId) => {
             alert('Group sent to panel successfully!');
         }
 
-        checkSendToPanelButton(groupId);
+        // Update all buttons for this group
+        if (['title1', 'title2', 'title3'].includes(label)) {
+            ['title1', 'title2', 'title3'].forEach(k => checkSendToPanelButton(groupId, k));
+        } else if (['ch1', 'ch2', 'ch3'].includes(label)) {
+            ['ch1', 'ch2', 'ch3'].forEach(k => checkSendToPanelButton(groupId, k));
+        } else if (['ch4', 'ch5'].includes(label)) {
+            ['ch4', 'ch5'].forEach(k => checkSendToPanelButton(groupId, k));
+        }
         renderTable();
 
     } catch (err) {
         console.error('Error sending to panel:', err);
         alert('Failed to send to panel: ' + err.message);
-        checkSendToPanelButton(groupId);
+        checkSendToPanelButton(groupId, label);
     }
 };
 
