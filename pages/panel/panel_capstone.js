@@ -1328,6 +1328,13 @@ async function saveAnnotatedPDF(isAuto = false) {
 
     if (!viewerApp || !viewerApp.pdfDocument) return;
 
+    // Capture current viewer states locally to prevent race conditions when modal closes/switches
+    const targetGroupId = currentViewerGroupId;
+    const targetFileKey = currentViewerFileKey;
+    const targetTab = currentTab;
+
+    if (!targetGroupId || !targetFileKey) return;
+
     const statusText = document.getElementById('autoSaveText');
     const statusIcon = document.querySelector('#autoSaveStatus span');
 
@@ -1345,7 +1352,7 @@ async function saveAnnotatedPDF(isAuto = false) {
         const user = userJson ? JSON.parse(userJson || '{}') : {};
         const userName = user.name || user.full_name || 'Panel';
         const cleanName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        const fileName = `annotated_${currentViewerGroupId}_${currentViewerFileKey}_${cleanName}.pdf`;
+        const fileName = `annotated_${targetGroupId}_${targetFileKey}_${cleanName}.pdf`;
 
         const { data: uploadData, error: uploadError } = await supabaseClient.storage
             .from('project-submissions')
@@ -1363,9 +1370,9 @@ async function saveAnnotatedPDF(isAuto = false) {
         const { error: dbError } = await supabaseClient
             .from('capstone_annotations')
             .upsert({
-                group_id: currentViewerGroupId,
-                defense_type: normalizeType(currentTab),
-                file_key: currentViewerFileKey,
+                group_id: targetGroupId,
+                defense_type: normalizeType(targetTab),
+                file_key: targetFileKey,
                 user_name: userName,
                 annotated_file_url: publicUrl,
                 updated_at: new Date().toISOString()
@@ -1373,9 +1380,9 @@ async function saveAnnotatedPDF(isAuto = false) {
 
         if (dbError) throw dbError;
 
-        if (allData && currentViewerGroupId) {
-            const normTab = normalizeType(currentTab);
-            const groupEntry = allData.find(g => String(g.id) === String(currentViewerGroupId) && g.normalizedType === normTab);
+        if (allData && targetGroupId) {
+            const normTab = normalizeType(targetTab);
+            const groupEntry = allData.find(g => String(g.id) === String(targetGroupId) && g.normalizedType === normTab);
 
             if (groupEntry) {
                 let annotKey = "";
@@ -1385,8 +1392,8 @@ async function saveAnnotatedPDF(isAuto = false) {
 
                 if (annotKey) {
                     if (!groupEntry[annotKey]) groupEntry[annotKey] = {};
-                    if (!groupEntry[annotKey][currentViewerFileKey]) groupEntry[annotKey][currentViewerFileKey] = {};
-                    groupEntry[annotKey][currentViewerFileKey][userName] = publicUrl;
+                    if (!groupEntry[annotKey][targetFileKey]) groupEntry[annotKey][targetFileKey] = {};
+                    groupEntry[annotKey][targetFileKey][userName] = publicUrl;
                 }
             }
         }

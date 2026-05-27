@@ -1321,6 +1321,13 @@ async function saveAnnotatedPDF(isAuto = false) {
 
     if (!viewerApp || !viewerApp.pdfDocument) return;
 
+    // Capture current viewer states locally to prevent race conditions when modal closes/switches
+    const targetGroupId = currentViewerGroupId;
+    const targetFileKey = currentViewerFileKey;
+    const targetTab = currentTab;
+
+    if (!targetGroupId || !targetFileKey) return;
+
     const statusText = document.getElementById('autoSaveText');
     const statusIcon = document.querySelector('#autoSaveStatus span');
 
@@ -1339,51 +1346,51 @@ async function saveAnnotatedPDF(isAuto = false) {
         const user = JSON.parse(userJson || '{}');
         const userName = user.name || user.full_name || 'Instructor';
         const cleanName = userName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        const fileName = `annotated_${currentViewerGroupId}_${currentViewerFileKey}_${cleanName}.pdf`;
+        const fileName = `annotated_${targetGroupId}_${targetFileKey}_${cleanName}.pdf`;
 
         const { data: uploadData, error: uploadError } = await supabaseClient.storage
-            .from('project-submissions')
-            .upload(`submissions/annotations/${fileName}`, data, {
-                contentType: 'application/pdf',
-                upsert: true
-            });
+             .from('project-submissions')
+             .upload(`submissions/annotations/${fileName}`, data, {
+                 contentType: 'application/pdf',
+                 upsert: true
+             });
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabaseClient.storage
-            .from('project-submissions')
-            .getPublicUrl(`submissions/annotations/${fileName}`);
+             .from('project-submissions')
+             .getPublicUrl(`submissions/annotations/${fileName}`);
 
         const { error: dbError } = await supabaseClient
-            .from('capstone_annotations')
-            .upsert({
-                group_id: currentViewerGroupId,
-                defense_type: normalizeType(currentTab),
-                file_key: currentViewerFileKey,
-                user_name: userName,
-                annotated_file_url: publicUrl,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'group_id, defense_type, file_key, user_name' });
+             .from('capstone_annotations')
+             .upsert({
+                 group_id: targetGroupId,
+                 defense_type: normalizeType(targetTab),
+                 file_key: targetFileKey,
+                 user_name: userName,
+                 annotated_file_url: publicUrl,
+                 updated_at: new Date().toISOString()
+             }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
         if (dbError) throw dbError;
 
-        if (allData && currentViewerGroupId) {
-            const normTab = normalizeType(currentTab);
-            const groupEntry = allData.find(g => String(g.id) === String(currentViewerGroupId) && g.normalizedType === normTab);
+        if (allData && targetGroupId) {
+             const normTab = normalizeType(targetTab);
+             const groupEntry = allData.find(g => String(g.id) === String(targetGroupId) && g.normalizedType === normTab);
 
-            if (groupEntry) {
-                let annotKey = "";
-                if (normTab.includes('title')) annotKey = "titleAnnotations";
-                else if (normTab.includes('preoral')) annotKey = "preOralAnnotations";
-                else if (normTab.includes('final')) annotKey = "finalAnnotations";
+             if (groupEntry) {
+                 let annotKey = "";
+                 if (normTab.includes('title')) annotKey = "titleAnnotations";
+                 else if (normTab.includes('preoral')) annotKey = "preOralAnnotations";
+                 else if (normTab.includes('final')) annotKey = "finalAnnotations";
 
-                if (annotKey) {
-                    if (!groupEntry[annotKey]) groupEntry[annotKey] = {};
-                    if (!groupEntry[annotKey][currentViewerFileKey]) groupEntry[annotKey][currentViewerFileKey] = {};
-                    groupEntry[annotKey][currentViewerFileKey][userName] = publicUrl;
-                }
-            }
-        }
+                 if (annotKey) {
+                     if (!groupEntry[annotKey]) groupEntry[annotKey] = {};
+                     if (!groupEntry[annotKey][targetFileKey]) groupEntry[annotKey][targetFileKey] = {};
+                     groupEntry[annotKey][targetFileKey][userName] = publicUrl;
+                 }
+             }
+         }
 
         if (statusText) statusText.innerText = "Changes Auto-saved";
         if (statusIcon) {
