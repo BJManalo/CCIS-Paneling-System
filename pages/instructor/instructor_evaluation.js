@@ -499,9 +499,13 @@ function applyFilters() {
         const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
         const isPanelist = (ev.panelistName || '').toLowerCase() === userName.toLowerCase();
 
+        // Advisers must not view panel evaluations of groups where they are the adviser
+        if (isAdviser) {
+            return false;
+        }
+
         if (currentMainTab === 'Advisory' || currentMainTab === 'Adviser') {
-            // Must be the Adviser of the group being evaluated
-            matchesMain = isAdviser;
+            matchesMain = false;
         } else {
             // "Instructor" tab: only show evaluations for groups created by this instructor
             matchesMain = (String(ev.createdBy) === String(userId));
