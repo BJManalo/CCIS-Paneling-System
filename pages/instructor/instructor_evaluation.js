@@ -308,7 +308,7 @@ function renderAdvisoryTable() {
     // Get User
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
-    const userName = (user ? (user.full_name || '') : '').toLowerCase();
+    const userName = (user ? (user.name || user.full_name || '') : '').toLowerCase();
 
     // Filter Groups where I am Adviser
     const myAdviseeGroups = rawGroups.filter(g => {
@@ -489,7 +489,7 @@ function applyFilters() {
     // Get User Info for Tab Filtering
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
-    const userName = user ? (user.full_name || '').toLowerCase() : '';
+    const userName = user ? (user.name || user.full_name || '').toLowerCase() : '';
     const userId = user ? user.id : '';
 
     const filtered = loadedEvaluations.filter(ev => {
