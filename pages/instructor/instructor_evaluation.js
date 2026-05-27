@@ -505,6 +505,12 @@ function applyFilters() {
         } else {
             // "Instructor" tab: only show evaluations for groups created by this instructor
             matchesMain = (String(ev.createdBy) === String(userId));
+
+            // Legacy override for Christian Rae Salvacion (who created Aetheris and Faith in Motion)
+            if (userName === 'christian rae salvacion' && 
+                (ev.groupName.toLowerCase() === 'aetheris' || ev.groupName.toLowerCase() === 'faith in motion')) {
+                matchesMain = true;
+            }
         }
         if (!matchesMain) return false;
 
