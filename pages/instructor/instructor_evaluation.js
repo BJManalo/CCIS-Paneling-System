@@ -276,10 +276,19 @@ async function loadEvaluations() {
 }
 
 // --- Main Tab Logic ---
-let currentMainTab = 'Evaluation'; // Default to All
+let currentMainTab = 'Instructor'; // Default to Instructor
 
-window.switchMainTab = (tab) => {
-    currentMainTab = 'Evaluation';
+window.switchMainTab = (tab, btn) => {
+    currentMainTab = tab;
+
+    // Update active tab styling
+    document.querySelectorAll('.switcher-tabs .switcher-btn').forEach(b => b.classList.remove('active'));
+    if (btn) {
+        btn.classList.add('active');
+    } else {
+        const activeBtn = tab === 'Instructor' ? document.getElementById('tabInstructorBtn') : document.getElementById('tabAdviserBtn');
+        if (activeBtn) activeBtn.classList.add('active');
+    }
 
     const filterContainer = document.querySelector('.filter-container');
     const accordion = document.getElementById('accordionContainer');
@@ -470,13 +479,8 @@ window.setFilter = (type, btn) => {
     document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
 
-    if (currentMainTab === 'Advisory') {
-        currentPageAdvisory = 1;
-        renderAdvisoryTable();
-    } else {
-        currentPageEval = 1;
-        applyFilters();
-    }
+    currentPageEval = 1;
+    applyFilters();
 };
 
 function applyFilters() {
@@ -495,11 +499,11 @@ function applyFilters() {
         const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
         const isPanelist = (ev.panelistName || '').toLowerCase() === userName.toLowerCase();
 
-        if (currentMainTab === 'Advisory') {
+        if (currentMainTab === 'Advisory' || currentMainTab === 'Adviser') {
             // Must be the Adviser of the group being evaluated
             matchesMain = isAdviser;
         } else {
-            // "Evaluation" tab: only show evaluations for groups created by this instructor
+            // "Instructor" tab: only show evaluations for groups created by this instructor
             matchesMain = (String(ev.createdBy) === String(userId));
         }
         if (!matchesMain) return false;

@@ -315,7 +315,15 @@
         <!-- Main Content -->
         <div class="evaluation-wrapper" style="padding: 0; max-width: 1000px; margin: 0 auto;">
 
-            <!-- Switcher Removed -->
+            <!-- Switcher Tabs -->
+            <div class="switcher-tabs" style="margin-bottom: 20px;">
+                <button class="switcher-btn active" id="tabInstructorBtn" onclick="switchMainTab('Instructor', this)">
+                    <span class="material-icons-round">person</span> Instructor
+                </button>
+                <button class="switcher-btn" id="tabAdviserBtn" onclick="switchMainTab('Adviser', this)">
+                    <span class="material-icons-round">supervisor_account</span> Adviser
+                </button>
+            </div>
 
             <!-- Filters -->
             <div class="filter-container">
