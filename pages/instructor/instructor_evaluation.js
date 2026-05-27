@@ -276,20 +276,9 @@ async function loadEvaluations() {
 }
 
 // --- Main Tab Logic ---
-let currentMainTab = 'Instructor'; // Default to Instructor
+let currentMainTab = 'Instructor';
 
-window.switchMainTab = (tab, btn) => {
-    currentMainTab = tab;
-
-    // Update active tab styling
-    document.querySelectorAll('.switcher-tabs .switcher-btn').forEach(b => b.classList.remove('active'));
-    if (btn) {
-        btn.classList.add('active');
-    } else {
-        const activeBtn = tab === 'Instructor' ? document.getElementById('tabInstructorBtn') : document.getElementById('tabAdviserBtn');
-        if (activeBtn) activeBtn.classList.add('active');
-    }
-
+window.switchMainTab = (tab) => {
     const filterContainer = document.querySelector('.filter-container');
     const accordion = document.getElementById('accordionContainer');
 
@@ -504,19 +493,16 @@ function applyFilters() {
             return false;
         }
 
-        if (currentMainTab === 'Advisory' || currentMainTab === 'Adviser') {
-            matchesMain = false;
-        } else {
-            // "Instructor" tab: only show evaluations for groups created by this instructor
-            matchesMain = (String(ev.createdBy) === String(userId));
+        // Only show evaluations for groups created by this instructor
+        let matchesCreator = (String(ev.createdBy) === String(userId));
 
-            // Legacy override for Christian Rae Salvacion (who created Aetheris and Faith in Motion)
-            if (userName === 'christian rae salvacion' && 
-                (ev.groupName.toLowerCase() === 'aetheris' || ev.groupName.toLowerCase() === 'faith in motion')) {
-                matchesMain = true;
-            }
+        // Legacy override for Christian Rae Salvacion (who created Aetheris and Faith in Motion)
+        if (userName === 'christian rae salvacion' && 
+            (ev.groupName.toLowerCase() === 'aetheris' || ev.groupName.toLowerCase() === 'faith in motion')) {
+            matchesCreator = true;
         }
-        if (!matchesMain) return false;
+
+        if (!matchesCreator) return false;
 
         // 2. Text Match
         const matchesText = ev.groupName.toLowerCase().includes(searchTerm) ||
