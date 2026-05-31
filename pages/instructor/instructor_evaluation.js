@@ -484,7 +484,7 @@ function applyFilters() {
     const filtered = loadedEvaluations.filter(ev => {
         // 1. Main Tab Filter (Advisory vs Evaluation)
         let matchesMain = true;
-        const adviser = (ev.adviser || '').toLowerCase();
+        const adviser = (ev.adviser || '').toLowerCase().replace(/\s*\(creator:[^)]+\)/gi, '');
         const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
         const isPanelist = (ev.panelistName || '').toLowerCase() === userName.toLowerCase();
 
@@ -493,8 +493,18 @@ function applyFilters() {
             return false;
         }
 
+        // Extract creator email from adviser field if it exists
+        let creatorEmail = '';
+        const match = (ev.adviser || '').match(/\(creator:([^)]+)\)/);
+        if (match) {
+            creatorEmail = match[1].trim().toLowerCase();
+        }
+
         // Only show evaluations for groups created by this instructor
-        let matchesCreator = (String(ev.createdBy) === String(userId));
+        let matchesCreator = false;
+        if (creatorEmail && user && user.email) {
+            matchesCreator = (creatorEmail === user.email.toLowerCase());
+        }
 
         // Legacy override for Christian Rae Salvacion (who created Aetheris and Faith in Motion)
         if (userName === 'christian rae salvacion' && 

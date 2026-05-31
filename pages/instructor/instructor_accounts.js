@@ -243,7 +243,7 @@ function renderGroups(groups) {
             <td><span class="prog-badge ${progClass}">${program}</span></td>
             <td>${group.year_level}</td>
             <td>${group.section}</td>
-            <td>${group.adviser}</td>
+            <td>${(group.adviser || '').replace(/\s*\(creator:[^)]+\)/gi, '')}</td>
             <td>
                 <div class="chips-container">
                     ${membersHtml || '<span style="color:#94a3b8; font-style:italic; font-size:11px;">No Members</span>'}
@@ -333,7 +333,9 @@ async function openEditGroupModal(groupId) {
     document.getElementById('programEdit').value = group.program;
     document.getElementById('yearEdit').value = group.year_level;
     document.getElementById('sectionEdit').value = group.section;
-    document.getElementById('adviserEdit').value = group.adviser;
+    const rawAdviser = group.adviser || '';
+    const cleanAdviser = rawAdviser.replace(/\s*\(creator:[^)]+\)/gi, '');
+    document.getElementById('adviserEdit').value = cleanAdviser;
     document.getElementById('emailEdit').value = group.email || '';
     document.getElementById('passwordEdit').value = group.password || '';
 
@@ -416,12 +418,20 @@ async function saveGroupChanges(e) {
     e.preventDefault();
     const groupId = document.getElementById('editGroupForm').getAttribute('data-editing-id');
 
+    const userJson = localStorage.getItem('loginUser');
+    const user = userJson ? JSON.parse(userJson) : null;
+    const creatorSuffix = (user && user.email) ? ` (creator:${user.email})` : '';
+
+    let adviserValue = document.getElementById('adviserEdit').value;
+    adviserValue = adviserValue.replace(/\s*\(creator:[^)]+\)/gi, '');
+    const finalAdviser = adviserValue + creatorSuffix;
+
     const groupData = {
         group_name: document.getElementById('groupNameEdit').value,
         program: document.getElementById('programEdit').value,
         year_level: document.getElementById('yearEdit').value,
         section: document.getElementById('sectionEdit').value,
-        adviser: document.getElementById('adviserEdit').value,
+        adviser: finalAdviser,
         email: document.getElementById('emailEdit').value,
         password: document.getElementById('passwordEdit').value
     };
@@ -436,12 +446,6 @@ async function saveGroupChanges(e) {
                 .eq('id', groupId);
             if (error) throw error;
         } else {
-            const userJson = localStorage.getItem('loginUser');
-            const user = userJson ? JSON.parse(userJson) : null;
-            if (user && user.id) {
-                groupData.created_by = user.id;
-                groupData.user_id = user.id;
-            }
             const { data, error } = await supabaseClient
                 .from('student_groups')
                 .insert([groupData])
