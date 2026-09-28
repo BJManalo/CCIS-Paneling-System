@@ -203,12 +203,17 @@ window.applyDashboardFilters = () => {
 
             if (Object.values(fMap).some(v => v === 'Completed')) {
                 statusBadge = '<span class="status-badge approved">Completed</span>';
-            } else if (Object.values(fMap).some(v => v.includes('Approved') || v.includes('Revisions'))) {
+            } else if (Object.values(fMap).some(v => v === 'Approved')) {
                 statusBadge = '<span class="status-badge approved" style="background:#dcfce7; color:#166534;">Final Ongoing</span>';
-            } else if (pStatus.includes('Approved') || pStatus.includes('Revisions')) {
+            } else if (Object.values(fMap).some(v => v.includes('Revisions'))) {
+                statusBadge = '<span class="status-badge approved" style="background:#dcfce7; color:#166534;">Final Ongoing</span>';
+            } else if (Object.values(pMap).some(v => v === 'Approved') || Object.values(pMap).some(v => v.includes('Revisions'))) {
                 statusBadge = '<span class="status-badge approved" style="background:#e0f2fe; color:#0369a1;">Pre-Oral Passed</span>';
-            } else if (tStatus.includes('Approved') || tStatus.includes('Revisions')) {
+            } else if (tStatus === 'Approved' || tStatus.includes('Revisions')) {
                 statusBadge = '<span class="status-badge approved" style="background:#dbeafe; color:#2563eb;">Title Approved</span>';
+            } else if (Object.values(tMap).some(v => v && v.startsWith('Pending Approval'))) {
+                const bestPending = Object.values(tMap).filter(v => v && v.startsWith('Pending Approval')).sort().reverse()[0];
+                statusBadge = `<span class="status-badge" style="background:#fef9c3; color:#713f12;">${bestPending}</span>`;
             } else if (tStatus === 'Rejected' || tStatus === 'Redefend' || pStatus === 'Redefend' || fStatus === 'Redefend') {
                 statusBadge = `<span class="status-badge rejected">${fStatus === 'Redefend' ? 'Redefend Final' : pStatus === 'Redefend' ? 'Redefend Pre-Oral' : tStatus}</span>`;
             }
@@ -289,13 +294,16 @@ function resolveStatusMap(groupId, defenseType) {
         filePanelMap[fb.file_key][pName] = fb.status;
     });
 
+    const REQUIRED_PANEL_APPROVALS = 5;
     const resolved = {};
     Object.keys(filePanelMap).forEach(fk => {
         const votes = Object.values(filePanelMap[fk]);
+        const approvalCount = votes.filter(v => v && (v.includes('Approved') || v.includes('Approve') || v === 'Completed')).length;
         if (votes.some(v => v === 'Redefend')) resolved[fk] = 'Redefend';
         else if (votes.some(v => v === 'Rejected')) resolved[fk] = 'Rejected';
+        else if (approvalCount >= REQUIRED_PANEL_APPROVALS) resolved[fk] = 'Approved';
         else if (votes.some(v => v && v.includes('Revision'))) resolved[fk] = 'Approved with Revisions';
-        else if (votes.some(v => v && (v.includes('Approved') || v.includes('Approve') || v === 'Completed'))) resolved[fk] = 'Approved';
+        else if (approvalCount > 0) resolved[fk] = `Pending Approval (${approvalCount}/${REQUIRED_PANEL_APPROVALS})`;
         else resolved[fk] = 'Pending';
     });
     return resolved;

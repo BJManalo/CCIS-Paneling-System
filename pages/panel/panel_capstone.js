@@ -213,7 +213,7 @@ async function loadCapstoneData() {
                 // 5. Construct Data Object with fuzzy name matching
                 const userNameNormalized = String(user.name || user.full_name || "Panel").trim().toLowerCase();
                 const userEmailNormalized = String(user.email || "").trim().toLowerCase();
-                
+
                 const robustMatch = (nameA, nameB) => {
                     const nA = String(nameA || "").trim().toLowerCase();
                     const nB = String(nameB || "").trim().toLowerCase();
@@ -375,6 +375,18 @@ function renderTable() {
             (currentRole === 'Adviser' && g.isAdviser);
 
         if (!typeMatch || !programMatch || !searchMatch || !roleMatch) return false;
+
+        // Check if fully approved by adviser before showing to Panels
+        if (currentRole === 'Panel' && g.isPanelist) {
+            const advStat = g.adviserStatus || {};
+            let reqKeys = [];
+            if (normCurrentTab.includes('title')) reqKeys = ['title1', 'title2', 'title3'];
+            else if (normCurrentTab.includes('preoral')) reqKeys = ['ch1', 'ch2', 'ch3'];
+            else if (normCurrentTab.includes('final')) reqKeys = ['ch4', 'ch5'];
+            
+            const isApprovedByAdviser = reqKeys.length > 0 && reqKeys.every(k => advStat[k] === 'Approved');
+            if (!isApprovedByAdviser) return false; // Hide from panel account completely
+        }
 
         // --- Finished/Unfinished Filter Logic ---
         if (currentStatusFilter === 'ALL') return true;
@@ -560,7 +572,7 @@ function updatePaginationUI(totalPages) {
     }
 
     paginationContainer.style.display = 'flex';
-    
+
     paginationContainer.innerHTML = `
         <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
         <span class="page-number active">${currentPage}</span>
@@ -817,7 +829,7 @@ window.openFileModal = (groupId) => {
             }
 
             let interactiveControls = '';
-            
+
             if (currentRole === 'Panel' && group.isPanelist) {
                 const adviserStatus = group.adviserStatus || {};
                 let requiredKeys = [];
@@ -827,7 +839,7 @@ window.openFileModal = (groupId) => {
                 else if (norm.includes('final')) requiredKeys = ['ch4', 'ch5'];
 
                 const isSentToPanel = requiredKeys.length > 0 && requiredKeys.every(key => adviserStatus[key] === 'Approved');
-                
+
                 if (!isSentToPanel) {
                     interactiveControls = `
                         <div style="padding: 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; color: #b45309; font-size: 12px; font-weight: 500; text-align: center; margin-bottom: 10px;">
@@ -836,7 +848,7 @@ window.openFileModal = (groupId) => {
                         </div>
                     `;
                 } else {
-                interactiveControls = `
+                    interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Your Status</span>
                     <div id="status-badge-${categoryKey}-${label}" style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
@@ -1180,6 +1192,9 @@ window.closeFileModal = () => {
     const saveBtn = document.getElementById('saveAnnotationBtnContainer');
     if (saveBtn) saveBtn.style.display = 'none';
 
+    const commentsSidebar = document.getElementById('commentsSidebar');
+    if (commentsSidebar) commentsSidebar.style.display = 'none';
+
     // Clear auto-save
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
@@ -1285,6 +1300,26 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
             autoSaveInterval = setInterval(() => { saveAnnotatedPDF(true); }, 2000);
             if (saveBtn) saveBtn.style.display = 'block';
 
+            // Show Comments Sidebar
+            const commentsSidebar = document.getElementById('commentsSidebar');
+            if (commentsSidebar) commentsSidebar.style.display = 'flex';
+
+            // Hook into iframe to detect page change
+            pdfFrame.onload = () => {
+                try {
+                    const viewerApp = pdfFrame.contentWindow.PDFViewerApplication;
+                    if (viewerApp && viewerApp.eventBus) {
+                        viewerApp.eventBus.on('pagechanging', function (evt) {
+                            window.updateCommentsPage(evt.pageNumber);
+                        });
+                        setTimeout(() => window.updateCommentsPage(viewerApp.page || 1), 500);
+                    }
+                } catch (e) {
+                    console.warn("Could not hook into PDF viewer for page comments:", e);
+                    window.updateCommentsPage(1);
+                }
+            };
+
         } else if (isDrive) {
             const fileIdMatch = finalUrl.match(/\/d\/([^\/]+)/) || finalUrl.match(/id=([^\&]+)/);
             const drivePreview = fileIdMatch ? `https://drive.google.com/file/d/${fileIdMatch[1]}/preview` : finalUrl;
@@ -1321,7 +1356,7 @@ window.loadViewer = async (url, groupId = null, fileKey = null) => {
 };
 
 async function saveAnnotatedPDF(isAuto = false) {
-    if (isSaving) return; 
+    if (isSaving) return;
 
     const frame = document.getElementById('pdfFrame');
     const viewerApp = frame ? frame.contentWindow.PDFViewerApplication : null;
@@ -1516,7 +1551,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         const modalContent = document.getElementById('fileModalContent');
         const btnApprove = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Approved')"]`);
         const btnDecline = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Declined')"]`);
-        
+
         if (btnApprove) {
             btnApprove.disabled = true;
             if (newStatus === 'Approved') {
@@ -1607,7 +1642,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 window.saveAdviserRemarks = async (groupId, fileKey) => {
     const textarea = document.getElementById(`adviser-remarks-${groupId}-${fileKey}`);
     const btn = textarea ? textarea.nextElementSibling : null;
-    
+
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">hourglass_empty</span> Saving...';
@@ -1632,7 +1667,7 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
             .eq('id', groupId);
 
         if (error) throw error;
-        
+
         const localGroup = allData.find(g => String(g.id) === String(groupId));
         if (localGroup) localGroup.adviserRemarks = currentRemarks;
 
@@ -1661,7 +1696,7 @@ window.checkSendToPanelButton = (groupId, label) => {
     if (!btnContainer) return;
 
     const statuses = localGroup.adviserStatus || {};
-    
+
     // Check if the stage for this file is approved
     let isStageApproved = false;
     if (['title1', 'title2', 'title3'].includes(label)) {
@@ -1675,7 +1710,7 @@ window.checkSendToPanelButton = (groupId, label) => {
     if (isStageApproved) {
         btnContainer.style.display = 'block';
         const btn = btnContainer.querySelector('button');
-        
+
         if (statuses['SEND_TO_PANEL']) {
             btn.disabled = true;
             btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">check_circle</span> Sent to Panel';
@@ -1712,9 +1747,9 @@ window.sendToPanel = async (groupId, label) => {
             .eq('id', groupId);
 
         if (error) throw error;
-        
+
         localGroup.adviserStatus = currentStatus;
-        
+
         window.showToast('Group sent to panel successfully!', 'success');
 
         // Update all buttons for this group
@@ -1739,7 +1774,7 @@ function logout() {
     window.location.href = '../../';
 }
 
-window.showToast = function(message, type = 'info') {
+window.showToast = function (message, type = 'info') {
     let toast = document.getElementById('toast');
     if (!toast) {
         toast = document.createElement('div');
@@ -1748,10 +1783,10 @@ window.showToast = function(message, type = 'info') {
         toast.style = "position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #334155; color: white; padding: 12px 24px; border-radius: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; font-weight: 600; display: none;";
         document.body.appendChild(toast);
     }
-    
+
     document.getElementById('toastMessage').innerText = message;
     const icon = document.getElementById('toastIcon');
-    
+
     if (type === 'success') {
         toast.style.backgroundColor = '#10b981';
         icon.innerText = 'check_circle';
@@ -1762,8 +1797,132 @@ window.showToast = function(message, type = 'info') {
         toast.style.backgroundColor = '#334155';
         icon.innerText = 'info';
     }
-    
+
     toast.style.display = 'flex';
     setTimeout(() => { toast.style.display = 'none'; }, 3000);
 }
+
+// ========== PAGE COMMENTS LOGIC ==========
+let currentViewerPage = 1;
+let pageCommentsCache = {};
+
+window.updateCommentsPage = async (pageNumber) => {
+    currentViewerPage = pageNumber;
+
+    const badge = document.getElementById('currentPageBadge');
+    if (badge) badge.innerText = pageNumber;
+
+    const input = document.getElementById('pageCommentInput');
+    if (input) input.placeholder = `Add a comment for Page ${pageNumber}...`;
+
+    await renderPageComments();
+};
+
+window.renderPageComments = async () => {
+    const list = document.getElementById('commentsList');
+    if (!list) return;
+
+    if (!currentViewerGroupId || !currentViewerFileKey) {
+        list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">No document selected.</div>`;
+        return;
+    }
+
+    list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;"><div style="width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid var(--primary-color); border-radius: 50%; animation: viewer-spin 1s linear infinite; margin: 0 auto 10px;"></div></div>`;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('document_page_comments')
+            .select('*')
+            .eq('group_id', currentViewerGroupId)
+            .eq('file_key', currentViewerFileKey)
+            .eq('page_number', currentViewerPage)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            // Table might not exist yet if they haven't run the SQL
+            console.warn("Table document_page_comments might not exist yet:", error.message);
+            list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">
+                <p>⚠️ SQL Table missing.</p><p style="font-size: 0.75rem;">Please run the provided SQL to create document_page_comments.</p>
+            </div>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">
+                <span class="material-icons-round" style="font-size: 32px; opacity: 0.5;">forum</span>
+                <p>No comments for Page ${currentViewerPage} yet.</p>
+            </div>`;
+            return;
+        }
+
+        let html = '';
+        const userJson = localStorage.getItem('loginUser');
+        const currentUser = userJson ? JSON.parse(userJson).name || JSON.parse(userJson).full_name : '';
+
+        data.forEach(c => {
+            const isMine = c.user_name === currentUser;
+            const dateStr = new Date(c.created_at).toLocaleDateString() + ' ' + new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            html += `
+                <div style="background: ${isMine ? '#eff6ff' : '#f1f5f9'}; padding: 12px; border-radius: 8px; border-left: 3px solid ${isMine ? 'var(--primary-color)' : '#94a3b8'};">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="font-weight: 700; font-size: 0.8rem; color: #334155;">${c.user_name}</span>
+                        <span style="font-size: 0.7rem; color: #94a3b8;">${dateStr}</span>
+                    </div>
+                    <div style="font-size: 0.85rem; color: #475569; white-space: pre-wrap; line-height: 1.4;">${c.comment_text}</div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+        list.scrollTop = list.scrollHeight;
+    } catch (e) {
+        list.innerHTML = `<div style="text-align: center; color: #ef4444; font-size: 0.85rem; margin-top: 20px;">Failed to load comments</div>`;
+    }
+};
+
+window.postPageComment = async () => {
+    const input = document.getElementById('pageCommentInput');
+    const text = input ? input.value.trim() : '';
+    if (!text) {
+        showToast("Please enter a comment.", "warning");
+        return;
+    }
+
+    if (!currentViewerGroupId || !currentViewerFileKey) return;
+
+    const btn = document.getElementById('postCommentBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="material-icons-round" style="font-size: 18px; animation: viewer-spin 1s linear infinite;">sync</span> Posting...`;
+    }
+
+    try {
+        const userJson = localStorage.getItem('loginUser');
+        const user = userJson ? JSON.parse(userJson) : {};
+        const userName = user.name || user.full_name || 'Panel';
+
+        const { error } = await supabaseClient
+            .from('document_page_comments')
+            .insert({
+                group_id: currentViewerGroupId,
+                file_key: currentViewerFileKey,
+                page_number: currentViewerPage,
+                user_name: userName,
+                comment_text: text
+            });
+
+        if (error) throw error;
+
+        input.value = '';
+        await renderPageComments();
+
+    } catch (err) {
+        console.error("Failed to post comment:", err);
+        showToast("Error posting comment. Table might be missing.", "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<span class="material-icons-round" style="font-size: 18px;">send</span> Post Comment`;
+        }
+    }
+};
 

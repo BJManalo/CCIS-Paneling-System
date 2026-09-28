@@ -24,7 +24,7 @@ window.switchSubmissionTab = (tabId, btn) => {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     const targetTab = document.getElementById('tab-' + tabId);
     if (targetTab) targetTab.classList.add('active');
-    
+
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     if (btn) btn.classList.add('active');
 
@@ -262,7 +262,7 @@ async function loadSubmissionData() {
 
                     let mayLynnStatus = null;
                     const normalizedTarget = "may lynn farren";
-                    
+
                     Object.keys(panelStatuses).forEach(panelName => {
                         if (panelName.toLowerCase().trim() === normalizedTarget) {
                             mayLynnStatus = panelStatuses[panelName];
@@ -270,7 +270,7 @@ async function loadSubmissionData() {
                     });
 
                     const isTitle = key.startsWith('title');
-                    
+
                     // Determine winner status by majority vote
                     let winnerStatus = null;
                     const statusCounts = {};
@@ -380,7 +380,7 @@ async function loadSubmissionData() {
                 const uploadColor = isRevised ? '#d97706' : 'var(--primary-color)';
 
                 uploadBtn.disabled = !canUpload;
-                
+
                 // Use class for basic styling, but keep dynamic colors if needed
                 if (!canUpload) {
                     uploadBtn.style.background = '#f1f5f9';
@@ -434,8 +434,8 @@ async function loadSubmissionData() {
 
             window.currentLinks = { titles: tLinks, preoral: pLinks, final: fLinks };
             const activeTabBtn = document.querySelector('.tab-btn.active');
-            const activeTabName = activeTabBtn?.innerText?.toLowerCase()?.includes('title') ? 'titles' : 
-                               activeTabBtn?.innerText?.toLowerCase()?.includes('pre') ? 'preoral' : 'final';
+            const activeTabName = activeTabBtn?.innerText?.toLowerCase()?.includes('title') ? 'titles' :
+                activeTabBtn?.innerText?.toLowerCase()?.includes('pre') ? 'preoral' : 'final';
             updateSaveButtonState(activeTabName);
         }
     } catch (err) {
@@ -554,6 +554,47 @@ function updateSaveButtonState(tabId) {
         const stageLinks = (window.currentLinks && window.currentLinks[stageName]) || {};
         const isSubmitted = fieldKey && stageLinks[fieldKey] && typeof stageLinks[fieldKey] === 'string' && stageLinks[fieldKey].trim() !== '';
 
+        // CALCULATE WINNER STATUS FOR THIS FIELD
+        let currentWinnerStatus = null;
+        if (window.feedbackStatus && window.feedbackStatus[tabId] && window.feedbackStatus[tabId][fieldKey]) {
+            const fStat = window.feedbackStatus[tabId][fieldKey];
+            let mayLynnStatus = null;
+            Object.keys(fStat).forEach(panelName => {
+                if (panelName.toLowerCase().trim() === "may lynn farren") mayLynnStatus = fStat[panelName];
+            });
+
+            const statusCounts = {};
+            let totalVotesCount = 0;
+            Object.keys(fStat).forEach(name => {
+                const s = fStat[name];
+                if (s && s !== 'Pending') {
+                    statusCounts[s] = (statusCounts[s] || 0) + 1;
+                    totalVotesCount++;
+                }
+            });
+
+            if (totalVotesCount > 0) {
+                let maxCount = 0;
+                Object.keys(statusCounts).forEach(s => {
+                    if (statusCounts[s] > maxCount) {
+                        maxCount = statusCounts[s];
+                        currentWinnerStatus = s;
+                    } else if (statusCounts[s] === maxCount) {
+                        if (mayLynnStatus && mayLynnStatus === s) currentWinnerStatus = s;
+                    }
+                });
+                if (totalVotesCount === 1 && mayLynnStatus) currentWinnerStatus = mayLynnStatus;
+            } else if (mayLynnStatus) {
+                currentWinnerStatus = mayLynnStatus;
+            }
+        }
+
+        const isRejectedByPanel = currentWinnerStatus && (
+            currentWinnerStatus.toLowerCase().includes('reject') ||
+            currentWinnerStatus.toLowerCase().includes('redefend') ||
+            currentWinnerStatus.toLowerCase().includes('decline')
+        );
+
         // --- ADVISER STATUS BADGE (Always Visible) ---
         const existingBadge = subContent.querySelector('.adviser-status-badge');
         if (existingBadge) existingBadge.remove();
@@ -561,8 +602,9 @@ function updateSaveButtonState(tabId) {
         let statusHtml = '';
         if (isSubmitted) {
             if (adviserStatus === 'Approved') {
+                const badgeText = isRejectedByPanel ? `Approved by Adviser.` : `Approved by Adviser. ${isScheduled ? 'Schedule is set.' : 'Waiting for Instructor to Schedule.'}`;
                 statusHtml = `<div class="adviser-status-badge" style="background:#dcfce7; color:#166534; padding:10px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; font-weight:600; display:flex; flex-direction:column; gap:4px; border:1px solid #bbf7d0;">
-                    <div style="display:flex; align-items:center; gap:8px;"><span class="material-icons-round">check_circle</span> Approved by Adviser. ${isScheduled ? 'Schedule is set.' : 'Waiting for Instructor to Schedule.'}</div>
+                    <div style="display:flex; align-items:center; gap:8px;"><span class="material-icons-round">check_circle</span> ${badgeText}</div>
                     ${adviserRemarks ? `<div style="font-size:0.75rem; font-weight:400; background:rgba(255,255,255,0.5); padding:8px; border-radius:4px; margin-top:4px;"><strong>Remarks:</strong> ${adviserRemarks}</div>` : ''}
                 </div>`;
             } else if (adviserStatus === 'Declined') {
@@ -645,7 +687,7 @@ function updateSaveButtonState(tabId) {
                                 uBtn.disabled = false;
                                 uBtn.style.opacity = '1';
                                 uBtn.style.cursor = 'pointer';
-                                
+
                                 if (adviserStatus === 'Declined' && isSubmitted) {
                                     uBtn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">sync</span>';
                                     uBtn.style.background = '#dc2626';
@@ -671,10 +713,10 @@ function updateSaveButtonState(tabId) {
             // CHECK IF PANELS HAVE REPLIED (Allow Revision)
             let hasFeedback = false;
             let isWinnerApproved = false;
-            
+
             if (window.feedbackStatus && window.feedbackStatus[tabId] && window.feedbackStatus[tabId][fieldKey]) {
                 const fStat = window.feedbackStatus[tabId][fieldKey];
-                
+
                 // Determine winner status by majority vote / May Lynn Farren
                 let mayLynnStatus = null;
                 const normalizedTarget = "may lynn farren";
@@ -1004,26 +1046,26 @@ window.saveSubmissions = async function (specificField) {
             .select('adviser_status, adviser_remarks')
             .eq('id', loginUser.id)
             .single();
-            
+
         if (currentGroupData) {
             let currentStatus = currentGroupData.adviser_status || {};
             let currentRemarks = currentGroupData.adviser_remarks || {};
-            
+
             // Reset to Pending and clear remarks because student re-uploaded
             currentStatus[specificField] = 'Pending';
             currentRemarks[specificField] = '';
             delete currentStatus['SEND_TO_PANEL'];
-            
+
             updates.adviser_status = currentStatus;
             updates.adviser_remarks = currentRemarks;
-            
+
             // Update localStorage immediately so UI re-renders correctly on next tick
             try {
                 const lsGroup = JSON.parse(localStorage.getItem('lastGroupData') || '{}');
                 lsGroup.adviser_status = currentStatus;
                 lsGroup.adviser_remarks = currentRemarks;
                 localStorage.setItem('lastGroupData', JSON.stringify(lsGroup));
-            } catch (e) {}
+            } catch (e) { }
         }
 
         const { error } = await supabaseClient
@@ -1201,6 +1243,28 @@ window.openFileViewer = async (url, fileKey, panelName = null) => {
         iframe.onload = () => {
             if (placeholder) placeholder.style.display = 'none';
             if (iframe) iframe.style.display = 'block';
+
+            // Show Comments Sidebar
+            const commentsSidebar = document.getElementById('commentsSidebar');
+            if (commentsSidebar) commentsSidebar.style.display = 'flex';
+
+            // Hook into iframe to detect page change for PDF.js
+            if (isPDF) {
+                try {
+                    const viewerApp = iframe.contentWindow.PDFViewerApplication;
+                    if (viewerApp && viewerApp.eventBus) {
+                        viewerApp.eventBus.on('pagechanging', function (evt) {
+                            window.updateCommentsPage(evt.pageNumber);
+                        });
+                        setTimeout(() => window.updateCommentsPage(viewerApp.page || 1), 500);
+                    }
+                } catch (e) {
+                    console.warn("Could not hook into PDF viewer for page comments:", e);
+                    window.updateCommentsPage(1);
+                }
+            } else {
+                window.updateCommentsPage(1); // Default for non-PDFs
+            }
         };
 
     } catch (e) {
@@ -1222,6 +1286,9 @@ window.closeFileModal = () => {
     const viewer = document.getElementById('fileViewer');
     if (viewer) viewer.src = '';
 
+    const commentsSidebar = document.getElementById('commentsSidebar');
+    if (commentsSidebar) commentsSidebar.style.display = 'none';
+
     // Revoke blob if exists
     if (currentBlobUrl) {
         URL.revokeObjectURL(currentBlobUrl);
@@ -1231,7 +1298,81 @@ window.closeFileModal = () => {
     currentViewerFileKey = null;
 };
 
-// --- SIDEBAR COMMENT SYSTEM (Student Side) ---
+// ========== PAGE COMMENTS LOGIC (STUDENT) ==========
+let currentViewerPage = 1;
+
+window.updateCommentsPage = async (pageNumber) => {
+    currentViewerPage = pageNumber;
+
+    const badge = document.getElementById('currentPageBadge');
+    if (badge) badge.innerText = pageNumber;
+
+    await renderPageComments();
+};
+
+window.renderPageComments = async () => {
+    const list = document.getElementById('commentsList');
+    if (!list) return;
+
+    if (!currentViewerFileKey) {
+        list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">No document selected.</div>`;
+        return;
+    }
+
+    list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;"><div style="width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid var(--primary-color); border-radius: 50%; animation: viewer-spin 1s linear infinite; margin: 0 auto 10px;"></div></div>`;
+
+    try {
+        const userJson = localStorage.getItem('loginUser');
+        const loginUser = userJson ? JSON.parse(userJson) : null;
+        if (!loginUser) return;
+        const currentViewerGroupId = loginUser.id; // Student group ID
+
+        const { data, error } = await supabaseClient
+            .from('document_page_comments')
+            .select('*')
+            .eq('group_id', currentViewerGroupId)
+            .eq('file_key', currentViewerFileKey)
+            .eq('page_number', currentViewerPage)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.warn("Table document_page_comments might not exist yet:", error.message);
+            list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">
+                <p>⚠️ SQL Table missing.</p>
+            </div>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">
+                <span class="material-icons-round" style="font-size: 32px; opacity: 0.5;">forum</span>
+                <p>No comments for Page ${currentViewerPage} yet.</p>
+            </div>`;
+            return;
+        }
+
+        let html = '';
+        data.forEach(c => {
+            const dateStr = new Date(c.created_at).toLocaleDateString() + ' ' + new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            // Panel comments are styled as incoming
+            html += `
+                <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; border-left: 3px solid #94a3b8;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="font-weight: 700; font-size: 0.8rem; color: #334155;">${c.user_name}</span>
+                        <span style="font-size: 0.7rem; color: #94a3b8;">${dateStr}</span>
+                    </div>
+                    <div style="font-size: 0.85rem; color: #475569; white-space: pre-wrap; line-height: 1.4;">${c.comment_text}</div>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+        list.scrollTop = list.scrollHeight;
+    } catch (e) {
+        list.innerHTML = `<div style="text-align: center; color: #ef4444; font-size: 0.85rem; margin-top: 20px;">Failed to load comments</div>`;
+    }
+};
+
+// --- SIDEBAR COMMENT SYSTEM (Student Side - Upload Logic Below) ---
 window.handleFileUpload = async (input, targetId) => {
     const file = input.files[0];
     if (!file) return;

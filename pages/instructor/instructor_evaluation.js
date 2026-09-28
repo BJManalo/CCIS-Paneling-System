@@ -180,11 +180,8 @@ const systemCriteria = [
 
 async function loadEvaluations() {
     const accordionContainer = document.getElementById('accordionContainer');
-    // We don't overwrite innerHTML immediately because we might be in Advisory mode
-    // But initially, loading...
 
     try {
-        // 1. Fetch Groups + their Schedules + Students
         const { data: groups, error } = await supabaseClient
             .from('student_groups')
             .select(`
@@ -199,15 +196,13 @@ async function loadEvaluations() {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        rawGroups = groups || []; // Store for Advisory View
+        rawGroups = groups || [];
 
-        // 2. Fetch Defense Statuses (For Advisory View)
         const { data: statuses } = await supabaseClient
             .from('defense_statuses')
             .select('*');
         allDefenseStatuses = statuses || [];
 
-        // 3. Fetch ALL Submitted Evaluations (For Evaluation View)
         const { data: indScores } = await supabaseClient
             .from('individual_evaluations')
             .select('*');
@@ -216,11 +211,14 @@ async function loadEvaluations() {
             .from('system_evaluations')
             .select('*');
 
-        // 4. Process Data for Evaluations View
         let processedEvaluations = [];
 
         (groups || []).forEach(group => {
             const schedules = group.schedules || [];
+            if (schedules.length === 0) return;
+
+            let groupHasEvaluations = false;
+            let groupDefenses = {};
 
             schedules.forEach(sched => {
                 const relevantIndScores = (indScores || []).filter(s => s.schedule_id === sched.id);
@@ -232,37 +230,43 @@ async function loadEvaluations() {
                 const allRaters = [...new Set([...panelistsWhoRated, ...panelistsSys])];
 
                 let dType = sched.schedule_type || 'Defense';
-                if (dType.toLowerCase().endsWith(' defense')) {
-                    dType = dType.substring(0, dType.length - 8).trim();
-                }
+                let normType = '';
+                if (dType.toLowerCase().includes('title')) normType = 'titledefense';
+                else if (dType.toLowerCase().includes('pre')) normType = 'preoraldefense';
+                else if (dType.toLowerCase().includes('final')) normType = 'finaldefense';
 
-                allRaters.forEach(panelistName => {
-                    processedEvaluations.push({
-                        id: sched.id + '-' + panelistName.replace(/\s+/g, ''),
+                if (allRaters.length > 0 && normType) {
+                    groupHasEvaluations = true;
+                    groupDefenses[normType] = {
                         schedId: sched.id,
-                        groupId: group.id,
-                        groupName: group.group_name,
-                        program: group.program,
-                        members: group.students || [],
-                        title: group.title,
                         defenseType: dType,
-                        panelistName: panelistName,
-                        roles: { panel: true },
-                        isSubmitted: true,
-                        adviser: group.adviser,
-                        createdBy: group.created_by || group.user_id,
+                        panelists: allRaters,
+                        panelistName: allRaters.join(', '),
                         savedScores: {
-                            individual: (indScores || []).filter(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase()),
-                            system: (sysScores || []).find(s => s.schedule_id === sched.id && s.panelist_name.toLowerCase() === panelistName.toLowerCase())
+                            individual: relevantIndScores,
+                            system: relevantSysScores
                         }
-                    });
-                });
+                    };
+                }
             });
+
+            if (groupHasEvaluations) {
+                processedEvaluations.push({
+                    id: group.id,
+                    groupId: group.id,
+                    groupName: group.group_name,
+                    program: group.program,
+                    members: group.students || [],
+                    title: group.title,
+                    adviser: group.adviser,
+                    createdBy: group.created_by || group.user_id,
+                    defenses: groupDefenses
+                });
+            }
         });
 
         loadedEvaluations = processedEvaluations;
 
-        // Initial Render based on Tab
         if (window.switchMainTab) {
             window.switchMainTab(currentMainTab);
         } else {
@@ -434,7 +438,7 @@ function updatePaginationUIAdvisory(totalPages) {
     }
 
     paginationContainer.style.display = 'flex';
-    
+
     paginationContainer.innerHTML = `
         <button class="page-btn prev" ${currentPageAdvisory === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePageAdvisory(${currentPageAdvisory - 1})"`}>Previous</button>
         <span class="page-number active">${currentPageAdvisory}</span>
@@ -479,56 +483,46 @@ function applyFilters() {
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
     const userName = user ? (user.name || user.full_name || '').toLowerCase() : '';
-    const userId = user ? user.id : '';
 
-    const filtered = loadedEvaluations.filter(ev => {
-        // 1. Main Tab Filter (Advisory vs Evaluation)
-        let matchesMain = true;
-        const adviser = (ev.adviser || '').toLowerCase().replace(/\s*\(creator:[^)]+\)/gi, '');
+    const filtered = loadedEvaluations.filter(group => {
+        const adviser = (group.adviser || '').toLowerCase().replace(/\s*\(creator:[^)]+\)/gi, '');
         const isAdviser = adviser.includes(userName) || (userName && userName.includes(adviser));
-        const isPanelist = (ev.panelistName || '').toLowerCase() === userName.toLowerCase();
 
         // Advisers must not view panel evaluations of groups where they are the adviser
         if (isAdviser) {
             return false;
         }
 
-        // Extract creator email from adviser field if it exists
         let creatorEmail = '';
-        const match = (ev.adviser || '').match(/\(creator:([^)]+)\)/);
+        const match = (group.adviser || '').match(/\(creator:([^)]+)\)/);
         if (match) {
             creatorEmail = match[1].trim().toLowerCase();
         }
 
-        // Only show evaluations for groups created by this instructor
         let matchesCreator = false;
         if (creatorEmail && user && user.email) {
             matchesCreator = (creatorEmail === user.email.toLowerCase());
         }
 
-        // Legacy override for Christian Rae Salvacion (who created Aetheris and Faith in Motion)
-        if (userName === 'christian rae salvacion' && 
-            (ev.groupName.toLowerCase() === 'aetheris' || ev.groupName.toLowerCase() === 'faith in motion')) {
+        if (userName === 'christian rae salvacion' &&
+            (group.groupName.toLowerCase() === 'aetheris' || group.groupName.toLowerCase() === 'faith in motion')) {
             matchesCreator = true;
         }
 
         if (!matchesCreator) return false;
 
-        // 2. Text Match
-        const matchesText = ev.groupName.toLowerCase().includes(searchTerm) ||
-            ev.panelistName.toLowerCase().includes(searchTerm) ||
-            ev.defenseType.toLowerCase().includes(searchTerm);
+        const matchesText = group.groupName.toLowerCase().includes(searchTerm) ||
+            group.program.toLowerCase().includes(searchTerm);
 
-        // 3. Type Match
-        let matchesType = true;
-        const dType = ev.defenseType.toLowerCase();
-
-        if (currentTypeFilter === 'title') {
-            matchesType = dType.includes('title');
-        } else if (currentTypeFilter === 'pre') {
-            matchesType = dType.includes('pre') && (dType.includes('oral') || dType.includes('defense'));
-        } else if (currentTypeFilter === 'final') {
-            matchesType = dType.includes('final');
+        let matchesType = false;
+        if (currentTypeFilter === 'ALL') {
+            matchesType = Object.keys(group.defenses).length > 0;
+        } else if (currentTypeFilter === 'title' && group.defenses['titledefense']) {
+            matchesType = true;
+        } else if (currentTypeFilter === 'pre' && group.defenses['preoraldefense']) {
+            matchesType = true;
+        } else if (currentTypeFilter === 'final' && group.defenses['finaldefense']) {
+            matchesType = true;
         }
 
         return matchesText && matchesType;
@@ -537,11 +531,44 @@ function applyFilters() {
     renderAccordions(filtered);
 }
 
+// Keep track of which inner tab is active per accordion
+let activeInnerTabs = {};
+
+window.switchEvalInnerTab = (groupId, tabKey, event) => {
+    if (event) event.stopPropagation();
+
+    activeInnerTabs[groupId] = tabKey;
+
+    const cardBody = document.getElementById(`body-${groupId}`);
+    if (!cardBody) return;
+
+    const tabs = cardBody.querySelectorAll('.inner-tab');
+    tabs.forEach(tab => {
+        if (tab.dataset.tab === tabKey) {
+            tab.classList.add('active');
+            tab.style.borderBottom = '2px solid var(--primary-color)';
+            tab.style.color = 'var(--primary-color)';
+        } else {
+            tab.classList.remove('active');
+            tab.style.borderBottom = 'none';
+            tab.style.color = '#64748b';
+        }
+    });
+
+    const contents = cardBody.querySelectorAll('.inner-tab-content');
+    contents.forEach(content => {
+        if (content.dataset.content === tabKey) {
+            content.style.display = 'block';
+        } else {
+            content.style.display = 'none';
+        }
+    });
+};
+
 function renderAccordions(evaluations) {
     const container = document.getElementById('accordionContainer');
     container.innerHTML = '';
 
-    // --- Pagination Logic ---
     const totalPages = Math.ceil(evaluations.length / rowsPerPageEval);
     if (currentPageEval > totalPages && totalPages > 0) currentPageEval = totalPages;
     if (currentPageEval < 1) currentPageEval = 1;
@@ -555,61 +582,73 @@ function renderAccordions(evaluations) {
         return;
     }
 
-    paginatedEvaluations.forEach(evalItem => {
+    paginatedEvaluations.forEach(group => {
         const card = document.createElement('div');
         card.className = 'evaluation-card';
+        card.style.background = 'white';
+        card.style.borderRadius = '16px';
+        card.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)';
+        card.style.border = '1px solid #f0f0f0';
+        card.style.overflow = 'hidden';
+        card.style.marginBottom = '15px';
 
-        // Defense Type Badge
-        let typeClass = 'type-unknown';
-        const lowerType = evalItem.defenseType.toLowerCase();
-        if (lowerType.includes('title')) typeClass = 'type-title';
-        else if (lowerType.includes('pre-oral') || lowerType.includes('pre oral')) typeClass = 'type-pre-oral';
-        else if (lowerType.includes('final')) typeClass = 'type-final';
+        const program = (group.program || '').toUpperCase();
+        let progColor = '#64748b'; let progBg = '#f1f5f9';
+        if (program.includes('BSIS')) { progColor = '#0284c7'; progBg = '#e0f2fe'; }
+        else if (program.includes('BSIT')) { progColor = '#16a34a'; progBg = '#dcfce7'; }
+        else if (program.includes('BSCS')) { progColor = '#dc2626'; progBg = '#fee2e2'; }
 
-        // Get Program from members if available, or assume from group (need to check data structure)
-        // Since we don't have program directly in evalItem, let's look at how it's loaded
-        // In loadEvaluations, we fetch *, which includes program.
-        const program = (evalItem.program || '').toUpperCase();
-        let progClass = 'prog-unknown';
-        if (program.includes('BSIS')) progClass = 'prog-bsis';
-        else if (program.includes('BSIT')) progClass = 'prog-bsit';
-        else if (program.includes('BSCS')) progClass = 'prog-bscs';
+        let adviserClean = group.adviser ? group.adviser.replace(/\s*\(creator:[^)]+\)/gi, '') : 'None Array';
 
         card.innerHTML = `
-             <div class="card-header" onclick="toggleAccordion('${evalItem.id}')">
-                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div class="header-info">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span class="group-name">${evalItem.groupName}</span>
-                            <span class="prog-badge ${progClass}">${program}</span>
-                        </div>
-                        <div style="font-size: 0.9rem; color: #64748b; margin-top: 4px;">
-                            Rated by: <strong style="color: var(--primary-color);">${evalItem.panelistName}</strong>
-                        </div>
-                        <div style="margin-top: 8px;">
-                            <span class="type-badge ${typeClass}">${evalItem.defenseType}</span>
+             <div class="card-header" onclick="toggleAccordion('${group.id}')" style="cursor: pointer; padding: 20px; display: flex; justify-content: space-between; align-items: center; background: white; transition: background 0.2s;">
+                 <div style="flex: 1; display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 20px; align-items: center;">
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Group Name</span>
+                        <span style="font-size: 1.1rem; font-weight: 700; color: #1e293b;">${group.groupName}</span>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Program</span>
+                        <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; color: ${progColor}; background: ${progBg};">${program}</span>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Group Adviser</span>
+                        <div style="display: flex; align-items: center; gap: 6px; color: #475569; font-size: 13px; font-weight: 500;">
+                            <span class="material-icons-round" style="font-size: 16px; color: #94a3b8;">school</span>
+                            ${adviserClean}
                         </div>
                     </div>
-                    <span class="material-icons-round expand-icon" id="icon-${evalItem.id}" style="color: #9ca3af; transition: transform 0.3s; font-size: 24px;">expand_more</span>
                  </div>
+                 <span class="material-icons-round expand-icon" id="icon-${group.id}" style="color: #cbd5e1; transition: transform 0.3s; font-size: 24px; margin-left: 15px;">expand_more</span>
              </div>
-             <div class="card-body" id="body-${evalItem.id}" style="display: none;">
-                 <div class="card-content">
-                     ${getCardContent(evalItem)}
+             <div class="card-body" id="body-${group.id}" style="display: none; border-top: 1px solid #f1f5f9;">
+                 <div style="display: flex; gap: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 0 15px; margin-top: 5px;">
+                     <button class="inner-tab" data-tab="titledefense" onclick="switchEvalInnerTab('${group.id}', 'titledefense', event)" style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;">Title Defense</button>
+                     <button class="inner-tab" data-tab="preoraldefense" onclick="switchEvalInnerTab('${group.id}', 'preoraldefense', event)" style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;">Pre-Oral Defense</button>
+                     <button class="inner-tab" data-tab="finaldefense" onclick="switchEvalInnerTab('${group.id}', 'finaldefense', event)" style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;">Final Defense</button>
+                 </div>
+                 <div class="card-content" style="padding: 20px;">
+                     ${getCardContentGrouped(group)}
                  </div>
              </div>
          `;
         container.appendChild(card);
+
+        let initialTab = currentTypeFilter === 'title' ? 'titledefense'
+            : currentTypeFilter === 'pre' ? 'preoraldefense'
+                : currentTypeFilter === 'final' ? 'finaldefense'
+                    : 'titledefense';
+
+        setTimeout(() => switchEvalInnerTab(group.id, initialTab, null), 10);
     });
 
     updatePaginationUIEval(totalPages, evaluations);
 }
 
-// Attach currentEvaluations to window so changePage can access it, or re-run applyFilters
 let currentFilteredEvaluations = [];
 
 function updatePaginationUIEval(totalPages, evaluations) {
-    currentFilteredEvaluations = evaluations; // Save state for changePageEval
+    currentFilteredEvaluations = evaluations;
     let paginationContainer = document.getElementById('evalPagination');
     if (!paginationContainer) {
         const accordionContainer = document.getElementById('accordionContainer');
@@ -631,7 +670,7 @@ function updatePaginationUIEval(totalPages, evaluations) {
     }
 
     paginationContainer.style.display = 'flex';
-    
+
     paginationContainer.innerHTML = `
         <button class="page-btn prev" ${currentPageEval === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePageEval(${currentPageEval - 1})"`}>Previous</button>
         <span class="page-number active">${currentPageEval}</span>
@@ -644,191 +683,164 @@ window.changePageEval = (newPage) => {
     renderAccordions(currentFilteredEvaluations);
 };
 
-function getCardContent(evalItem) {
-    const type = (evalItem.defenseType || '').toLowerCase();
-    const isMultiPage = type.includes('pre oral') || type.includes('pre-oral') || type.includes('final');
+function getCardContentGrouped(group) {
+    const renderDefense = (dKey) => {
+        const defense = group.defenses[dKey];
+        if (!defense) {
+            return `
+                <div style="padding: 40px; text-align: center; color: #94a3b8; background: #fafafa; border-radius: 12px; border: 1px dashed #e2e8f0;">
+                    <span class="material-icons-round" style="font-size: 32px; color: #cbd5e1; margin-bottom: 10px; display: block;">assignment_late</span>
+                    No evaluation data available for ${dKey.replace('defense', ' defense')}.
+                </div>
+            `;
+        }
 
-    let html = '';
+        const isMultiPage = dKey.includes('pre') || dKey.includes('final');
+        let html = '';
 
-    // Switcher Tabs for Multi-page (Read Only)
-    if (isMultiPage) {
-        html += `
-            <div class="switcher-tabs">
-                <button class="switcher-btn active" id="btn-p1-${evalItem.id}" onclick="switchPage('${evalItem.id}', 1)">
-                    <span class="material-icons-round">person</span> Individual
-                </button>
-                <button class="switcher-btn" id="btn-p2-${evalItem.id}" onclick="switchPage('${evalItem.id}', 2)">
-                    <span class="material-icons-round">dvr</span> System Project
-                </button>
-            </div>
-        `;
-    }
+        if (isMultiPage) {
+            html += `
+                <div class="switcher-tabs">
+                    <button class="switcher-btn active" id="btn-p1-${group.id}-${dKey}" onclick="switchPageGrouped('${group.id}-${dKey}', 1)">
+                        <span class="material-icons-round">person</span> Individual Ratings
+                    </button>
+                    <button class="switcher-btn" id="btn-p2-${group.id}-${dKey}" onclick="switchPageGrouped('${group.id}-${dKey}', 2)">
+                        <span class="material-icons-round">dvr</span> System Ratings
+                    </button>
+                </div>
+            `;
+        }
 
-    // Step 1: Individual Rating
-    html += `<div class="eval-step active" id="step1-${evalItem.id}">`;
-    html += renderIndividualTable(evalItem);
+        html += `<div class="eval-step active" id="step1-${group.id}-${dKey}">`;
+        html += renderIndividualTable(group, defense);
 
-    if (isMultiPage) {
-        html += `
-            <div style="margin-top: 25px; text-align: right; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-                <button class="btn-save" onclick="switchPage('${evalItem.id}', 2)" 
-                        style="padding: 12px 24px; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2);">
-                    View System Project 
-                    <span class="material-icons-round" style="font-size: 20px;">arrow_forward</span>
-                </button>
-            </div>
-        `;
-    }
-    html += `</div>`;
+        if (isMultiPage) {
+            html += `
+                <div style="margin-top: 25px; text-align: right; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+                    <button class="btn-save" onclick="switchPageGrouped('${group.id}-${dKey}', 2)" 
+                            style="padding: 10px 20px; border-radius: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2); border: none; background: var(--primary-color); color: white; cursor: pointer; transition: all 0.2s;">
+                        View System Project 
+                        <span class="material-icons-round" style="font-size: 20px;">arrow_forward</span>
+                    </button>
+                </div>
+            `;
+        }
+        html += `</div>`;
 
-    // Step 2: System Rating
-    if (isMultiPage) {
-        html += `<div class="eval-step" id="step2-${evalItem.id}">`;
-        html += renderSystemTable(evalItem);
-        html += `
-            <div style="margin-top: 30px; display: flex; justify-content: flex-start; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 25px;">
-                <button class="btn-cancel" onclick="switchPage('${evalItem.id}', 1)" 
-                        style="padding: 12px 24px; border-radius: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid #e2e8f0; background: white; color: #64748b;">
-                    <span class="material-icons-round" style="font-size: 20px;">arrow_back</span>
-                    Back to Individual
-                </button>
-            </div>
-        </div>`;
-    }
+        if (isMultiPage) {
+            html += `<div class="eval-step" id="step2-${group.id}-${dKey}">`;
+            html += renderSystemTable(group, defense);
+            html += `
+                <div style="margin-top: 30px; display: flex; justify-content: flex-start; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 25px;">
+                    <button class="btn-cancel" onclick="switchPageGrouped('${group.id}-${dKey}', 1)" 
+                            style="padding: 10px 20px; border-radius: 10px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; transition: all 0.2s;">
+                        <span class="material-icons-round" style="font-size: 20px;">arrow_back</span>
+                        Back to Individual
+                    </button>
+                </div>
+            </div>`;
+        }
 
-    return html;
+        return html;
+    };
+
+    return `
+        <div class="inner-tab-content active" data-content="titledefense">${renderDefense('titledefense')}</div>
+        <div class="inner-tab-content" data-content="preoraldefense" style="display:none;">${renderDefense('preoraldefense')}</div>
+        <div class="inner-tab-content" data-content="finaldefense" style="display:none;">${renderDefense('finaldefense')}</div>
+    `;
 }
 
-function renderIndividualTable(evalItem) {
+window.switchPageGrouped = (tabId, stepIdx) => {
+    document.getElementById(`step1-${tabId}`).classList.remove('active');
+    document.getElementById(`step2-${tabId}`).classList.remove('active');
+    document.getElementById(`btn-p1-${tabId}`).classList.remove('active');
+    document.getElementById(`btn-p2-${tabId}`).classList.remove('active');
+
+    document.getElementById(`step${stepIdx}-${tabId}`).classList.add('active');
+    document.getElementById(`btn-p${stepIdx}-${tabId}`).classList.add('active');
+};
+
+function renderIndividualTable(group, defense) {
     let headerCols = '';
-    evalItem.members.forEach((student, idx) => {
-        headerCols += `<th>${student.full_name}<br><span style="font-size: 10px; color: #9ca3af; font-weight: 400; text-transform: none;">Presenter ${idx + 1}</span></th>`;
+    defense.panelists.forEach((pName, idx) => {
+        headerCols += `<th style="padding: 12px; border-bottom: 2px solid #e2e8f0;">${pName}<br><span style="font-size: 10px; color: #9ca3af; font-weight: 400; text-transform: none;">Panel ${idx + 1}</span></th>`;
     });
 
-    const columns = ['clarity_score', 'engagement_score', 'delivery_score', 'knowledge_score', 'collab_score', 'prof_score', 'time_score'];
-
     let rows = '';
-    individualCriteria.forEach((c, cIdx) => {
+    group.members.forEach((student) => {
         let inputs = '';
-        evalItem.members.forEach((student, mIdx) => {
-            const savedScoreObj = evalItem.savedScores.individual.find(s => s.student_id === student.id);
-            const scoreVal = savedScoreObj ? savedScoreObj[columns[cIdx]] : 0;
-            inputs += `<td style="font-weight: 600; color: #374151;">${scoreVal || '-'}</td>`;
+        defense.panelists.forEach(pName => {
+            const savedScoreObj = defense.savedScores.individual.find(s => s.student_id === student.id && s.panelist_name === pName);
+            const scoreVal = savedScoreObj ? savedScoreObj.total_score : '-';
+            inputs += `<td style="font-weight: 800; color: var(--primary-color); text-align: center; font-size: 1.1rem; padding: 12px; border-bottom: 1px solid #f1f5f9;">${scoreVal}</td>`;
         });
         rows += `
-            <tr>
-                <td class="criteria-cell" style="text-align: left; background: #fafafa;">
-                    <div style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                         <span style="flex: 1;">${c.name}</span>
-                         <span class="material-icons-round tooltip-trigger" 
-                               style="font-size: 18px; color: #cbd5e1; cursor: help;"
-                               onmouseover="if(window.innerWidth > 768) showRubricTip(event, '${c.name}');" 
-                               onmouseout="if(window.innerWidth > 768) hideRubricTip();"
-                               onclick="if(window.innerWidth <= 768) showRubricTip(event, '${c.name}');">
-                               help_outline
-                         </span>
-                    </div>
-                </td>
+            <tr style="transition: background 0.2s;">
+                <td style="text-align: left; padding: 12px; border-bottom: 1px solid #f1f5f9; font-weight: 700; color: #1e293b; background: white;">${student.full_name}</td>
                 ${inputs}
             </tr>
         `;
     });
 
-    // Total Row
-    let totalCells = '';
-    evalItem.members.forEach((student, mIdx) => {
-        let total = 0;
-        const saved = evalItem.savedScores.individual.find(s => s.student_id === student.id);
-        total = saved ? saved.total_score : 0;
-        totalCells += `<td style="font-weight: 800; font-size: 1.1rem; color: var(--primary-color);">${total}</td>`;
-    });
-
     return `
-        <div style="margin-bottom: 25px;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                <span class="material-icons-round" style="color: var(--primary-color);">person_outline</span>
-                <h4 style="color: var(--text-main); font-size: 1.05rem; font-weight: 700;">Individual Rating of Presenters</h4>
+        <div style="margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="material-icons-round" style="color: var(--primary-color); font-size: 20px;">person_outline</span>
+                <h4 style="color: #334155; font-size: 1rem; font-weight: 700; margin: 0;">Individual Rating of Presenters (Total Scores)</h4>
             </div>
         </div>
-        <div class="table-responsive">
-            <table class="eval-table">
+        <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: white;">
+            <table class="eval-table" style="min-width: unset; width: 100%; margin: 0; border: none;">
                 <thead>
-                    <tr>
-                        <th class="criteria-header">Evaluation Criteria</th>
+                    <tr style="background: #f8fafc;">
+                        <th style="text-align: left; padding: 12px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 12px; text-transform: uppercase;">Student Name</th>
                         ${headerCols}
                     </tr>
                 </thead>
                 <tbody>
                     ${rows}
-                    <tr style="background: #f8fbff;">
-                        <td style="text-align: right; padding-right: 20px; font-weight: 800; color: var(--primary-dark);">TOTAL INDIVIDUAL SCORE</td>
-                        ${totalCells}
-                    </tr>
                 </tbody>
             </table>
         </div>
     `;
 }
 
-function renderSystemTable(evalItem) {
-    const sysCols = ['func_score', 'tech_score', 'usability_score', 'code_score', 'innov_score', 'testing_score', 'docu_score', 'demo_score'];
-
+function renderSystemTable(group, defense) {
     let rows = '';
-    systemCriteria.forEach((c, cIdx) => {
-        // Safe access to score
-        let scoreVal = '-';
-        if (evalItem.savedScores && evalItem.savedScores.system) {
-            scoreVal = evalItem.savedScores.system[sysCols[cIdx]];
-            if (scoreVal === undefined || scoreVal === null) scoreVal = '-';
-        }
-
-        const inputArea = `<div style="font-weight: 800; color: var(--primary-color); text-align: center; font-size: 1.1rem;">${scoreVal}</div>`;
-
+    defense.panelists.forEach((pName, idx) => {
+        const savedScoreObj = defense.savedScores.system.find(s => s.panelist_name === pName);
+        const scoreVal = savedScoreObj ? savedScoreObj.total_score : '-';
         rows += `
-            <tr>
-                <td class="criteria-cell" style="text-align: left; background: #fafafa;">
-                    <div style="font-weight: 600; font-size: 0.95rem; color: #1e293b; display: flex; align-items: center; gap: 8px;">
-                         <span style="flex: 1;">${c.name}</span>
-                         <span class="material-icons-round tooltip-trigger" 
-                               style="font-size: 18px; color: #cbd5e1; cursor: help;"
-                               onmouseover="if(window.innerWidth > 768) showRubricTip(event, '${c.name}', true);" 
-                               onmouseout="if(window.innerWidth > 768) hideRubricTip();"
-                               onclick="if(window.innerWidth <= 768) showRubricTip(event, '${c.name}', true);">
-                               help_outline
-                         </span>
-                    </div>
+            <tr style="transition: background 0.2s;">
+                <td style="text-align: left; padding: 12px; border-bottom: 1px solid #f1f5f9; background: white;">
+                    <div style="font-weight: 700; color: #1e293b; font-size: 0.95rem;">${pName}</div>
+                    <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Panel ${idx + 1}</div>
                 </td>
-                <td style="background: #f8fbff; width: 120px;">${inputArea}</td>
+                <td style="font-weight: 800; color: var(--primary-color); text-align: center; font-size: 1.15rem; padding: 12px; border-bottom: 1px solid #f1f5f9; background: #fdfdfd;">
+                    ${scoreVal}
+                </td>
             </tr>
         `;
     });
 
-    const totalVal = (evalItem.savedScores && evalItem.savedScores.system) ? evalItem.savedScores.system.total_score : 0;
-
     return `
-        <div style="margin-bottom: 20px; border-bottom: 2px dashed #f1f5f9; padding-bottom: 20px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="material-icons-round" style="color: var(--primary-color); font-size: 26px;">dvr</span>
-                <div>
-                    <h4 style="color: var(--text-main); font-size: 1.1rem; font-weight: 800; margin: 0;">System Project Evaluation</h4>
-                    <p style="font-size: 0.8rem; color: #64748b; margin: 2px 0 0;">Evaluation of the project's overall implementation and documentation.</p>
-                </div>
+        <div style="margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span class="material-icons-round" style="color: var(--primary-color); font-size: 20px;">dvr</span>
+                <h4 style="color: #334155; font-size: 1rem; font-weight: 700; margin: 0;">System Project Evaluation (Total Scores per Panelist)</h4>
             </div>
         </div>
-        <div class="table-responsive" style="max-width: 700px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-            <table class="eval-table" style="min-width: unset; width: 100%;">
+        <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: white; max-width: 600px;">
+            <table class="eval-table" style="min-width: unset; width: 100%; margin: 0; border: none;">
                 <thead>
-                    <tr style="background: #f8fbff; border-bottom: 1px solid #e2e8f0;">
-                        <th class="criteria-header" style="font-size: 0.95rem; font-weight: 700; color: #0f172a; padding: 16px 20px;">Technical Criteria</th>
-                        <th style="width: 140px; font-size: 0.95rem; font-weight: 700; color: #0f172a; text-align: center;">Score</th>
+                    <tr style="background: #f8fafc;">
+                        <th style="min-width: 200px; text-align: left; padding: 12px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 12px; text-transform: uppercase;">Panelist</th>
+                        <th style="width: 120px; text-align: center; padding: 12px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 12px; text-transform: uppercase;">Total Score</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${rows}
-                    <tr style="background: #f1f5f9; border-top: 1px solid #e2e8f0;">
-                        <td style="text-align: right; padding: 16px 25px; font-weight: 800; color: #334155; font-size: 0.95rem; letter-spacing: 0.5px; text-transform: uppercase;">TOTAL SYSTEM SCORE</td>
-                        <td style="font-weight: 900; font-size: 1.3rem; color: var(--primary-color); text-align: center; padding: 16px;">${totalVal}</td>
-                    </tr>
                 </tbody>
             </table>
         </div>
@@ -942,7 +954,7 @@ window.showRubricTip = (event, criteriaName, isSystem = false) => {
     `;
 
     tip.style.display = 'block';
-    
+
     if (isMobile) {
         overlay.style.display = 'block';
         tip.style.left = '50%';

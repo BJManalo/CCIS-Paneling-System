@@ -14,6 +14,9 @@
     <!-- Styles -->
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="icon" type="image/jpeg" href="../../assets/images/ua_logo_official.png">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="icon" type="image/jpeg" href="../../assets/images/ua_logo_official.png">
     <style>
         /* Expandable Table Styles */
         tr.main-row {
@@ -137,45 +140,16 @@
         <h2 class="page-title">Payers</h2>
 
         <!-- Filters (Under Logout) -->
-        <div style="display: flex; justify-content: flex-end; gap: 15px; margin-bottom: 20px;">
-            <div class="custom-select-wrapper" style="width: 200px; position: relative;">
-                <select id="filterProgram" onchange="filterPayers()"
-                    style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
-                    <option value="">All Programs</option>
-                    <option value="BSCS">BSCS</option>
-                    <option value="BSIT">BSIT</option>
-                    <option value="BSIS">BSIS</option>
-                </select>
-                <span class="material-icons-round select-arrow"
-                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
-            </div>
-
-            <div class="custom-select-wrapper" style="width: 200px; position: relative;">
-                <select id="filterDefenseType" onchange="filterPayers()"
-                    style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
-                    <option value="">All Defense Types</option>
-                    <option value="Title Defense">Title Defense</option>
-                    <option value="Pre-Oral Defense">Pre-Oral Defense</option>
-                    <option value="Final Defense">Final Defense</option>
-                </select>
-                <span class="material-icons-round select-arrow"
-                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
-            </div>
-
-            <div class="custom-select-wrapper" style="width: 200px; position: relative;">
-                <select id="filterSection" onchange="filterPayers()"
-                    style="padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: white; cursor: pointer;">
-                    <option value="">All Sections</option>
-                    <!-- Options will be populated dynamically if possible, or static for now -->
-                    <option value="A">Section A</option>
-                    <option value="B">Section B</option>
-                    <option value="C">Section C</option>
-                    <option value="D">Section D</option>
-                    <option value="E">Section E</option>
-                    <option value="F">Section F</option>
-                </select>
-                <span class="material-icons-round select-arrow"
-                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #64748b;">filter_list</span>
+        <!-- Filters -->
+        <div class="filter-section"
+            style="display: flex; gap: 12px; margin-bottom: 25px; align-items: center; justify-content: space-between; margin-top: 15px;">
+            <div style="display: flex; gap: 12px;">
+                <button class="filter-btn bsis" onclick="filterTable('BSIS')"
+                    style="background: #f472b6 !important; color: white !important;">BSIS</button>
+                <button class="filter-btn bsit" onclick="filterTable('BSIT')"
+                    style="background: #60a5fa !important; color: white !important;">BSIT</button>
+                <button class="filter-btn bscs" onclick="filterTable('BSCS')"
+                    style="background: #f87171 !important; color: white !important;">BSCS</button>
             </div>
         </div>
 
@@ -185,12 +159,10 @@
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr style="border-bottom: 2px solid #f1f5f9; text-align: left; color: #64748b;">
-                        <th style="padding: 15px;">Date Paid</th>
-                        <th style="padding: 15px;">Group Name</th>
-                        <th style="padding: 15px;">Program</th>
-                        <th style="padding: 15px;">Members</th>
-                        <th style="padding: 15px;">Action</th>
-                        <!-- <th style="padding: 15px;">Status</th> -->
+                        <th style="padding: 15px; width: 35%;">Group Name</th>
+                        <th style="padding: 15px; width: 15%;">Program</th>
+                        <th style="padding: 15px; width: 35%;">Group Adviser</th>
+                        <th style="padding: 15px; width: 15%; text-align: right;">Details</th>
                     </tr>
                 </thead>
                 <tbody id="payersTableBody">
@@ -205,31 +177,27 @@
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-        <a href="instructor_dashboard" class="nav-item">
+        <a href="instructor_dashboard.html" class="nav-item">
             <span class="material-icons-round">dashboard</span>
             <span class="nav-label">Dashboard</span>
         </a>
-        <a href="instructor_capstone" class="nav-item">
+        <a href="instructor_capstone.html" class="nav-item">
             <span class="material-icons-round">folder_shared</span>
             <span class="nav-label">Capstone</span>
         </a>
-        <a href="instructor_evaluation" class="nav-item">
+        <a href="instructor_evaluation.html" class="nav-item">
             <span class="material-icons-round">rate_review</span>
             <span class="nav-label">Evaluations</span>
         </a>
-        <a href="instructor_grades" class="nav-item">
-            <span class="material-icons-round">grading</span>
-            <span class="nav-label">Grades</span>
-        </a>
-        <a href="instructor_payers" class="nav-item active">
+        <a href="instructor_payers.html" class="nav-item active">
             <span class="material-icons-round">payments</span>
             <span class="nav-label">Payers</span>
         </a>
-        <a href="instructor_schedule" class="nav-item">
+        <a href="instructor_schedule.html" class="nav-item">
             <span class="material-icons-round">calendar_today</span>
             <span class="nav-label">Schedule</span>
         </a>
-        <a href="instructor_accounts" class="nav-item">
+        <a href="instructor_accounts.html" class="nav-item">
             <span class="material-icons-round">people</span>
             <span class="nav-label">Accounts</span>
         </a>

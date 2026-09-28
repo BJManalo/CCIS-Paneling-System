@@ -15,6 +15,9 @@
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="icon" type="image/jpeg" href="../../assets/images/ua_logo_official.png">
 
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
@@ -137,7 +140,7 @@
         </header>
 
         <!-- Role Context Tabs -->
-        <div style="display: flex; gap: 15px; margin: 25px 0 0 0; padding-left: 20px;">
+        <div style="display: flex; gap: 15px; margin: 25px 0 25px 0; padding-left: 20px;">
             <button class="role-filter-btn active" onclick="switchRole('All')" id="role-All">
                 <span class="material-icons-round">list</span>
                 All Groups
@@ -148,42 +151,17 @@
             </button>
         </div>
 
-
-        <!-- Defense Stage Tabs -->
-        <div class="role-tabs"
-            style="display: flex; gap: 40px; margin: 20px 0; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">
-            <button class="role-tab active" onclick="switchTab('Title Defense')" id="tab-Title Defense">
-                Title Defense
-            </button>
-            <button class="role-tab" onclick="switchTab('Pre-Oral Defense')" id="tab-Pre-Oral Defense"
-                style="display: flex; align-items: center; gap: 6px;">
-                Pre-Oral Defense
-                <span class="lock-icon material-icons-round" style="font-size: 16px; display: none;">lock</span>
-            </button>
-            <button class="role-tab" onclick="switchTab('Final Defense')" id="tab-Final Defense"
-                style="display: flex; align-items: center; gap: 6px;">
-                Final Defense
-                <span class="lock-icon material-icons-round" style="font-size: 16px; display: none;">lock</span>
-            </button>
-        </div>
+        <!-- Defense Stage Tabs Removed for Accordion Grouping -->
 
         <!-- Filters -->
-        <div class="filter-section" style="display: flex; gap: 12px; margin-bottom: 25px; align-items: center;">
+        <div class="filter-section"
+            style="display: flex; gap: 12px; margin-bottom: 25px; padding-left: 20px; align-items: center;">
             <button class="filter-btn bsis" onclick="filterTable('BSIS')"
                 style="background: #f472b6 !important; color: white !important;">BSIS</button>
             <button class="filter-btn bsit" onclick="filterTable('BSIT')"
                 style="background: #60a5fa !important; color: white !important;">BSIT</button>
             <button class="filter-btn bscs" onclick="filterTable('BSCS')"
                 style="background: #f87171 !important; color: white !important;">BSCS</button>
-
-            <div style="width: 1px; background: #e2e8f0; height: 24px; margin: 0 4px;"></div>
-
-            <button class="filter-btn status-btn active" id="status-ALL" onclick="filterStatus('ALL')"
-                style="background: #64748b !important; color: white !important;">All</button>
-            <button class="filter-btn status-btn" id="status-FINISHED" onclick="filterStatus('FINISHED')"
-                style="background: #10b981 !important; color: white !important; opacity: 0.5;">Finished</button>
-            <button class="filter-btn status-btn" id="status-UNFINISHED" onclick="filterStatus('UNFINISHED')"
-                style="background: #ef4444 !important; color: white !important; opacity: 0.5;">Unfinished</button>
         </div>
 
         <!-- Data Table -->
@@ -191,13 +169,10 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th style="width: 15%;">Type</th>
-                        <th style="width: 20%;">Group Name</th>
-                        <th style="width: 8%;">Program</th>
-                        <th style="width: 15%;">Date & Time</th>
-                        <th style="width: 12%;">Venue</th>
-                        <th style="width: 20%;">Panels</th>
-                        <th style="width: 10%; text-align: center;">Submission</th>
+                        <th style="width: 35%;">Group Name</th>
+                        <th style="width: 15%;">Program</th>
+                        <th style="width: 35%;">Group Adviser</th>
+                        <th style="width: 15%; text-align: right; padding-right: 20px;">Details</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -232,10 +207,6 @@
         <a href="instructor_evaluation.html" class="nav-item">
             <span class="material-icons-round">rate_review</span>
             <span class="nav-label">Evaluations</span>
-        </a>
-        <a href="instructor_grades.html" class="nav-item">
-            <span class="material-icons-round">grading</span>
-            <span class="nav-label">Grades</span>
         </a>
         <a href="instructor_payers.html" class="nav-item">
             <span class="material-icons-round">payments</span>

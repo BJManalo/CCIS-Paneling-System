@@ -20,6 +20,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
 
+    <!-- PDF.js viewer config to expose event bus globally if needed -->
+    <script>window.pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];</script>
+
     <style>
         /* PDF.js Text Layer styles */
         .textLayer {
@@ -295,12 +298,49 @@
                         <p style="font-weight: 500;">Select a file to review</p>
                     </div>
 
-                    <!-- Silent Auto-save (UI Hidden as requested) -->
+                    <!-- silent save UI previously here -->
                     <div id="saveAnnotationBtnContainer" style="display: none;">
                         <div id="autoSaveStatus" style="display: none;">
                             <span class="material-icons-round">sync</span>
                             <span id="autoSaveText"></span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Right Sidebar: Page Comments -->
+                <div class="comments-sidebar" id="commentsSidebar"
+                    style="display: none; width: 320px; min-width: 320px; background: white; border-left: 1px solid #e2e8f0; flex-direction: column;">
+                    <div
+                        style="padding: 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                        <h4
+                            style="margin: 0; display: flex; align-items: center; gap: 8px; color: #1e293b; font-size: 1rem;">
+                            <span class="material-icons-round" style="color: var(--primary-color);">forum</span>
+                            Page <span id="currentPageBadge"
+                                style="background: var(--primary-color); color: white; padding: 2px 8px; border-radius: 99px; font-size: 0.85rem; margin: 0 4px;">1</span>
+                            Comments
+                        </h4>
+                    </div>
+
+                    <div id="commentsList"
+                        style="flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; background: #fff;">
+                        <!-- Comments injected here -->
+                        <div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">
+                            <span class="material-icons-round"
+                                style="font-size: 32px; opacity: 0.5;">question_answer</span>
+                            <p>Loading comments...</p>
+                        </div>
+                    </div>
+
+                    <div style="padding: 15px; border-top: 1px solid #e2e8f0; background: #f8fafc;">
+                        <textarea id="pageCommentInput" placeholder="Add a comment for Page 1..."
+                            style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; resize: none; font-family: inherit; font-size: 0.85rem; box-sizing: border-box; outline: none; transition: border-color 0.2s;"
+                            rows="3" onfocus="this.style.borderColor='var(--primary-color)'"
+                            onblur="this.style.borderColor='#cbd5e1'"></textarea>
+
+                        <button id="postCommentBtn" onclick="postPageComment()"
+                            style="width: 100%; margin-top: 10px; background: var(--primary-color); color: white; border: none; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                            <span class="material-icons-round" style="font-size: 18px;">send</span> Post Comment
+                        </button>
                     </div>
                 </div>
 

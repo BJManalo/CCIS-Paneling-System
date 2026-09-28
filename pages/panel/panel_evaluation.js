@@ -169,6 +169,7 @@ const systemCriteria = [
     }
 ];
 
+
 async function loadEvaluations() {
     const accordionContainer = document.getElementById('accordionContainer');
     accordionContainer.innerHTML = '<p style="text-align: center; color: #888;">Loading defense schedules...</p>';
@@ -181,7 +182,6 @@ async function loadEvaluations() {
     const userNameRaw = loginUser.name || loginUser.full_name || 'Panel';
 
     try {
-        // 1. Fetch Groups + their Schedules + Students (Core Data)
         const { data: groups, error } = await supabaseClient
             .from('student_groups')
             .select(`
@@ -195,8 +195,18 @@ async function loadEvaluations() {
             `)
             .order('created_at', { ascending: false });
 
+        const { data: indScores } = await supabaseClient
+            .from('individual_evaluations')
+            .select('*')
+            .eq('panelist_name', loginUser.name);
+
+        const { data: sysScores } = await supabaseClient
+            .from('system_evaluations')
+            .select('*')
+            .eq('panelist_name', loginUser.name);
+
         const currentUserNormalized = String(userNameRaw).trim().toLowerCase();
-        
+
         const fuzzyMatch = (nameA, nameB) => {
             const nA = String(nameA || "").trim().toLowerCase();
             const nB = String(nameB || "").trim().toLowerCase();
@@ -208,62 +218,65 @@ async function loadEvaluations() {
             return wB.every(word => wA.includes(word));
         };
 
-        const evaluations = (groups || []).flatMap(group => {
-            const isAdviser = fuzzyMatch(group.adviser || group.advisor, currentUserNormalized);
-            const schedules = group.schedules || [];
-            const results = [];
+        const processedGroups = [];
 
-            schedules.forEach(sched => {
+        (groups || []).forEach(group => {
+            let isAdviser = fuzzyMatch(group.adviser || group.advisor, currentUserNormalized);
+
+            let groupDefenses = {};
+            let hasValidPanel = false;
+
+            (group.schedules || []).forEach(sched => {
                 const panels = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
                 const isPanel = panels.some(p => fuzzyMatch(p, currentUserNormalized));
-                let dType = sched.schedule_type || 'Defense';
-                if (dType.toLowerCase().endsWith(' defense')) {
-                    dType = dType.substring(0, dType.length - 8).trim();
-                }
 
-                if (isPanel) {
-                    results.push({
+                let dTypeRaw = sched.schedule_type || 'Defense';
+                let dType = dTypeRaw.toLowerCase().endsWith(' defense') ? dTypeRaw.substring(0, dTypeRaw.length - 8).trim() : dTypeRaw.trim();
+
+                let normType = '';
+                if (dType.toLowerCase().includes('title')) normType = 'titledefense';
+                else if (dType.toLowerCase().includes('pre')) normType = 'preoraldefense';
+                else if (dType.toLowerCase().includes('final')) normType = 'finaldefense';
+
+                if (isPanel && normType) {
+                    hasValidPanel = true;
+                    // Check submitted scores
+                    let submittedInd = (indScores || []).filter(s => s.schedule_id === sched.id);
+                    let submittedSys = (sysScores || []).find(s => s.schedule_id === sched.id);
+                    groupDefenses[normType] = {
                         id: sched.id,
-                        groupId: group.id,
-                        groupName: group.group_name,
-                        members: group.students || [],
-                        title: group.title,
                         defenseType: dType,
-                        panelists: [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p),
-                        roles: { panel: isPanel, adviser: isAdviser }
-                    });
+                        panelists: panels,
+                        isSubmitted: submittedInd.length > 0 || !!submittedSys,
+                        savedScores: {
+                            individual: submittedInd,
+                            system: submittedSys || null
+                        }
+                    };
                 }
             });
-            return results;
+
+            if (hasValidPanel) {
+                processedGroups.push({
+                    id: group.id,
+                    groupId: group.id,
+                    groupName: group.group_name,
+                    members: group.students || [],
+                    title: group.title,
+                    program: group.program,
+                    adviser: group.adviser,
+                    defenses: groupDefenses
+                });
+            }
         });
 
-        // 3. Fetch already submitted scores for this user
-        const { data: indScores } = await supabaseClient
-            .from('individual_evaluations')
-            .select('*')
-            .eq('panelist_name', loginUser.name);
-
-        const { data: sysScores } = await supabaseClient
-            .from('system_evaluations')
-            .select('*')
-            .eq('panelist_name', loginUser.name);
-
-        // 4. Attach scores to evaluations
-        evaluations.forEach(ev => {
-            ev.savedScores = {
-                individual: (indScores || []).filter(s => s.schedule_id === ev.id),
-                system: (sysScores || []).find(s => s.schedule_id === ev.id)
-            };
-            ev.isSubmitted = ev.savedScores.individual.length > 0 || !!ev.savedScores.system;
-        });
-
-        if (evaluations.length === 0) {
+        if (processedGroups.length === 0) {
             accordionContainer.innerHTML = '<div class="empty-state"><span class="material-icons-round">assignment_turned_in</span><p>No evaluations found for you.</p></div>';
             return;
         }
 
-        loadedEvaluations = evaluations;
-        renderAccordions(evaluations);
+        loadedEvaluations = processedGroups;
+        renderAccordions(processedGroups);
 
     } catch (err) {
         console.error('Error loading data:', err);
@@ -288,14 +301,18 @@ window.applyStatusFilter = (status) => {
     renderAccordions(loadedEvaluations);
 };
 
+
 function renderAccordions(evaluations) {
     const container = document.getElementById('accordionContainer');
     container.innerHTML = '';
 
     // Filter local data based on current tab
     const filtered = evaluations.filter(ev => {
-        if (currentStatusFilter === 'pending') return !ev.isSubmitted;
-        if (currentStatusFilter === 'done') return ev.isSubmitted;
+        const hasPending = Object.values(ev.defenses).some(d => !d.isSubmitted);
+        const hasDone = Object.values(ev.defenses).some(d => d.isSubmitted);
+
+        if (currentStatusFilter === 'pending') return hasPending;
+        if (currentStatusFilter === 'done') return hasDone;
         return true;
     });
 
@@ -315,7 +332,6 @@ function renderAccordions(evaluations) {
         return;
     }
 
-    // --- Pagination Logic ---
     const totalPages = Math.ceil(filtered.length / rowsPerPage);
     if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
@@ -323,37 +339,241 @@ function renderAccordions(evaluations) {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const paginatedItems = filtered.slice(startIndex, startIndex + rowsPerPage);
 
-    paginatedItems.forEach(evalItem => {
+    paginatedItems.forEach(group => {
         const card = document.createElement('div');
         card.className = 'evaluation-card';
+        card.style.background = 'white';
+        card.style.borderRadius = '16px';
+        card.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)';
+        card.style.border = '1px solid #f0f0f0';
+        card.style.overflow = 'hidden';
+        card.style.marginBottom = '15px';
 
-        const dBadgeClass = evalItem.defenseType.toLowerCase().includes('title') ? 'title-defense' :
-            (evalItem.defenseType.toLowerCase().includes('pre-oral') || evalItem.defenseType.toLowerCase().includes('pre oral')) ? 'pre-oral' :
-                evalItem.defenseType.toLowerCase().includes('final') ? 'final-defense' : 'title-defense';
+        let titleStr = '';
+        if (typeof group.title === 'object' && group.title !== null) {
+            titleStr = group.title.title1 || group.title.title2 || Object.values(group.title)[0] || '';
+        } else if (typeof group.title === 'string' && group.title.startsWith('{')) {
+            try { const t = JSON.parse(group.title); titleStr = t.title1 || Object.values(t)[0] || ''; } catch (e) { }
+        } else if (group.title) {
+            titleStr = group.title;
+        }
+
+        const program = (group.program || '').toUpperCase();
+        let progColor = '#64748b'; let progBg = '#f1f5f9';
+        if (program.includes('BSIS')) { progColor = '#0284c7'; progBg = '#e0f2fe'; }
+        else if (program.includes('BSIT')) { progColor = '#16a34a'; progBg = '#dcfce7'; }
+        else if (program.includes('BSCS')) { progColor = '#dc2626'; progBg = '#fee2e2'; }
+
+        let adviserClean = group.adviser ? group.adviser.replace(/\s*\(creator:[^)]+\)/gi, '') : 'None Array';
+
+        // Check if we show tab buttons according to the current filter
+        const tabsRender = [];
+        ['titledefense', 'preoraldefense', 'finaldefense'].forEach(dKey => {
+            if (group.defenses[dKey]) {
+                const def = group.defenses[dKey];
+                let display = false;
+                if (currentStatusFilter === 'pending' && !def.isSubmitted) display = true;
+                if (currentStatusFilter === 'done' && def.isSubmitted) display = true;
+                if (display) {
+                    const label = dKey === 'titledefense' ? 'Title Defense' : dKey === 'preoraldefense' ? 'Pre-Oral Defense' : 'Final Defense';
+                    tabsRender.push(`
+                        <button class="inner-tab" data-tab="${dKey}" onclick="switchEvalInnerTab('${group.id}', '${dKey}', event)" 
+                                style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s;">
+                            ${label}
+                        </button>
+                    `);
+                }
+            }
+        });
 
         card.innerHTML = `
-             <div class="card-header" onclick="toggleAccordion(${evalItem.id})">
-                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div class="header-info">
-                        <span class="group-name">${evalItem.groupName}</span>
-                        ${evalItem.title ? `<div style="font-size: 0.85rem; color: #6b7280; margin-top: 4px; line-height: 1.4;">${evalItem.title}</div>` : ''}
-                        <span class="defense-badge ${dBadgeClass}">${evalItem.defenseType}</span>
+             <div class="card-header" onclick="toggleAccordion('${group.id}')" style="cursor: pointer; padding: 20px; display: flex; justify-content: space-between; align-items: center; background: white; transition: background 0.2s;">
+                 <div style="flex: 1; display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 20px; align-items: center;">
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Group Name</span>
+                        <span style="font-size: 1.1rem; font-weight: 700; color: #1e293b;">${group.groupName}</span>
                     </div>
-                    <span class="material-icons-round expand-icon" id="icon-${evalItem.id}" style="color: #9ca3af; transition: transform 0.3s;">expand_more</span>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Program</span>
+                        <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; color: ${progColor}; background: ${progBg};">${program}</span>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">Project Title</span>
+                        <div style="display: flex; align-items: center; gap: 6px; color: #475569; font-size: 13px; font-weight: 500;">
+                            ${titleStr || 'Untitled'}
+                        </div>
+                    </div>
                  </div>
+                 <span class="material-icons-round expand-icon" id="icon-${group.id}" style="color: #cbd5e1; transition: transform 0.3s; font-size: 24px; margin-left: 15px;">expand_more</span>
              </div>
-             <div class="card-body" id="body-${evalItem.id}" style="display: none;">
-                 <div class="card-content">
-                     ${getCardContent(evalItem)}
+             <div class="card-body" id="body-${group.id}" style="display: none; border-top: 1px solid #f1f5f9;">
+                 <div style="display: flex; gap: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 0 15px; margin-top: 5px;">
+                    ${tabsRender.join('')}
+                 </div>
+                 <div class="card-content" style="padding: 20px;">
+                     ${getCardContentGrouped(group)}
                  </div>
              </div>
          `;
         container.appendChild(card);
+
+        // Find the first tab that should be active and switch to it
+        const firstActiveMatch = ['titledefense', 'preoraldefense', 'finaldefense'].find(dKey => {
+            const def = group.defenses[dKey];
+            if (!def) return false;
+            if (currentStatusFilter === 'pending') return !def.isSubmitted;
+            if (currentStatusFilter === 'done') return def.isSubmitted;
+            return false;
+        });
+
+        if (firstActiveMatch) {
+            setTimeout(() => switchEvalInnerTab(group.id, firstActiveMatch, null), 10);
+        }
     });
 
     updatePaginationUI(totalPages);
 }
 
+// Inner tab switcher
+let activeInnerTabs = {};
+window.switchEvalInnerTab = (groupId, tabKey, event) => {
+    if (event) event.stopPropagation();
+    activeInnerTabs[groupId] = tabKey;
+
+    const cardBody = document.getElementById(`body-${groupId}`);
+    if (!cardBody) return;
+
+    const tabs = cardBody.querySelectorAll('.inner-tab');
+    tabs.forEach(tab => {
+        if (tab.dataset.tab === tabKey) {
+            tab.classList.add('active');
+            tab.style.borderBottom = '2px solid var(--primary-color)';
+            tab.style.color = 'var(--primary-color)';
+        } else {
+            tab.classList.remove('active');
+            tab.style.borderBottom = 'none';
+            tab.style.color = '#64748b';
+        }
+    });
+
+    const contents = cardBody.querySelectorAll('.inner-tab-content');
+    contents.forEach(content => {
+        if (content.dataset.content === tabKey) {
+            content.style.display = 'block';
+        } else {
+            content.style.display = 'none';
+        }
+    });
+};
+
+function getCardContentGrouped(group) {
+    const renderDefense = (dKey) => {
+        const defense = group.defenses[dKey];
+        if (!defense || (currentStatusFilter === 'pending' && defense.isSubmitted) || (currentStatusFilter === 'done' && !defense.isSubmitted)) {
+            return '';
+        }
+
+        const isMultiPage = dKey.includes('pre') || dKey.includes('final');
+        let html = '';
+
+        if (isMultiPage) {
+            html += `
+                <div class="switcher-tabs">
+                    <button class="switcher-btn active" id="btn-p1-${defense.id}" onclick="switchPage('${defense.id}', 1)">
+                        <span class="material-icons-round">person</span> Individual
+                    </button>
+                    <button class="switcher-btn" id="btn-p2-${defense.id}" onclick="switchPage('${defense.id}', 2)">
+                        <span class="material-icons-round">dvr</span> System Project
+                    </button>
+                </div>
+            `;
+        }
+
+        // We wrap evaluation items in an object similar to old evalItem for compatibility with renderIndividualTable / renderSystemTable
+        const evalItem = {
+            id: defense.id,
+            groupId: group.id,
+            members: group.members,
+            isSubmitted: defense.isSubmitted,
+            savedScores: defense.savedScores,
+            defenseType: defense.defenseType
+        };
+
+        html += `<div class="eval-step active" id="step1-${defense.id}">`;
+
+        html += `
+            <div class="info-grid">
+                <div class="info-section">
+                    <h5><span class="material-icons-round" style="color: var(--primary-color); font-size: 20px;">groups</span> Students</h5>
+                    <ul class="info-list">
+                        ${evalItem.members && evalItem.members.length > 0
+                ? evalItem.members.map((m, i) => `<li><span class="index">${i + 1}.</span> ${m.full_name}</li>`).join('')
+                : '<li style="color: #9ca3af; font-style: italic;">No students assigned</li>'}
+                    </ul>
+                </div>
+            </div>
+        `;
+
+        if (evalItem.members && evalItem.members.length > 0) {
+            html += renderIndividualTable(evalItem);
+        } else {
+            html += '<p style="color: #666; font-style: italic; padding: 20px;">Please ensure students are added to this group to enable individual scoring.</p>';
+        }
+
+        if (isMultiPage) {
+            html += `
+                <div style="margin-top: 25px; text-align: right; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+                    <button class="btn-save" onclick="switchPage('${defense.id}', 2)" 
+                            style="padding: 12px 24px; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px; transition: all 0.3s; box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2);">
+                        Next: System Evaluation 
+                        <span class="material-icons-round" style="font-size: 20px;">arrow_forward</span>
+                    </button>
+                </div>
+            `;
+        }
+
+        html += `</div>`; // Close step 1
+
+        if (isMultiPage) {
+            html += `<div class="eval-step" id="step2-${defense.id}">`;
+            html += renderSystemTable(evalItem);
+            html += `
+                <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 25px;">
+                    <button class="btn-cancel" onclick="switchPage('${defense.id}', 1)" 
+                            style="padding: 12px 24px; border-radius: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid #e2e8f0; background: white; color: #64748b;">
+                        <span class="material-icons-round" style="font-size: 20px;">arrow_back</span>
+                        Back
+                    </button>
+            `;
+            if (!evalItem.isSubmitted) {
+                html += `
+                    <button class="btn-save" onclick="submitEvaluation(${defense.id})" 
+                            style="padding: 12px 35px; border-radius: 12px; font-weight: 700; box-shadow: 0 4px 15px rgba(26, 86, 219, 0.3);">
+                        Submit Evaluation
+                    </button>`;
+            }
+            html += `</div></div>`;
+        } else if (!evalItem.isSubmitted) {
+            // Simple Submit for non-multipage
+            html += `
+                <div style="margin-top: 30px; text-align: right; border-top: 1px solid #eee; padding-top: 20px;">
+                    <button class="btn-save" onclick="submitEvaluation(${defense.id})" 
+                            style="padding: 12px 35px; border-radius: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2);">
+                        Submit Evaluation
+                    </button>
+                </div>
+            `;
+        }
+
+        return html;
+    };
+
+    return `
+        <div class="inner-tab-content active" data-content="titledefense">${renderDefense('titledefense')}</div>
+        <div class="inner-tab-content" data-content="preoraldefense" style="display:none;">${renderDefense('preoraldefense')}</div>
+        <div class="inner-tab-content" data-content="finaldefense" style="display:none;">${renderDefense('finaldefense')}</div>
+    `;
+}
 function updatePaginationUI(totalPages) {
     let paginationContainer = document.getElementById('evaluationPagination');
     if (!paginationContainer) {
@@ -375,7 +595,7 @@ function updatePaginationUI(totalPages) {
     }
 
     paginationContainer.style.display = 'flex';
-    
+
     paginationContainer.innerHTML = `
         <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
         <span class="page-number active">${currentPage}</span>
@@ -387,97 +607,6 @@ window.changePage = (newPage) => {
     currentPage = newPage;
     renderAccordions(loadedEvaluations);
 };
-
-function getCardContent(evalItem) {
-    const type = (evalItem.defenseType || '').toLowerCase();
-    const isMultiPage = type.includes('pre oral') || type.includes('pre-oral') || type.includes('final');
-
-    let html = '';
-
-    // Switcher Tabs for Multi-page
-    if (isMultiPage) {
-        html += `
-            <div class="switcher-tabs">
-                <button class="switcher-btn active" id="btn-p1-${evalItem.id}" onclick="switchPage(${evalItem.id}, 1)">
-                    <span class="material-icons-round">person</span> Individual
-                </button>
-                <button class="switcher-btn" id="btn-p2-${evalItem.id}" onclick="switchPage(${evalItem.id}, 2)">
-                    <span class="material-icons-round">dvr</span> System Project
-                </button>
-            </div>
-        `;
-    }
-
-    // Step 1: Individual Rating
-    html += `<div class="eval-step active" id="step1-${evalItem.id}">`;
-    html += `
-        <div class="info-grid">
-            <div class="info-section">
-                <h5><span class="material-icons-round" style="color: var(--primary-color); font-size: 20px;">groups</span> Students</h5>
-                <ul class="info-list">
-                    ${evalItem.members && evalItem.members.length > 0
-            ? evalItem.members.map((m, i) => `<li><span class="index">${i + 1}.</span> ${m.full_name}</li>`).join('')
-            : '<li style="color: #9ca3af; font-style: italic;">No students assigned</li>'}
-                </ul>
-            </div>
-            <div class="info-shared" style="display: none;"></div> 
-        </div>
-    `;
-
-    if (evalItem.members && evalItem.members.length > 0) {
-        html += renderIndividualTable(evalItem);
-    } else {
-        html += '<p style="color: #666; font-style: italic; padding: 20px;">Please ensure students are added to this group to enable individual scoring.</p>';
-    }
-
-    if (isMultiPage) {
-        html += `
-            <div style="margin-top: 25px; text-align: right; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-                <button class="btn-save" onclick="switchPage(${evalItem.id}, 2)" 
-                        style="padding: 12px 24px; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px; transition: all 0.3s; box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2);">
-                    Next: System Evaluation 
-                    <span class="material-icons-round" style="font-size: 20px;">arrow_forward</span>
-                </button>
-            </div>
-        `;
-    }
-    html += `</div>`; // Close step 1
-
-    // Step 2: System Rating
-    if (isMultiPage) {
-        html += `<div class="eval-step" id="step2-${evalItem.id}">`;
-        html += renderSystemTable(evalItem);
-        html += `
-            <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 25px;">
-                <button class="btn-cancel" onclick="switchPage(${evalItem.id}, 1)" 
-                        style="padding: 12px 24px; border-radius: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid #e2e8f0; background: white; color: #64748b;">
-                    <span class="material-icons-round" style="font-size: 20px;">arrow_back</span>
-                    Back
-                </button>
-        `;
-
-        if (!evalItem.isSubmitted) {
-            html += `
-                <button class="btn-save" onclick="submitEvaluation(${evalItem.id})" 
-                        style="padding: 12px 35px; border-radius: 12px; font-weight: 700; font-size: 1.05rem; box-shadow: 0 4px 15px rgba(26, 86, 219, 0.3);">
-                    Submit Evaluation
-                </button>`;
-        }
-        html += `</div></div>`;
-    } else if (!evalItem.isSubmitted) {
-        // Simple Submit for non-multipage
-        html += `
-            <div style="margin-top: 30px; text-align: right; border-top: 1px solid #eee; padding-top: 20px;">
-                <button class="btn-save" onclick="submitEvaluation(${evalItem.id})" 
-                        style="padding: 12px 35px; border-radius: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2);">
-                    Submit Evaluation
-                </button>
-            </div>
-        `;
-    }
-
-    return html;
-}
 
 function renderIndividualTable(evalItem) {
     const isSaved = evalItem.isSubmitted;
@@ -645,7 +774,7 @@ function renderSystemTable(evalItem) {
     `;
 }
 
-window.switchPage = (id, page) => {
+/* replaced */ window.switchPageLegacy = (id, page) => {
     const step1 = document.getElementById(`step1-${id}`);
     const step2 = document.getElementById(`step2-${id}`);
     const btn1 = document.getElementById(`btn-p1-${id}`);
@@ -665,7 +794,7 @@ window.switchPage = (id, page) => {
 };
 
 // --- Interaction Helpers ---
-window.toggleAccordion = (id) => {
+/* replaced */ window.toggleAccordionLegacy = (id) => {
     const body = document.getElementById(`body-${id}`);
     const icon = document.getElementById(`icon-${id}`);
 
@@ -926,7 +1055,7 @@ window.showRubricTip = (event, criteriaName, isSystem = false) => {
     `;
 
     tip.style.display = 'block';
-    
+
     if (isMobile) {
         overlay.style.display = 'block';
         tip.style.left = '50%';
@@ -969,3 +1098,37 @@ window.hideRubricTip = () => {
 // Initial tooltips setup
 document.addEventListener('DOMContentLoaded', initTooltip);
 
+
+window.toggleAccordion = (id) => {
+    const body = document.getElementById(`body-${id}`);
+    const icon = document.getElementById(`icon-${id}`);
+
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        icon.textContent = 'expand_less';
+        icon.style.color = 'var(--primary-color)';
+    } else {
+        body.style.display = 'none';
+        icon.textContent = 'expand_more';
+        icon.style.color = '#888';
+    }
+};
+
+window.switchPage = (id, page) => {
+    const step1 = document.getElementById(`step1-${id}`);
+    const step2 = document.getElementById(`step2-${id}`);
+    const btn1 = document.getElementById(`btn-p1-${id}`);
+    const btn2 = document.getElementById(`btn-p2-${id}`);
+
+    if (page === 1) {
+        if (step1) step1.classList.add('active');
+        if (step2) step2.classList.remove('active');
+        if (btn1) btn1.classList.add('active');
+        if (btn2) btn2.classList.remove('active');
+    } else {
+        if (step1) step1.classList.remove('active');
+        if (step2) step2.classList.add('active');
+        if (btn1) btn1.classList.remove('active');
+        if (btn2) btn2.classList.add('active');
+    }
+};

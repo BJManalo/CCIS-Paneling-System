@@ -290,7 +290,7 @@ function updatePaginationUI(totalPages, groups) {
     }
 
     paginationContainer.style.display = 'flex';
-    
+
     paginationContainer.innerHTML = `
         <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
         <span class="page-number active">${currentPage}</span>
@@ -336,7 +336,13 @@ async function openEditGroupModal(groupId) {
     const rawAdviser = group.adviser || '';
     const cleanAdviser = rawAdviser.replace(/\s*\(creator:[^)]+\)/gi, '');
     document.getElementById('adviserEdit').value = cleanAdviser;
-    document.getElementById('emailEdit').value = group.email || '';
+
+    let displayEmail = group.email || '';
+    if (displayEmail.endsWith('@antiquespride.edu.ph')) {
+        displayEmail = displayEmail.replace('@antiquespride.edu.ph', '');
+    }
+    document.getElementById('emailEdit').value = displayEmail;
+
     document.getElementById('passwordEdit').value = group.password || '';
 
     // Fill members
@@ -426,13 +432,20 @@ async function saveGroupChanges(e) {
     adviserValue = adviserValue.replace(/\s*\(creator:[^)]+\)/gi, '');
     const finalAdviser = adviserValue + creatorSuffix;
 
+    let rawEmail = document.getElementById('emailEdit').value.trim();
+    if (rawEmail && !rawEmail.includes('@')) {
+        rawEmail += '@antiquespride.edu.ph';
+    } else if (rawEmail && rawEmail.includes('@') && !rawEmail.endsWith('@antiquespride.edu.ph')) {
+        rawEmail = rawEmail.split('@')[0] + '@antiquespride.edu.ph';
+    }
+
     const groupData = {
         group_name: document.getElementById('groupNameEdit').value,
         program: document.getElementById('programEdit').value,
         year_level: document.getElementById('yearEdit').value,
         section: document.getElementById('sectionEdit').value,
         adviser: finalAdviser,
-        email: document.getElementById('emailEdit').value,
+        email: rawEmail,
         password: document.getElementById('passwordEdit').value
     };
 

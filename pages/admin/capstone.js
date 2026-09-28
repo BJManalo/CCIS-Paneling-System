@@ -119,12 +119,12 @@ function applyFilters() {
         const pMap = resolveStatusMap(g.id, 'Pre-Oral Defense');
         const fMap = resolveStatusMap(g.id, 'Final Defense');
 
-        // Check if ANY title is approved or completed
+        // Check if ANY title is fully approved (5/5 panels) or completed
         const approvedKey = Object.keys(tMap).find(k =>
-            (tMap[k] || '').includes('Approved') || (tMap[k] || '').includes('Completed')
+            tMap[k] === 'Approved' || tMap[k] === 'Completed'
         );
 
-        if (!approvedKey) return; // Skip if not approved
+        if (!approvedKey) return; // Skip if not fully approved by 5 panels
 
         const projectTitle = getTitleText(g.project_title, approvedKey);
 
@@ -148,9 +148,9 @@ function applyFilters() {
         let statusBadge = '<span class="status-badge approved">Title Approved</span>';
         if (Object.values(fMap).some(v => v === 'Completed')) {
             statusBadge = '<span class="status-badge approved">Completed</span>';
-        } else if (Object.values(fMap).some(v => v.includes('Approved') || v.includes('Revisions'))) {
+        } else if (Object.values(fMap).some(v => v === 'Approved' || v.includes('Revisions'))) {
             statusBadge = '<span class="status-badge approved" style="background:#dcfce7; color:#166534;">Final Ongoing</span>';
-        } else if (Object.values(pMap).some(v => v.includes('Approved') || v.includes('Revisions'))) {
+        } else if (Object.values(pMap).some(v => v === 'Approved' || v.includes('Revisions'))) {
             statusBadge = '<span class="status-badge approved" style="background:#e0f2fe; color:#0369a1;">Pre-Oral Passed</span>';
         }
 
@@ -282,19 +282,19 @@ function resolveStatusMap(groupId, defenseType) {
         filePanelMap[fb.file_key][fb.user_name || 'Panel'] = fb.status;
     });
 
+    const REQUIRED_PANEL_APPROVALS = 5;
     const resolved = {};
     Object.keys(filePanelMap).forEach(fk => {
         const votes = Object.values(filePanelMap[fk]);
+        const approvalCount = votes.filter(v => v && (v.includes('Approved') || v.includes('Approve') || v === 'Completed')).length;
         if (votes.some(v => v === 'Redefend')) resolved[fk] = 'Redefend';
         else if (votes.some(v => v === 'Rejected')) resolved[fk] = 'Rejected';
+        else if (approvalCount >= REQUIRED_PANEL_APPROVALS) resolved[fk] = 'Approved';
         else if (votes.some(v => {
             const nv = (v || '').toLowerCase();
             return nv.includes('revision');
         })) resolved[fk] = 'Approved with Revisions';
-        else if (votes.some(v => {
-            const nv = (v || '').toLowerCase();
-            return nv.includes('approved') || nv === 'completed';
-        })) resolved[fk] = 'Approved';
+        else if (approvalCount > 0) resolved[fk] = `Pending Approval (${approvalCount}/${REQUIRED_PANEL_APPROVALS})`;
         else resolved[fk] = 'Pending';
     });
     return resolved;
@@ -409,8 +409,13 @@ function createSection(sectionTitle, fileObj, icon, categoryKey, group) {
             return nv.includes('approved') || nv.includes('revision') || nv === 'completed';
         });
 
-        // If it was rejected or hasn't been approved yet, hide it from Capstone portal view
-        if (hasRejected || !hasApproved) return;
+        // If it was rejected or hasn't been confirmed approved (≥5 panels) yet, hide it from Capstone portal view
+        const approvalVotes = votes.filter(v => {
+            const nv = (v || '').toLowerCase();
+            return nv.includes('approved') || nv.includes('revision') || nv === 'completed';
+        }).length;
+        const REQUIRED_PANEL_APPROVALS = 5;
+        if (hasRejected || approvalVotes < REQUIRED_PANEL_APPROVALS) return;
 
         let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 

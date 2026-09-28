@@ -12,7 +12,7 @@ let currentStatusFilter = 'ALL';
 let currentPage = 1;
 const rowsPerPage = 15;
 
-window.showToast = function(message, type = 'info') {
+window.showToast = function (message, type = 'info') {
     let toast = document.getElementById('toast');
     if (!toast) {
         toast = document.createElement('div');
@@ -21,9 +21,9 @@ window.showToast = function(message, type = 'info') {
         toast.style = "position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #334155; color: white; padding: 12px 24px; border-radius: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; font-weight: 600; display: none;";
         document.body.appendChild(toast);
     }
-    
+
     document.getElementById('toastMessage').textContent = message;
-    
+
     // Optional: change icon/color based on type
     const icon = document.getElementById('toastIcon');
     if (type === 'success') {
@@ -36,7 +36,7 @@ window.showToast = function(message, type = 'info') {
         icon.textContent = 'info';
         toast.style.background = '#334155'; // Slate
     }
-    
+
     toast.style.display = 'flex';
     setTimeout(() => { toast.style.display = 'none'; }, 3000);
 }
@@ -235,19 +235,32 @@ async function loadCapstoneData() {
         // 5. Process Data
         allData = [];
 
-        // Defined defense types to check for
-        const defenseTypes = ['Title Defense', 'Pre-Oral Defense', 'Final Defense'];
-
         groups.forEach(group => {
-            // Check each defense type for this group
+            const userNameNormalized = String(user.name || user.full_name || 'Instructor').trim().toLowerCase();
+            const userEmailNormalized = String(user.email || '').trim().toLowerCase();
+
+            const robustMatch = (nameA, nameB) => {
+                const nA = String(nameA || "").trim().toLowerCase();
+                const nB = String(nameB || "").trim().toLowerCase();
+                if (!nA || !nB) return false;
+                if (nA === nB) return true;
+                if (nA.includes(nB) || nB.includes(nA)) return true;
+                const wA = nA.split(/\s+/).filter(w => w);
+                const wB = nB.split(/\s+/).filter(w => w);
+                if (wA.length <= wB.length && wA.length > 0) return wA.every(word => wB.includes(word));
+                if (wB.length > 0) return wB.every(word => wA.includes(word));
+                return false;
+            };
+
+            const isAdviser = robustMatch(group.adviser, userNameNormalized) || robustMatch(group.adviser, userEmailNormalized);
+
+            const groupDefenses = {};
+            const defenseTypes = ['Title Defense', 'Pre-Oral Defense', 'Final Defense'];
+            let hasAnyActivity = false;
+
             defenseTypes.forEach(defType => {
                 const normType = normalizeType(defType);
-
-                // 1. Check for existing schedule
                 const sched = schedules.find(s => s.group_id === group.id && normalizeType(s.schedule_type) === normType);
-
-                // 2. Check for files (Handle both JSON objects and direct URL strings)
-                let filesObj = { titles: {}, pre_oral: {}, final: {} };
 
                 const parseFileField = (val, defaultLabel) => {
                     if (!val) return {};
@@ -260,107 +273,52 @@ async function loadCapstoneData() {
                     }
                 };
 
-                filesObj.titles = parseFileField(group.title_link, 'Title Proposal');
-                filesObj.pre_oral = parseFileField(group.pre_oral_link, 'Pre-Oral Document');
-                filesObj.final = parseFileField(group.final_link, 'Final Manuscript');
+                let filesObj = {};
+                if (normType.includes('title')) filesObj = parseFileField(group.title_link, 'Title Proposal');
+                else if (normType.includes('preoral')) filesObj = parseFileField(group.pre_oral_link, 'Pre-Oral Document');
+                else if (normType.includes('final')) filesObj = parseFileField(group.final_link, 'Final Manuscript');
 
-                let hasFiles = false;
-                if (normType.includes('title') && Object.keys(filesObj.titles).length > 0) hasFiles = true;
-                else if (normType.includes('preoral') && Object.keys(filesObj.pre_oral).length > 0) hasFiles = true;
-                else if (normType.includes('final') && Object.keys(filesObj.final).length > 0) hasFiles = true;
+                if (sched || Object.keys(filesObj).length > 0) hasAnyActivity = true;
 
-                // 3. Skip if neither schedule nor files exist
-                if (!sched && !hasFiles) return;
+                let panelList = sched ? [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p) : [];
 
-                // 4. Construct Data Object
-                const userNameNormalized = String(user.name || user.full_name || 'Instructor').trim().toLowerCase();
-                const userEmailNormalized = String(user.email || '').trim().toLowerCase();
-
-                const robustMatch = (nameA, nameB) => {
-                    const nA = String(nameA || "").trim().toLowerCase();
-                    const nB = String(nameB || "").trim().toLowerCase();
-                    if (!nA || !nB) return false;
-                    if (nA === nB) return true;
-                    // Check if one includes the other (e.g. Sonny in Sonny@gmail.com)
-                    if (nA.includes(nB) || nB.includes(nA)) return true;
-                    const wA = nA.split(/\s+/).filter(w => w);
-                    const wB = nB.split(/\s+/).filter(w => w);
-                    if (wA.length <= wB.length && wA.length > 0) return wA.every(word => wB.includes(word));
-                    if (wB.length > 0) return wB.every(word => wA.includes(word));
-                    return false;
-                };
-
-                const isAdviser = robustMatch(group.adviser, userNameNormalized) || robustMatch(group.adviser, userEmailNormalized);
-                // Flexible check for partial name match or exact match depending on data quality
-
-                let panelList = [];
-                if (sched) {
-                    panelList = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => p);
-                } else {
-                    const allGroupSchedules = schedules.filter(s => s.group_id === group.id);
-                    const allPanels = new Set();
-                    allGroupSchedules.forEach(s => {
-                        [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].forEach(p => {
-                            if (p) allPanels.add(p);
-                        });
-                    });
-                    panelList = Array.from(allPanels);
-                }
-
-                // Check panelist match with fuzzy logic
-                const isPanelist = panelList.some(p => robustMatch(p, userNameNormalized) || robustMatch(p, userEmailNormalized));
-
-                // Get Merged Feedback (Legacy + New Table)
                 const feedbackRes = getMergedFeedback(group.id, normType);
-                const currentStatuses = feedbackRes.statuses;
-                const currentRemarks = feedbackRes.remarks;
-                const currentAnnotations = feedbackRes.annotations;
 
-                let titleStatus = {}, preOralStatus = {}, finalStatus = {};
-                if (normType.includes('title')) titleStatus = currentStatuses;
-                else if (normType.includes('preoral')) preOralStatus = currentStatuses;
-                else if (normType.includes('final')) finalStatus = currentStatuses;
-
-                let titleRemarks = {}, preOralRemarks = {}, finalRemarks = {};
-                if (normType.includes('title')) titleRemarks = currentRemarks;
-                else if (normType.includes('preoral')) preOralRemarks = currentRemarks;
-                else if (normType.includes('final')) finalRemarks = currentRemarks;
-
-                let titleAnnotations = {}, preOralAnnotations = {}, finalAnnotations = {};
-                if (normType.includes('title')) titleAnnotations = currentAnnotations;
-                else if (normType.includes('preoral')) preOralAnnotations = currentAnnotations;
-                else if (normType.includes('final')) finalAnnotations = currentAnnotations;
-
-                allData.push({
-                    id: group.id,
+                groupDefenses[normType] = {
                     type: sched ? sched.schedule_type : defType,
-                    normalizedType: normType,
-                    groupName: group.group_name,
-                    program: (group.program || '').toUpperCase(),
                     date: sched ? sched.schedule_date : null,
                     time: sched ? sched.schedule_time : null,
                     venue: sched ? sched.schedule_venue : 'Online / TBA',
                     panels: panelList,
                     files: filesObj,
-                    adviser_status: group.adviser_status,
-                    adviser_remarks: group.adviser_remarks,
-
-                    // Unified accessors
-                    titleStatus, preOralStatus, finalStatus,
-                    titleRemarks, preOralRemarks, finalRemarks,
-                    titleAnnotations, preOralAnnotations, finalAnnotations,
-
-                    // Store raw status info for updates
+                    statuses: feedbackRes.statuses,
+                    remarks: feedbackRes.remarks,
+                    annotations: feedbackRes.annotations,
                     defenseStatusId: feedbackRes.id,
-                    currentStatusJson: currentStatuses,
-                    currentRemarksJson: currentRemarks,
-                    currentAnnotationsJson: currentAnnotations,
+                    status: sched ? (sched.status || 'Active') : 'Pending Schedule'
+                };
+            });
 
-                    status: sched ? (sched.status || 'Active') : 'Pending Schedule',
-                    isAdviser: isAdviser,
-                    isPanelist: isPanelist,
-                    projectTitle: group.project_title
-                });
+            if (!hasAnyActivity) return;
+
+            const allGroupSchedules = schedules.filter(s => s.group_id === group.id);
+            const allPanels = new Set();
+            allGroupSchedules.forEach(s => {
+                [s.panel1, s.panel2, s.panel3, s.panel4, s.panel5].forEach(p => { if (p) allPanels.add(p); });
+            });
+            const isPanelist = Array.from(allPanels).some(p => robustMatch(p, userNameNormalized) || robustMatch(p, userEmailNormalized));
+
+            allData.push({
+                id: group.id,
+                groupName: group.group_name,
+                program: (group.program || '').toUpperCase(),
+                yearLevel: group.year_level || '',
+                section: group.section || '',
+                adviser: group.adviser || 'Not Assigned',
+                isAdviser: isAdviser,
+                isPanelist: isPanelist,
+                projectTitle: group.project_title,
+                defenses: groupDefenses
             });
         });
 
@@ -417,80 +375,29 @@ function renderTable() {
 
     const userJson = localStorage.getItem('loginUser');
     const user = userJson ? JSON.parse(userJson) : null;
-    const userName = user ? (user.name || user.full_name || 'Instructor') : 'Instructor';
 
-    const normCurrentTab = normalizeType(currentTab);
-
-    // Filter
+    // Filters
     filteredGroups = allData.filter(g => {
-        // Tab Match (Defense Type)
-        const typeMatch = normalizeType(g.type) === normCurrentTab;
-
-        // Program Match
         const programMatch = currentProgram === 'ALL' || g.program === currentProgram;
 
-        // Search Match
-        const searchMatch = !searchTerm ||
-            g.groupName.toLowerCase().includes(searchTerm.toLowerCase());
-
-        // Role Match
-        const roleMatch = (currentRole === 'All') ||
-            (currentRole === 'Adviser' && g.isAdviser) ||
-            (currentRole === 'Panel' && g.isPanelist); // Keep legacy just in case
-
-        if (!typeMatch || !programMatch || !searchMatch || !roleMatch) return false;
-
-        // --- Finished/Unfinished Filter Logic ---
-        if (currentStatusFilter === 'ALL') return true;
-
-        let currentFileSet = {};
-        if (normCurrentTab.includes('title')) currentFileSet = g.files.titles;
-        else if (normCurrentTab.includes('preoral')) currentFileSet = g.files.pre_oral;
-        else if (normCurrentTab.includes('final')) currentFileSet = g.files.final;
-
-        // FILTER HIDDEN/NULL FILES (Fix for Unfinished/Finished Tab)
-        const fileKeys = Object.keys(currentFileSet).filter(key => {
-            const url = currentFileSet[key];
-            if (key.endsWith('_revised')) return false;
-            if (!url || String(url).trim().toLowerCase() === 'null') return false;
-            return true;
-        });
-        let isFinished = false;
-
-        if (fileKeys.length === 0) {
-            isFinished = false; // Blank student submissions are NOT finished
-        } else {
-            const statuses = g.currentStatusJson || {};
-            const remarks = g.currentRemarksJson || {};
-
-            if (currentRole === 'Panel') {
-                // For Panelists: Finished if THEY have evaluated all files
-                isFinished = fileKeys.every(key => {
-                    const s = statuses[key]?.[userName] || 'Pending';
-                    const r = remarks[key]?.[userName] || '';
-                    return s !== 'Pending' && r.trim() !== '';
-                });
-            } else {
-                // For Advisers: Finished if ALL panelists assigned have evaluated all files
-                const panels = g.panels || [];
-                if (panels.length === 0) {
-                    isFinished = false;
-                } else {
-                    isFinished = panels.every(pName => {
-                        return fileKeys.every(key => {
-                            const s = statuses[key]?.[pName] || 'Pending';
-                            const r = remarks[key]?.[pName] || '';
-                            return s !== 'Pending' && r.trim() !== '';
-                        });
-                    });
-                }
-            }
+        let sectionMatch = true;
+        if (currentSectionFilter !== 'ALL') {
+            const gSec = (g.yearLevel && g.section) ? `${g.yearLevel}${g.section}` : (g.section || '');
+            if (gSec !== currentSectionFilter) sectionMatch = false;
         }
 
-        return currentStatusFilter === 'FINISHED' ? isFinished : !isFinished;
+        const searchMatch = !searchTerm || g.groupName.toLowerCase().includes(searchTerm.toLowerCase());
+        const roleMatch = (currentRole === 'All') ||
+            (currentRole === 'Adviser' && g.isAdviser) ||
+            (currentRole === 'Panel' && g.isPanelist);
+
+        if (!programMatch || !sectionMatch || !searchMatch || !roleMatch) return false;
+
+        // Skip Finished filter since that was tab-based, defaulting to all for now
+        if (currentStatusFilter === 'ALL') return true;
+        return true;
     });
 
-    // --- Pagination Logic ---
     const totalPages = Math.ceil(filteredGroups.length / rowsPerPage);
     if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
@@ -507,127 +414,132 @@ function renderTable() {
     if (emptyState) emptyState.style.display = 'none';
 
     paginatedGroups.forEach(g => {
-        // --- LOCKING LOGIC ---
-        let isLocked = false;
-        let lockReason = '';
-        const userEvaluations = groupGrades[g.id] || new Set();
+        const progClass = g.program.includes('BSIS') ? 'prog-bsis' : g.program.includes('BSIT') ? 'prog-bsit' : g.program.includes('BSCS') ? 'prog-bscs' : 'prog-unknown';
 
-        // Sequential Locking: Only applies if the user is a panelist for this group
-        if (g.isPanelist && currentRole === 'Panel') {
-            if (normCurrentTab === normalizeType('Pre-Oral Defense')) {
-                if (!userEvaluations.has(normalizeType('Title Defense'))) {
-                    isLocked = true;
-                    lockReason = 'Evaluate Title Defense first';
-                }
-            } else if (normCurrentTab === normalizeType('Final Defense')) {
-                if (!userEvaluations.has(normalizeType('Pre-Oral Defense'))) {
-                    isLocked = true;
-                    lockReason = 'Evaluate Pre-Oral first';
-                }
-            }
-        }
+        let accordionContentHtml = `
+            <div class="defense-tabs" style="display:flex; border-bottom:1px solid #e2e8f0; margin-bottom:15px; background: white;">
+                <button onclick="switchInnerTab('titledefense', '${g.id}', event)" class="inner-tab active inner-tab-${g.id}" id="tab-titledefense-${g.id}" style="padding:10px 20px; background:none; border:none; border-bottom:3px solid var(--primary-color); color:var(--primary-color); font-weight:700; cursor:pointer;">Title Defense</button>
+                <button onclick="switchInnerTab('preoraldefense', '${g.id}', event)" class="inner-tab inner-tab-${g.id}" id="tab-preoraldefense-${g.id}" style="padding:10px 20px; background:none; border:none; border-bottom:3px solid transparent; color:#64748b; font-weight:500; cursor:pointer;">Pre-Oral Defense</button>
+                <button onclick="switchInnerTab('finaldefense', '${g.id}', event)" class="inner-tab inner-tab-${g.id}" id="tab-finaldefense-${g.id}" style="padding:10px 20px; background:none; border:none; border-bottom:3px solid transparent; color:#64748b; font-weight:500; cursor:pointer;">Final Defense</button>
+            </div>
+            <div style="background:white; padding:15px; border-radius:8px; border:1px solid #e2e8f0;">
+        `;
 
-        const dateStr = g.date ? new Date(g.date).toLocaleDateString() : '-';
+        ['titledefense', 'preoraldefense', 'finaldefense'].forEach((defKey, idx) => {
+            const d = g.defenses[defKey];
+            const isActive = idx === 0 ? 'display:block;' : 'display:none;';
+            const panelsHtml = d && d.panels && d.panels.length > 0 ? d.panels.map(p => `<span class="chip" style="margin-right:5px; margin-bottom:5px; display:inline-block;">${p}</span>`).join('') : '<span style="color:#94a3b8; font-style:italic; font-size:11px;">Not Assigned</span>';
+            const dateStr = d && d.date ? new Date(d.date).toLocaleDateString() : '-';
+            const timeStr = d && d.time ? formatTime12Hour(d.time) : '-';
+            const venueStr = d && d.venue ? d.venue : 'TBA';
+            const hasFiles = d && d.files && Object.keys(d.files).length > 0;
 
-        // Panels Chips
-        const panelList = g.panels && g.panels.length > 0 ? g.panels : [];
-        const panelsHtml = panelList.map(p => `<span class="chip">${p}</span>`).join('');
-
-        // Using standard badges
-        const program = (g.program || '').toUpperCase();
-        let progClass = 'prog-unknown';
-        if (program.includes('BSIS')) progClass = 'prog-bsis';
-        else if (program.includes('BSIT')) progClass = 'prog-bsit';
-        else if (program.includes('BSCS')) progClass = 'prog-bscs';
-
-        let typeClass = 'type-unknown';
-        const lowerType = g.type.toLowerCase();
-        if (lowerType.includes('title')) typeClass = 'type-title';
-        else if (lowerType.includes('pre-oral') || lowerType.includes('preoral')) typeClass = 'type-pre-oral';
-        else if (lowerType.includes('final')) typeClass = 'type-final';
-
-        // Define which file set corresponds to current tab for button context
-        let currentFileSet = {};
-        if (normCurrentTab.includes('title')) currentFileSet = g.files.titles;
-        else if (normCurrentTab.includes('preoral')) currentFileSet = g.files.pre_oral;
-        else if (normCurrentTab.includes('final')) currentFileSet = g.files.final;
-
-        const hasFiles = Object.keys(currentFileSet).length > 0;
-
-        const row = document.createElement('tr');
-
-        let actionBtn = '';
-        if (isLocked) {
-            actionBtn = `
-                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                    <button disabled style="background: #f1f5f9; color: #94a3b8; border: none; padding: 6px 12px; border-radius: 6px; cursor: not-allowed; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600;">
-                        <span class="material-icons-round" style="font-size: 16px;">lock</span>
-                        Locked
-                    </button>
-                    <span style="font-size: 10px; color: #ef4444; margin-top: 2px;">${lockReason}</span>
-                </div>
-             `;
-            row.style.background = '#fafafa';
-        } else {
-            actionBtn = `
-                <button onclick="${hasFiles ? `openFileModal('${g.id}')` : ''}" 
-                    style="background: ${hasFiles ? 'var(--primary-color)' : '#f1f5f9'}; color: ${hasFiles ? 'white' : '#94a3b8'}; border: none; cursor: ${hasFiles ? 'pointer' : 'default'}; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; box-shadow: ${hasFiles ? '0 4px 10px rgba(37, 99, 235, 0.2)' : 'none'}; transition: all 0.2s;"
-                    onmouseover="${hasFiles ? 'this.style.transform=\'translateY(-2px)\'; this.style.boxShadow=\'0 6px 15px rgba(37, 99, 235, 0.3)\'' : ''}"
-                    onmouseout="${hasFiles ? 'this.style.transform=\'translateY(0)\'; this.style.boxShadow=\'0 4px 10px rgba(37, 99, 235, 0.2)\'' : ''}">
+            const actionBtn = `
+                <button onclick="${hasFiles ? `openFileModal('${g.id}', '${defKey}')` : ''}" 
+                    style="background: ${hasFiles ? 'var(--primary-color)' : '#f1f5f9'}; color: ${hasFiles ? 'white' : '#94a3b8'}; border: none; cursor: ${hasFiles ? 'pointer' : 'default'}; display: inline-flex; align-items: center; justify-content: center; width: 100%; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; transition: all 0.2s; box-shadow: ${hasFiles ? '0 4px 10px rgba(37, 99, 235, 0.2)' : 'none'};">
                     <span class="material-icons-round" style="font-size: 18px;">${hasFiles ? 'folder_open' : 'folder_off'}</span>
                     <span>${hasFiles ? 'View Files' : 'No Files'}</span>
                 </button>
              `;
-        }
 
-        row.innerHTML = `
-            <td><span class="type-badge ${typeClass}">${g.type}</span></td>
+            accordionContentHtml += `
+                <div class="inner-content inner-content-${g.id}" id="content-${defKey}-${g.id}" style="${isActive}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 20px;">
+                        <div style="flex:1;">
+                            <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                                <span class="material-icons-round" style="color:#64748b; font-size:18px;">event</span> 
+                                <strong>Date & Time:</strong> 
+                                <span style="color:#334155;">${dateStr}</span> <span style="margin-left:5px; color:#64748b; font-size: 0.9em;">(${timeStr})</span>
+                            </div>
+                            <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                                <span class="material-icons-round" style="color:#64748b; font-size:18px;">place</span> 
+                                <strong>Venue:</strong> 
+                                <span style="color:#334155;">${venueStr}</span>
+                            </div>
+                            <div style="margin-bottom:8px; display:flex; align-items:flex-start; gap:8px;">
+                                <span class="material-icons-round" style="color:#64748b; font-size:18px; margin-top:2px;">groups</span> 
+                                <strong>Panels:</strong>
+                            </div>
+                            <div style="padding-left: 26px;">${panelsHtml}</div>
+                        </div>
+                        <div style="width:200px;">
+                            ${actionBtn}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        accordionContentHtml += `</div>`;
+
+        const mainRow = document.createElement('tr');
+        mainRow.style.cursor = 'pointer';
+        mainRow.onclick = () => {
+            const acc = document.getElementById(`accordion-${g.id}`);
+            const icon = document.getElementById(`icon-${g.id}`);
+            if (acc.style.display === 'none') {
+                acc.style.display = 'table-row';
+                icon.style.transform = 'rotate(180deg)';
+                mainRow.style.background = '#f8fafc';
+            } else {
+                acc.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+                mainRow.style.background = 'white';
+            }
+        };
+
+        const groupAdviser = g.adviser !== 'Not Assigned' ? g.adviser.replace(/\(creator:[^)]+\)/, '').trim() : 'Not Assigned';
+
+        mainRow.innerHTML = `
             <td>
-                <div style="font-weight: 600;">${g.groupName}</div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${g.isAdviser ? 'Adviser View' : (g.isPanelist ? 'Panel View' : '')}</div>
+                <div style="font-weight: 700; font-size:1.05rem; color:#0f172a;">${g.groupName}</div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 4px; font-weight:500;">${g.isAdviser ? 'Adviser View' : (g.isPanelist ? 'Panel View' : '')}</div>
             </td>
-            <td><span class="prog-badge ${progClass}">${program}</span></td>
+            <td><span class="prog-badge ${progClass}">${g.program}</span></td>
             <td>
-                <div style="font-weight: 500;">${dateStr}</div>
-                <div style="font-size: 11px; color: #64748b;">${formatTime12Hour(g.time)}</div>
-            </td>
-            <td>
-                <div style="display: flex; align-items: center; gap: 4px; color: #475569;">
-                    <span class="material-icons-round" style="font-size: 14px; color: var(--primary-color);">place</span>
-                    ${g.venue || 'TBA'}
+                <div style="font-size: 0.95rem; font-weight: 500; color: #334155; display:flex; align-items:center; gap:6px;">
+                    <span class="material-icons-round" style="font-size:16px; color:#94a3b8;">school</span>
+                    ${groupAdviser}
                 </div>
             </td>
-            <td>
-                <div class="chips-container">
-                    ${panelsHtml || '<span style="color:#94a3b8; font-style:italic; font-size:11px;">Not Assigned</span>'}
-                </div>
+            <td style="text-align:right; padding-right:20px;">
+                <span class="material-icons-round expand-icon" id="icon-${g.id}" style="color:#94a3b8; transition:transform 0.3s; pointer-events:none; font-size: 24px;">expand_more</span>
             </td>
-            <td>${actionBtn}</td>
         `;
 
-        tableBody.appendChild(row);
+        const accRow = document.createElement('tr');
+        accRow.id = `accordion-${g.id}`;
+        accRow.style.display = 'none';
+        accRow.style.background = '#f8fafc';
+        accRow.innerHTML = `
+            <td colspan="4" style="padding: 20px 25px; border-bottom: 2px solid #e2e8f0; background: #f8fbff;">
+                ${accordionContentHtml}
+            </td>
+        `;
+
+        tableBody.appendChild(mainRow);
+        tableBody.appendChild(accRow);
     });
 
     updatePaginationUI(totalPages);
 }
 
-function updatePaginationUI(totalPages) {
-    const paginationContainer = document.querySelector('.pagination');
-    if (!paginationContainer) return;
+window.switchInnerTab = (tabKey, groupId, event) => {
+    event.stopPropagation();
+    document.querySelectorAll('.inner-content-' + groupId).forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.inner-tab-' + groupId).forEach(el => {
+        el.style.color = '#64748b';
+        el.style.borderBottomColor = 'transparent';
+        el.style.fontWeight = '500';
+    });
 
-    if (totalPages <= 1) {
-        paginationContainer.style.display = 'none';
-        return;
-    }
+    document.getElementById('content-' + tabKey + '-' + groupId).style.display = 'block';
 
-    paginationContainer.style.display = 'flex';
-    
-    paginationContainer.innerHTML = `
-        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
-        <span class="page-number active">${currentPage}</span>
-        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
-    `;
-}
+    const activeTab = document.getElementById('tab-' + tabKey + '-' + groupId);
+    activeTab.style.color = 'var(--primary-color)';
+    activeTab.style.borderBottomColor = 'var(--primary-color)';
+    activeTab.style.fontWeight = '700';
+};
 
 window.changePage = (newPage) => {
     currentPage = newPage;
@@ -635,16 +547,15 @@ window.changePage = (newPage) => {
 };
 
 // Global functions for Modal
-window.openFileModal = (groupId) => {
-    const stringGroupId = String(groupId);
-    const normTab = normalizeType(currentTab);
+window.openFileModal = (groupId, defKey) => {
+    // Prevent event capturing if attached to row, but its attached to button so it's fine
+    if (window.event) window.event.stopPropagation();
 
-    // Attempt 1: Exact Match (ID + Current Tab)
-    let group = allData.find(g => String(g.id) === stringGroupId && normalizeType(g.type) === normTab);
-    if (!group) {
-        group = allData.find(g => String(g.id) === stringGroupId);
-    }
-    if (!group) return;
+    const stringGroupId = String(groupId);
+    let group = allData.find(g => String(g.id) === stringGroupId);
+    if (!group || !group.defenses[defKey]) return;
+
+    let selectedDefense = group.defenses[defKey];
 
     document.getElementById('modalGroupName').innerText = group.groupName;
     const fileList = document.getElementById('fileList');
@@ -674,9 +585,6 @@ window.openFileModal = (groupId) => {
         header.style.letterSpacing = '0.5px';
         header.style.marginBottom = '10px';
         section.appendChild(header);
-
-        // Get Group Data reference
-        const groupData = group;
 
         Object.entries(fileObj).forEach(([label, url]) => {
             const isRevised = label.endsWith('_revised');
@@ -790,19 +698,8 @@ window.openFileModal = (groupId) => {
             const user = userJson ? JSON.parse(userJson) : null;
             const userName = user ? (user.name || user.full_name || 'Instructor') : 'Instructor';
 
-            let currentStatusMap = {};
-            let currentRemarksMap = {};
-
-            if (categoryKey === 'titles') {
-                currentStatusMap = group.titleStatus || {};
-                currentRemarksMap = group.titleRemarks || {};
-            } else if (categoryKey === 'pre_oral') {
-                currentStatusMap = group.preOralStatus || {};
-                currentRemarksMap = group.preOralRemarks || {};
-            } else if (categoryKey === 'final') {
-                currentStatusMap = group.finalStatus || {};
-                currentRemarksMap = group.finalRemarks || {};
-            }
+            let currentStatusMap = selectedDefense.statuses || {};
+            let currentRemarksMap = selectedDefense.remarks || {};
 
             const fileStatuses = typeof currentStatusMap[label] === 'object' ? currentStatusMap[label] : {};
             const fileRemarks = typeof currentRemarksMap[label] === 'object' ? currentRemarksMap[label] : {};
@@ -855,12 +752,11 @@ window.openFileModal = (groupId) => {
             const canGrade = (currentRole === 'Panel' || (currentRole === 'All' && group.isPanelist));
 
             if (canGrade) {
-                const groupAdviserStatus = groupData.adviser_status || {};
+                const groupAdviserStatus = group.adviser_status || {};
                 let requiredKeys = [];
-                const norm = currentTab.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (norm.includes('title')) requiredKeys = ['title1', 'title2', 'title3'];
-                else if (norm.includes('preoral')) requiredKeys = ['ch1', 'ch2', 'ch3'];
-                else if (norm.includes('final')) requiredKeys = ['ch4', 'ch5'];
+                if (categoryKey === 'titles') requiredKeys = ['title1', 'title2', 'title3'];
+                else if (categoryKey === 'pre_oral') requiredKeys = ['ch1', 'ch2', 'ch3'];
+                else if (categoryKey === 'final') requiredKeys = ['ch4', 'ch5'];
 
                 const isSentToPanel = requiredKeys.length > 0 && requiredKeys.every(key => groupAdviserStatus[key] === 'Approved');
 
@@ -872,7 +768,7 @@ window.openFileModal = (groupId) => {
                         </div>
                     `;
                 } else {
-                interactiveControls = `
+                    interactiveControls = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">Your Status</span>
                     <div id="status-badge-${categoryKey}-${label}" style="font-size: 12px; font-weight: 700; color: ${statusColor}; background: ${statusBg}; padding: 4px 8px; border-radius: 99px; display: flex; align-items: center; gap: 4px;">
@@ -897,10 +793,9 @@ window.openFileModal = (groupId) => {
                 `;
                 }
             } else if (group.isAdviser) {
-                // Get Adviser Status for this specific FILE (granular)
-                const groupAdviserStatus = groupData.adviser_status || {};
+                const groupAdviserStatus = group.adviser_status || {};
                 const currentAdvStatus = groupAdviserStatus[label] || 'Pending';
-                const groupAdviserRemarks = groupData.adviser_remarks || {};
+                const groupAdviserRemarks = group.adviser_remarks || {};
                 const currentAdvRemarks = groupAdviserRemarks[label] || '';
 
                 interactiveControls = `
@@ -941,10 +836,8 @@ window.openFileModal = (groupId) => {
             // Other Panel Feedback
             let panelsToDisplay = [];
             if (currentRole === 'Adviser') {
-                // Hide Panel Evaluations from Adviser view as requested
                 panelsToDisplay = [];
             } else {
-                // If grading mode, filter self out. If viewing as third party (All but not panelist), show all
                 if (canGrade) {
                     panelsToDisplay = Object.keys(fileStatuses).filter(p => p !== userName);
                 } else {
@@ -978,12 +871,12 @@ window.openFileModal = (groupId) => {
         fileList.appendChild(section);
     };
 
-    if (normTab.includes('title')) {
-        createSection('Title Defense', group.files.titles, 'article', 'titles');
-    } else if (normTab.includes('preoral')) {
-        createSection('Pre-Oral Defense', group.files.pre_oral, 'description', 'pre_oral');
-    } else if (normTab.includes('final')) {
-        createSection('Final Defense', group.files.final, 'menu_book', 'final');
+    if (defKey === 'titledefense') {
+        createSection('Title Defense', selectedDefense.files, 'article', 'titles');
+    } else if (defKey === 'preoraldefense') {
+        createSection('Pre-Oral Defense', selectedDefense.files, 'description', 'pre_oral');
+    } else if (defKey === 'finaldefense') {
+        createSection('Final Defense', selectedDefense.files, 'menu_book', 'final');
     }
 
     // Reset Mobile View State
@@ -1349,48 +1242,48 @@ async function saveAnnotatedPDF(isAuto = false) {
         const fileName = `annotated_${targetGroupId}_${targetFileKey}_${cleanName}.pdf`;
 
         const { data: uploadData, error: uploadError } = await supabaseClient.storage
-             .from('project-submissions')
-             .upload(`submissions/annotations/${fileName}`, data, {
-                 contentType: 'application/pdf',
-                 upsert: true
-             });
+            .from('project-submissions')
+            .upload(`submissions/annotations/${fileName}`, data, {
+                contentType: 'application/pdf',
+                upsert: true
+            });
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabaseClient.storage
-             .from('project-submissions')
-             .getPublicUrl(`submissions/annotations/${fileName}`);
+            .from('project-submissions')
+            .getPublicUrl(`submissions/annotations/${fileName}`);
 
         const { error: dbError } = await supabaseClient
-             .from('capstone_annotations')
-             .upsert({
-                 group_id: targetGroupId,
-                 defense_type: normalizeType(targetTab),
-                 file_key: targetFileKey,
-                 user_name: userName,
-                 annotated_file_url: publicUrl,
-                 updated_at: new Date().toISOString()
-             }, { onConflict: 'group_id, defense_type, file_key, user_name' });
+            .from('capstone_annotations')
+            .upsert({
+                group_id: targetGroupId,
+                defense_type: normalizeType(targetTab),
+                file_key: targetFileKey,
+                user_name: userName,
+                annotated_file_url: publicUrl,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'group_id, defense_type, file_key, user_name' });
 
         if (dbError) throw dbError;
 
         if (allData && targetGroupId) {
-             const normTab = normalizeType(targetTab);
-             const groupEntry = allData.find(g => String(g.id) === String(targetGroupId) && g.normalizedType === normTab);
+            const normTab = normalizeType(targetTab);
+            const groupEntry = allData.find(g => String(g.id) === String(targetGroupId) && g.normalizedType === normTab);
 
-             if (groupEntry) {
-                 let annotKey = "";
-                 if (normTab.includes('title')) annotKey = "titleAnnotations";
-                 else if (normTab.includes('preoral')) annotKey = "preOralAnnotations";
-                 else if (normTab.includes('final')) annotKey = "finalAnnotations";
+            if (groupEntry) {
+                let annotKey = "";
+                if (normTab.includes('title')) annotKey = "titleAnnotations";
+                else if (normTab.includes('preoral')) annotKey = "preOralAnnotations";
+                else if (normTab.includes('final')) annotKey = "finalAnnotations";
 
-                 if (annotKey) {
-                     if (!groupEntry[annotKey]) groupEntry[annotKey] = {};
-                     if (!groupEntry[annotKey][targetFileKey]) groupEntry[annotKey][targetFileKey] = {};
-                     groupEntry[annotKey][targetFileKey][userName] = publicUrl;
-                 }
-             }
-         }
+                if (annotKey) {
+                    if (!groupEntry[annotKey]) groupEntry[annotKey] = {};
+                    if (!groupEntry[annotKey][targetFileKey]) groupEntry[annotKey][targetFileKey] = {};
+                    groupEntry[annotKey][targetFileKey][userName] = publicUrl;
+                }
+            }
+        }
 
         if (statusText) statusText.innerText = "Changes Auto-saved";
         if (statusIcon) {
@@ -1405,17 +1298,65 @@ async function saveAnnotatedPDF(isAuto = false) {
     }
 }
 
+let currentSectionFilter = 'ALL';
+
 window.filterTable = (program) => {
-    currentPage = 1;
     const btns = document.querySelectorAll('.filter-btn:not(.status-btn)');
+
+    // If clicking the currently active program, turn it off (reset to ALL)
     if (currentProgram === program) {
         currentProgram = 'ALL';
+        currentSectionFilter = 'ALL';
         btns.forEach(btn => btn.classList.remove('active'));
-    } else {
-        currentProgram = program;
-        btns.forEach(btn => btn.classList.toggle('active', btn.innerText === program));
+        currentPage = 1;
+        renderTable();
+        return;
     }
-    renderTable();
+
+    // Get unique sections for the selected program
+    const matchingGroups = allData.filter(g => g.program === program);
+    const sections = new Set();
+    matchingGroups.forEach(g => {
+        let secName = '';
+        if (g.yearLevel && g.section) {
+            secName = `${g.yearLevel}${g.section}`;
+        } else if (g.section) {
+            secName = g.section;
+        }
+        if (secName) sections.add(secName);
+    });
+
+    const sectionArr = Array.from(sections).sort();
+    let optionsHtml = `<option value="ALL">All Sections</option>`;
+    sectionArr.forEach(sec => {
+        optionsHtml += `<option value="${sec}">${sec}</option>`;
+    });
+
+    Swal.fire({
+        title: `Filter ${program}`,
+        html: `
+            <div style="text-align: left; margin-top: 15px;">
+                <label style="font-weight: 600; color: #475569; font-size: 14px; display: block; margin-bottom: 8px;">Select Section:</label>
+                <select id="sectionFilterSelect" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; font-size: 15px; font-family: 'Outfit';">
+                    ${optionsHtml}
+                </select>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Apply Filter',
+        confirmButtonColor: 'var(--primary-color)',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const chosenSection = document.getElementById('sectionFilterSelect').value;
+            currentProgram = program;
+            currentSectionFilter = chosenSection;
+
+            btns.forEach(btn => btn.classList.toggle('active', btn.innerText === program));
+            currentPage = 1;
+            renderTable();
+        }
+    });
 };
 
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
@@ -1426,13 +1367,13 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
 
 window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
     try {
-         // Show remarks box immediately if declining
-         const remarksBox = document.getElementById(`adviser-remarks-container-${groupId}-${fileKey}`);
-         if (newStatus === 'Declined' && remarksBox) {
-             remarksBox.style.display = 'block';
-         } else if (newStatus === 'Approved' && remarksBox) {
-             remarksBox.style.display = 'none';
-         }
+        // Show remarks box immediately if declining
+        const remarksBox = document.getElementById(`adviser-remarks-container-${groupId}-${fileKey}`);
+        if (newStatus === 'Declined' && remarksBox) {
+            remarksBox.style.display = 'block';
+        } else if (newStatus === 'Approved' && remarksBox) {
+            remarksBox.style.display = 'none';
+        }
 
         const group = allData.find(g => g.id == groupId);
         if (!group) return;
@@ -1441,7 +1382,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         const modalContent = document.getElementById('fileModalContent');
         const btnApprove = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Approved')"]`);
         const btnDecline = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Declined')"]`);
-        
+
         if (btnApprove) {
             btnApprove.disabled = true;
             if (newStatus === 'Approved') {
@@ -1465,7 +1406,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 
         const currentStatus = group.adviser_status || {};
         const currentRemarks = group.adviser_remarks || {};
-        
+
         const remarksValue = document.getElementById(`adviser-remarks-${groupId}-${fileKey}`)?.value.trim() || '';
 
         currentStatus[fileKey] = newStatus;
@@ -1514,7 +1455,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
             const toastType = newStatus === 'Approved' ? 'success' : 'error';
             window.showToast(`Status updated to ${newStatus}.`, toastType);
         }
-        
+
         // Refresh UI (only the background table, do NOT re-open modal to avoid resetting the PDF viewer)
         renderTable();
 
@@ -1530,7 +1471,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 window.saveAdviserRemarks = async (groupId, fileKey) => {
     const textarea = document.getElementById(`adviser-remarks-${groupId}-${fileKey}`);
     const btn = textarea ? textarea.nextElementSibling : null;
-    
+
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">hourglass_empty</span> Saving...';
@@ -1541,7 +1482,7 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
         if (!group) throw new Error("Group not found");
 
         const remarksValue = textarea?.value.trim() || '';
-        
+
         const currentRemarks = group.adviser_remarks || {};
         currentRemarks[fileKey] = remarksValue;
 
@@ -1587,7 +1528,7 @@ window.checkSendToPanelButton = (groupId, label) => {
     if (!btnContainer) return;
 
     const statuses = group.adviser_status || {};
-    
+
     // Check if the stage for this file is approved
     let isStageApproved = false;
     if (['title1', 'title2', 'title3'].includes(label)) {
@@ -1601,7 +1542,7 @@ window.checkSendToPanelButton = (groupId, label) => {
     if (isStageApproved) {
         btnContainer.style.display = 'block';
         const btn = btnContainer.querySelector('button');
-        
+
         if (statuses['SEND_TO_PANEL']) {
             btn.disabled = true;
             btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">check_circle</span> Sent to Panel';
@@ -1638,9 +1579,9 @@ window.sendToPanel = async (groupId, label) => {
             .eq('id', groupId);
 
         if (error) throw error;
-        
+
         group.adviser_status = currentStatus;
-        
+
         if (typeof window.showToast === 'function') {
             window.showToast('Group sent to panel successfully!', 'success');
         } else {

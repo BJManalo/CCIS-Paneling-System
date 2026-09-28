@@ -15,6 +15,11 @@
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="icon" type="image/jpeg" href="../../assets/images/ua_logo_official.png">
     <link rel="manifest" href="../../manifest.json">
+
+    <!-- PDF.js Configuration so we can hook into events -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>window.pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];</script>
+
     <style>
         .submission-card {
             background: white;
@@ -224,9 +229,12 @@
             </style>
 
             <div class="submission-tabs">
-                <button id="btn-titles" class="tab-btn active" onclick="switchSubmissionTab('titles', this)">Title Defense</button>
-                <button id="btn-preoral" class="tab-btn" onclick="switchSubmissionTab('preoral', this)">Pre-Oral</button>
-                <button id="btn-final" class="tab-btn" onclick="switchSubmissionTab('final', this)">Final Defense</button>
+                <button id="btn-titles" class="tab-btn active" onclick="switchSubmissionTab('titles', this)">Title
+                    Defense</button>
+                <button id="btn-preoral" class="tab-btn"
+                    onclick="switchSubmissionTab('preoral', this)">Pre-Oral</button>
+                <button id="btn-final" class="tab-btn" onclick="switchSubmissionTab('final', this)">Final
+                    Defense</button>
             </div>
 
             <style>
@@ -287,7 +295,8 @@
                         <div class="input-with-action">
                             <input type="text" id="titleLink1" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('fileTitle1').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('fileTitle1').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="fileTitle1" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'titleLink1')">
@@ -300,7 +309,8 @@
                         <div class="input-with-action">
                             <input type="text" id="titleLink1_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('fileTitle1_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button" onclick="document.getElementById('fileTitle1_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="fileTitle1_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'titleLink1_revised')">
@@ -320,7 +330,8 @@
                         <div class="input-with-action">
                             <input type="text" id="titleLink2" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('fileTitle2').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('fileTitle2').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="fileTitle2" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'titleLink2')">
@@ -333,7 +344,8 @@
                         <div class="input-with-action">
                             <input type="text" id="titleLink2_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('fileTitle2_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button" onclick="document.getElementById('fileTitle2_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="fileTitle2_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'titleLink2_revised')">
@@ -353,7 +365,8 @@
                         <div class="input-with-action">
                             <input type="text" id="titleLink3" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('fileTitle3').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('fileTitle3').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="fileTitle3" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'titleLink3')">
@@ -366,7 +379,8 @@
                         <div class="input-with-action">
                             <input type="text" id="titleLink3_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('fileTitle3_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button" onclick="document.getElementById('fileTitle3_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="fileTitle3_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'titleLink3_revised')">
@@ -385,11 +399,13 @@
                 </div>
                 <div id="preoral-content-1" class="sub-tab-content active">
                     <div class="form-group">
-                        <label for="preOralCh1" style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 1</label>
+                        <label for="preOralCh1"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 1</label>
                         <div class="input-with-action">
                             <input type="text" id="preOralCh1" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('filePreOral1').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('filePreOral1').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="filePreOral1" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'preOralCh1')">
@@ -402,7 +418,9 @@
                         <div class="input-with-action">
                             <input type="text" id="preOralCh1_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('filePreOral1_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button"
+                                onclick="document.getElementById('filePreOral1_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="filePreOral1_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'preOralCh1_revised')">
@@ -413,11 +431,13 @@
                 </div>
                 <div id="preoral-content-2" class="sub-tab-content">
                     <div class="form-group">
-                        <label for="preOralCh2" style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 2</label>
+                        <label for="preOralCh2"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 2</label>
                         <div class="input-with-action">
                             <input type="text" id="preOralCh2" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('filePreOral2').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('filePreOral2').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="filePreOral2" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'preOralCh2')">
@@ -430,7 +450,9 @@
                         <div class="input-with-action">
                             <input type="text" id="preOralCh2_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('filePreOral2_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button"
+                                onclick="document.getElementById('filePreOral2_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="filePreOral2_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'preOralCh2_revised')">
@@ -441,11 +463,13 @@
                 </div>
                 <div id="preoral-content-3" class="sub-tab-content">
                     <div class="form-group">
-                        <label for="preOralCh3" style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 3</label>
+                        <label for="preOralCh3"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 3</label>
                         <div class="input-with-action">
                             <input type="text" id="preOralCh3" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('filePreOral3').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('filePreOral3').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="filePreOral3" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'preOralCh3')">
@@ -458,7 +482,9 @@
                         <div class="input-with-action">
                             <input type="text" id="preOralCh3_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('filePreOral3_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button"
+                                onclick="document.getElementById('filePreOral3_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="filePreOral3_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'preOralCh3_revised')">
@@ -476,11 +502,13 @@
                 </div>
                 <div id="final-content-4" class="sub-tab-content active">
                     <div class="form-group">
-                        <label for="finalCh4" style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 4</label>
+                        <label for="finalCh4"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 4</label>
                         <div class="input-with-action">
                             <input type="text" id="finalCh4" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('fileFinal4').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('fileFinal4').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="fileFinal4" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'finalCh4')">
@@ -493,7 +521,8 @@
                         <div class="input-with-action">
                             <input type="text" id="finalCh4_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('fileFinal4_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button" onclick="document.getElementById('fileFinal4_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="fileFinal4_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'finalCh4_revised')">
@@ -504,11 +533,13 @@
                 </div>
                 <div id="final-content-5" class="sub-tab-content">
                     <div class="form-group">
-                        <label for="finalCh5" style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 5</label>
+                        <label for="finalCh5"
+                            style="display:block; margin-bottom:8px; font-weight:600; color:#64748b;">Chapter 5</label>
                         <div class="input-with-action">
                             <input type="text" id="finalCh5" placeholder="Click Upload Icon to Submit PDF" readonly
                                 style="cursor: default; background: #f1f5f9;">
-                            <button type="button" onclick="document.getElementById('fileFinal5').click()"><span class="material-icons-round">upload_file</span></button>
+                            <button type="button" onclick="document.getElementById('fileFinal5').click()"><span
+                                    class="material-icons-round">upload_file</span></button>
                         </div>
                         <input type="file" id="fileFinal5" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'finalCh5')">
@@ -521,7 +552,8 @@
                         <div class="input-with-action">
                             <input type="text" id="finalCh5_revised" placeholder="Upload revised PDF here" readonly
                                 style="border-color: #fcd34d; cursor: default; background: #fffdf5;">
-                            <button type="button" onclick="document.getElementById('fileFinal5_revised').click()"><span class="material-icons-round">history_edu</span></button>
+                            <button type="button" onclick="document.getElementById('fileFinal5_revised').click()"><span
+                                    class="material-icons-round">history_edu</span></button>
                         </div>
                         <input type="file" id="fileFinal5_revised" accept=".pdf" style="display: none;"
                             onchange="handleFileUpload(this, 'finalCh5_revised')">
@@ -544,10 +576,6 @@
         <a href="student_dashboard.html" class="nav-item active">
             <span class="material-icons-round">analytics</span>
             <span class="nav-label">Dashboard</span>
-        </a>
-        <a href="student_grades.html" class="nav-item">
-            <span class="material-icons-round">folder_open</span>
-            <span class="nav-label">Grades</span>
         </a>
         <a href="student_payments.html" class="nav-item">
             <span class="material-icons-round">monetization_on</span>
@@ -601,6 +629,31 @@
                             style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;">
                         </div>
                         <p>Loading preview...</p>
+                    </div>
+                </div>
+
+                <!-- Right Sidebar: Page Comments (Read Only) -->
+                <div class="comments-sidebar" id="commentsSidebar"
+                    style="display: none; width: 320px; min-width: 320px; background: white; border-left: 1px solid #e2e8f0; flex-direction: column;">
+                    <div
+                        style="padding: 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                        <h4
+                            style="margin: 0; display: flex; align-items: center; gap: 8px; color: #1e293b; font-size: 1rem;">
+                            <span class="material-icons-round" style="color: var(--primary-color);">forum</span>
+                            Page <span id="currentPageBadge"
+                                style="background: var(--primary-color); color: white; padding: 2px 8px; border-radius: 99px; font-size: 0.85rem; margin: 0 4px;">1</span>
+                            Comments
+                        </h4>
+                    </div>
+
+                    <div id="commentsList"
+                        style="flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; background: #fff;">
+                        <!-- Comments injected here -->
+                        <div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">
+                            <span class="material-icons-round"
+                                style="font-size: 32px; opacity: 0.5;">question_answer</span>
+                            <p>Loading comments...</p>
+                        </div>
                     </div>
                 </div>
             </div>

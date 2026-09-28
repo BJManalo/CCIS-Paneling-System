@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let { data: accountData, error: accountError } = await supabaseClient
                     .from('accounts')
                     .select('*')
-                    .or(`email.eq."${identifier}",name.eq."${identifier}"`)
+                    .or(`email.eq.${identifier},name.eq.${identifier}`)
                     .eq('password', password)
                     .maybeSingle(); // Use maybeSingle to avoid 406 error if not found
 
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let { data: groupData, error: groupError } = await supabaseClient
                     .from('student_groups')
                     .select('*')
-                    .or(`email.eq."${identifier}",group_name.eq."${identifier}"`)
+                    .or(`email.eq.${identifier},group_name.eq.${identifier}`)
                     .eq('password', password)
                     .maybeSingle();
 
@@ -169,7 +169,7 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         const isInPages = window.location.pathname.includes('/pages/');
         const swPath = isInPages ? '../../sw.js' : 'sw.js';
-        
+
         navigator.serviceWorker.register(swPath)
             .then(reg => {
                 console.log('PWA: Service Worker registered correctly.');
@@ -181,44 +181,11 @@ if ('serviceWorker' in navigator) {
 
 // 2. Catch the native 'beforeinstallprompt' event
 window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('PWA: beforeinstallprompt event fired.');
-    // Stash the event so it can be triggered later
+    console.log('PWA: beforeinstallprompt event fired. Suppressing auto-prompt.');
+    // Prevent the mini-info bar or automatic modal from appearing.
+    e.preventDefault();
+    // Stash the event (not strictly needed since we rely on URL bar install, but good practice)
     deferredPrompt = e;
-    
-    // Attempt to trigger if already on a dashboard
-    checkAndShowPrompt();
 });
 
-// 3. Helper to trigger prompt on Dashboards
-function checkAndShowPrompt() {
-    if (!deferredPrompt) return;
-
-    const isLoggedIn = localStorage.getItem('loginUser');
-    const isLoginPage = window.location.pathname.endsWith('index.html') || 
-                       window.location.pathname === '/' || 
-                       window.location.pathname.endsWith('BJManalo/') ||
-                       window.location.pathname.includes('/System/') ||
-                       window.location.pathname.endsWith('System');
-
-    if (isLoggedIn && !isLoginPage) {
-        console.log('PWA: Conditions met! Preparing prompt in 2 seconds...');
-        setTimeout(() => {
-            if (deferredPrompt) {
-                console.log('PWA: Triggering native "Install as App" dialog...');
-                deferredPrompt.prompt();
-                
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('PWA: User accepted installation');
-                    } else {
-                        console.log('PWA: User dismissed installation');
-                    }
-                    deferredPrompt = null;
-                });
-            }
-        }, 2000);
-    }
-}
-
-// 4. Run Check on every page load (in case event fired before script loaded or persisted)
-window.addEventListener('load', checkAndShowPrompt);
+// Automatic prompting is now disabled. Users will use the browser's native install icon (URL bar).

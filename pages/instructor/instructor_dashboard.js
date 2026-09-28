@@ -185,8 +185,8 @@ window.applyDashboardFilters = () => {
             original: g
         };
 
-        // Determine which title is approved
-        const approvedKey = Object.keys(tMap).find(k => (tMap[k] || '').includes('Approved') || (tMap[k] || '').includes('Completed'));
+        // Determine which title is fully approved (5/5 panels)
+        const approvedKey = Object.keys(tMap).find(k => tMap[k] === 'Approved' || tMap[k] === 'Completed');
         let projectTitleDisplay = g.group_name; // Default fallback
 
         // If we have an approved key, specifically fetch THAT title text
@@ -206,14 +206,16 @@ window.applyDashboardFilters = () => {
             let statusBadge = '<span class="status-badge pending">Pending</span>';
 
             // Check progression from Final -> Pre-Oral -> Title
-            const fStatus = Object.values(fMap).find(v => v === 'Completed' || v.includes('Approved') || v.includes('Revisions')) ||
+            const fStatus = Object.values(fMap).find(v => v === 'Completed') ||
+                Object.values(fMap).find(v => v === 'Approved' || v.includes('Revisions')) ||
                 Object.values(fMap).find(v => v === 'Redefend') || 'Pending';
 
-            const pStatus = Object.values(pMap).find(v => v.includes('Approved') || v.includes('Revisions')) ||
+            const pStatus = Object.values(pMap).find(v => v === 'Approved' || v.includes('Revisions')) ||
                 Object.values(pMap).find(v => v === 'Redefend') || 'Pending';
 
-            const tStatus = Object.values(tMap).find(v => v.includes('Approved') || v.includes('Revisions')) ||
-                Object.values(tMap).find(v => v === 'Redefend' || v === 'Rejected') || 'Pending';
+            const tStatus = Object.values(tMap).find(v => v === 'Approved' || v.includes('Revisions')) ||
+                Object.values(tMap).find(v => v === 'Redefend' || v === 'Rejected') ||
+                Object.values(tMap).find(v => v && v.startsWith('Pending Approval')) || 'Pending';
 
             if (tStatus === 'Rejected' || tStatus === 'Redefend' || pStatus === 'Redefend' || fStatus === 'Redefend') {
                 // Skip rejected titles in Dashboard tab as requested
@@ -222,12 +224,14 @@ window.applyDashboardFilters = () => {
 
             if (Object.values(fMap).some(v => v === 'Completed')) {
                 statusBadge = '<span class="status-badge approved">Completed</span>';
-            } else if (Object.values(fMap).some(v => v.includes('Approved') || v.includes('Revisions'))) {
+            } else if (Object.values(fMap).some(v => v === 'Approved' || v.includes('Revisions'))) {
                 statusBadge = '<span class="status-badge approved" style="background:#dcfce7; color:#166534;">Final Ongoing</span>';
-            } else if (pStatus.includes('Approved') || pStatus.includes('Revisions')) {
+            } else if (pStatus === 'Approved' || pStatus.includes('Revisions')) {
                 statusBadge = '<span class="status-badge approved" style="background:#e0f2fe; color:#0369a1;">Pre-Oral Passed</span>';
-            } else if (tStatus.includes('Approved') || tStatus.includes('Revisions')) {
+            } else if (tStatus === 'Approved' || tStatus.includes('Revisions')) {
                 statusBadge = '<span class="status-badge approved" style="background:#dbeafe; color:#2563eb;">Title Approved</span>';
+            } else if (tStatus && tStatus.startsWith('Pending Approval')) {
+                statusBadge = `<span class="status-badge" style="background:#fef9c3; color:#713f12;">${tStatus}</span>`;
             }
 
             displayRows.push({ ...baseObj, title: projectTitleDisplay, statusHtml: statusBadge });
@@ -338,10 +342,13 @@ function resolveStatusMap(groupId, defenseType) {
         // Priority: Redefend > Rejected > Approved with Revisions > Approved
         // Also normalize "Approve" (legacy) to "Approved"
 
+        const REQUIRED_PANEL_APPROVALS = 5;
+        const approvalCount = votes.filter(v => v && (v.includes('Approved') || v.includes('Approve') || v === 'Completed')).length;
         if (votes.some(v => v === 'Redefend')) resolved[fk] = 'Redefend';
         else if (votes.some(v => v === 'Rejected')) resolved[fk] = 'Rejected';
+        else if (approvalCount >= REQUIRED_PANEL_APPROVALS) resolved[fk] = 'Approved';
         else if (votes.some(v => v && v.includes('Revision'))) resolved[fk] = 'Approved with Revisions';
-        else if (votes.some(v => v && (v.includes('Approved') || v.includes('Approve') || v === 'Completed'))) resolved[fk] = 'Approved';
+        else if (approvalCount > 0) resolved[fk] = `Pending Approval (${approvalCount}/${REQUIRED_PANEL_APPROVALS})`;
         else resolved[fk] = 'Pending';
     });
 

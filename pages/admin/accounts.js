@@ -12,8 +12,24 @@ let filteredAccounts = [];
 let currentPage = 1;
 const rowsPerPage = 15;
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Login / Role Guard ---
+    const loginUser = JSON.parse(localStorage.getItem('loginUser'));
+    if (!loginUser || loginUser.role !== 'Admin') {
+        window.location.href = '../../';
+        return;
+    }
+
     loadAccounts();
     setupSearch();
+
+    // Close modals when clicking outside (moved here so DOM is guaranteed ready)
+    document.getElementById('addUserModal').addEventListener('click', (e) => {
+        if (e.target.id === 'addUserModal') closeAddUserModal();
+    });
+
+    document.getElementById('deleteConfirmModal').addEventListener('click', (e) => {
+        if (e.target.id === 'deleteConfirmModal') closeDeleteConfirmModal();
+    });
 });
 
 // --- Fetch Accounts from Supabase ---
@@ -269,18 +285,8 @@ async function confirmDeleteAccount() {
     }
 }
 
-// Close modals if clicked outside
-document.getElementById('addUserModal').addEventListener('click', (e) => {
-    if (e.target.id === 'addUserModal') {
-        closeAddUserModal();
-    }
-});
 
-document.getElementById('deleteConfirmModal').addEventListener('click', (e) => {
-    if (e.target.id === 'deleteConfirmModal') {
-        closeDeleteConfirmModal();
-    }
-});
+
 
 // --- Logout Function ---
 function logout() {
