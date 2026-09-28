@@ -288,27 +288,29 @@ async function loadSubmissionData() {
                     if (requiredApprovals === 0) requiredApprovals = 5;
 
                     let approvedCount = 0;
+                    let declinedCount = 0;
+                    let revisionCount = 0;
+
                     Object.keys(statusCounts).forEach(s => {
                         const sLower = s.toLowerCase();
                         if (sLower === 'approved' || sLower === 'completed') {
                             approvedCount += statusCounts[s];
+                        } else if (sLower.includes('revision')) {
+                            revisionCount += statusCounts[s];
+                        } else if (['declined', 'redefend', 'reject'].some(r => sLower.includes(r))) {
+                            declinedCount += statusCounts[s];
                         }
                     });
 
                     if (totalVotesCount > 0) {
                         if (approvedCount >= requiredApprovals) {
                             winnerStatus = "Approved";
+                        } else if (declinedCount >= requiredApprovals) {
+                            winnerStatus = "Declined";
+                        } else if (revisionCount >= requiredApprovals) {
+                            winnerStatus = "Approved with Revisions";
                         } else {
-                            const hasRejected = Object.keys(statusCounts).some(s => ['declined', 'redefend', 'reject'].some(r => s.toLowerCase().includes(r)));
-                            const hasRevisions = Object.keys(statusCounts).some(s => s.toLowerCase().includes('revision'));
-
-                            if (hasRejected) {
-                                winnerStatus = "Declined";
-                            } else if (hasRevisions) {
-                                winnerStatus = "Approved with Revisions";
-                            } else {
-                                winnerStatus = "Pending Panel Review"; // Waiting for the rest of the panelists
-                            }
+                            winnerStatus = "Pending Panel Review"; // Waiting for unanimous decision
                         }
                     }
 
