@@ -293,6 +293,7 @@ async function loadCapstoneData() {
                     isAdviser: isAdviser,
                     isPanelist: isPanelist,
                     projectTitle: group.project_title,
+                    adviser: group.adviser,
                     // Advisor Approval Data
                     adviserStatus: group.adviser_status || {},
                     adviserRemarks: group.adviser_remarks || {}
