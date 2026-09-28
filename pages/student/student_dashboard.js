@@ -83,6 +83,7 @@ async function loadSubmissionData() {
                 .eq('group_id', groupId);
 
             if (schedError) console.error('Error fetching schedules:', schedError);
+            window.groupSchedules = schedules || [];
 
             const normalize = (str) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const isScheduled = (type) => {
@@ -260,18 +261,9 @@ async function loadSubmissionData() {
                     ]));
                     const hasFeedback = panelNamesWithFeedback.length > 0;
 
-                    let mayLynnStatus = null;
-                    const normalizedTarget = "may lynn farren";
-
-                    Object.keys(panelStatuses).forEach(panelName => {
-                        if (panelName.toLowerCase().trim() === normalizedTarget) {
-                            mayLynnStatus = panelStatuses[panelName];
-                        }
-                    });
-
                     const isTitle = key.startsWith('title');
 
-                    // Determine winner status by majority vote
+                    // Determine strict approval (All assigned panelists must approve)
                     let winnerStatus = null;
                     const statusCounts = {};
                     let totalVotesCount = 0;
@@ -284,23 +276,40 @@ async function loadSubmissionData() {
                         }
                     });
 
-                    if (totalVotesCount > 0) {
-                        let maxCount = 0;
-                        Object.keys(statusCounts).forEach(s => {
-                            if (statusCounts[s] > maxCount) {
-                                maxCount = statusCounts[s];
-                                winnerStatus = s;
-                            } else if (statusCounts[s] === maxCount) {
-                                if (mayLynnStatus && mayLynnStatus === s) {
-                                    winnerStatus = s;
-                                }
-                            }
-                        });
-                        if (totalVotesCount === 1 && mayLynnStatus) {
-                            winnerStatus = mayLynnStatus;
+                    // Find exactly how many panelists are assigned for this defense type
+                    const tabName = isTitle ? 'Title Defense' : (['ch1', 'ch2', 'ch3'].includes(key) ? 'Pre-Oral Defense' : 'Final Defense');
+                    const normType = tabName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const sched = (window.groupSchedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === normType);
+
+                    let requiredApprovals = 5; // Default strict if no schedule is found
+                    if (sched) {
+                        requiredApprovals = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length;
+                    }
+                    if (requiredApprovals === 0) requiredApprovals = 5;
+
+                    let approvedCount = 0;
+                    Object.keys(statusCounts).forEach(s => {
+                        const sLower = s.toLowerCase();
+                        if (sLower === 'approved' || sLower === 'completed') {
+                            approvedCount += statusCounts[s];
                         }
-                    } else if (mayLynnStatus) {
-                        winnerStatus = mayLynnStatus;
+                    });
+
+                    if (totalVotesCount > 0) {
+                        if (approvedCount >= requiredApprovals) {
+                            winnerStatus = "Approved";
+                        } else {
+                            const hasRejected = Object.keys(statusCounts).some(s => ['declined', 'redefend', 'reject'].some(r => s.toLowerCase().includes(r)));
+                            const hasRevisions = Object.keys(statusCounts).some(s => s.toLowerCase().includes('revision'));
+
+                            if (hasRejected) {
+                                winnerStatus = "Declined";
+                            } else if (hasRevisions) {
+                                winnerStatus = "Approved with Revisions";
+                            } else {
+                                winnerStatus = "Pending Panel Review"; // Waiting for the rest of the panelists
+                            }
+                        }
                     }
 
                     if (subTabContent) {
