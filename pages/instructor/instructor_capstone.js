@@ -823,7 +823,6 @@ window.openFileModal = (groupId, defKey) => {
                                 <span class="material-icons-round" style="font-size: 16px;">save</span> Save
                             </button>
                         </div>
-                        </div>
                     </div>
                 `;
             } else {
