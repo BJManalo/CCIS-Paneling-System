@@ -864,15 +864,6 @@ window.openFileModal = (groupId) => {
                     <option value="Pending" ${myStatus === 'Pending' ? 'selected' : ''}>Change Your Status...</option>
                     ${optionsHtml}
                 </select>
-                <div style="margin-top: 5px;">
-                    <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 5px;">Your Remarks</div>
-                    <textarea id="remarks-${categoryKey}-${label}" placeholder="Add your feedback..." 
-                        style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 13px; min-height: 60px; resize: vertical;">${myRemarks.includes(':') ? myRemarks.split(':').slice(1).join(':').trim() : myRemarks}</textarea>
-                    <button onclick="saveRemarks(${group.id}, '${categoryKey}', '${label}')" 
-                        style="width: 100%; margin-top: 5px; background: ${myRemarks ? '#dcfce7' : 'var(--primary-light)'}; color: ${myRemarks ? '#166534' : 'var(--primary-color)'}; border: none; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                        ${myRemarks ? 'Update Remarks' : 'Save Remarks'}
-                    </button>
-                </div>
                 `;
                 }
             } else if (currentRole === 'Adviser' && group.isAdviser) {
