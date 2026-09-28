@@ -1852,10 +1852,22 @@ window.renderPageComments = async () => {
         const groupObj = allData.find(g => String(g.id) === String(currentViewerGroupId));
         const adviserName = groupObj ? groupObj.adviser : '';
 
+        const fuzzyNameMatch = (n1, n2) => {
+            const a = String(n1 || "").trim().toLowerCase();
+            const b = String(n2 || "").trim().toLowerCase();
+            if (!a || !b) return false;
+            if (a === b) return true;
+            if (a.includes(b) || b.includes(a)) return true;
+            return false;
+        };
+
         // Filter out the adviser's comments from Panel view, unless the viewing user IS the adviser
         const filteredData = data.filter(c => {
-            if (c.user_name === adviserName && currentUser !== adviserName) {
-                return false;
+            if (fuzzyNameMatch(c.user_name, adviserName)) {
+                // If the current logged-in panelist is NOT the adviser, completely hide it
+                if (!fuzzyNameMatch(currentUser, adviserName)) {
+                    return false;
+                }
             }
             return true;
         });
