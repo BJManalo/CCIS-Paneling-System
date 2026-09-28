@@ -906,10 +906,7 @@ window.openFileModal = (groupId) => {
                                 <span class="material-icons-round" style="font-size: 16px;">save</span> Save
                             </button>
                         </div>
-                        <div id="send-to-panel-container-${group.id}-${label}" style="margin-top: 10px; display: none;">
-                            <button onclick="sendToPanel(${group.id}, '${label}')" style="width: 100%; background: #6366f1; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;">Send to Panel</button>
                         </div>
-                        <script>setTimeout(() => checkSendToPanelButton(${group.id}, '${label}'), 100);</script>
                     </div>
                 `;
             } else {
@@ -928,6 +925,25 @@ window.openFileModal = (groupId) => {
             itemContainer.appendChild(controls);
             section.appendChild(itemContainer);
         });
+
+        if (currentRole === 'Adviser') {
+            const btnWrap = document.createElement('div');
+            btnWrap.style.marginTop = '15px';
+            btnWrap.id = `master-send-wrap-${categoryKey}-${group.id}`;
+            btnWrap.style.display = 'none'; // Hidden by default, shown if all approved
+
+            btnWrap.innerHTML = `
+                <button onclick="masterSendToPanel('${group.id}', '${categoryKey}')" 
+                    style="width: 100%; background: #6366f1; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
+                    <span class="material-icons-round" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">send</span>
+                    Send All to Panel
+                </button>
+            `;
+            section.appendChild(btnWrap);
+
+            // Initial check to show the master button
+            setTimeout(() => checkMasterSendBtn(group.id, categoryKey), 100);
+        }
 
         fileList.appendChild(section);
     };
@@ -1590,30 +1606,13 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         currentStatus[fileKey] = newStatus;
         currentRemarks[fileKey] = remarksValue;
 
-        // Auto Send to Panel Logic:
+        // Auto Send replaced by Master Button logic
         const checkStageApproved = (keys) => keys.every(k => currentStatus[k] === 'Approved');
-        let shouldAutoSend = false;
 
-        if (['title1', 'title2', 'title3'].includes(fileKey)) {
-            shouldAutoSend = checkStageApproved(['title1', 'title2', 'title3']);
-        } else if (['ch1', 'ch2', 'ch3'].includes(fileKey)) {
-            shouldAutoSend = checkStageApproved(['ch1', 'ch2', 'ch3']);
-        } else if (['ch4', 'ch5'].includes(fileKey)) {
-            shouldAutoSend = checkStageApproved(['ch4', 'ch5']);
-        }
-
-        if (shouldAutoSend) {
-            currentStatus['SEND_TO_PANEL'] = true;
-        } else {
-            // If the change leaves any current stage file unapproved, remove SEND_TO_PANEL
-            if (['title1', 'title2', 'title3'].includes(fileKey) && !checkStageApproved(['title1', 'title2', 'title3'])) {
-                delete currentStatus['SEND_TO_PANEL'];
-            } else if (['ch1', 'ch2', 'ch3'].includes(fileKey) && !checkStageApproved(['ch1', 'ch2', 'ch3'])) {
-                delete currentStatus['SEND_TO_PANEL'];
-            } else if (['ch4', 'ch5'].includes(fileKey) && !checkStageApproved(['ch4', 'ch5'])) {
-                delete currentStatus['SEND_TO_PANEL'];
-            }
-        }
+        let cKey = '';
+        if (['title1', 'title2', 'title3'].includes(fileKey)) cKey = 'titles';
+        else if (['ch1', 'ch2', 'ch3'].includes(fileKey)) cKey = 'pre_oral';
+        else if (['ch4', 'ch5'].includes(fileKey)) cKey = 'final';
 
         const { error } = await supabaseClient
             .from('student_groups')
@@ -1633,7 +1632,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 
         window.showToast(`Status updated to ${newStatus}.`, newStatus === 'Approved' ? 'success' : 'error');
         renderTable();
-        checkSendToPanelButton(groupId, fileKey);
+        if (cKey) checkMasterSendBtn(groupId, cKey);
 
     } catch (err) {
         console.error('Error updating status:', err);
@@ -1690,58 +1689,53 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
     }
 };
 
-window.checkSendToPanelButton = (groupId, label) => {
-    const localGroup = allData.find(g => String(g.id) === String(groupId));
-    if (!localGroup) return;
+window.checkMasterSendBtn = (groupId, cKey) => {
+    const group = allData.find(g => g.id == groupId);
+    if (!group) return;
 
-    const btnContainer = document.getElementById(`send-to-panel-container-${groupId}-${label}`);
-    if (!btnContainer) return;
+    const btnWrap = document.getElementById(`master-send-wrap-${cKey}-${groupId}`);
+    if (!btnWrap) return;
 
-    const statuses = localGroup.adviserStatus || {};
-
-    // Check if the stage for this file is approved
+    const statuses = group.adviserStatus || {};
     let isStageApproved = false;
-    if (['title1', 'title2', 'title3'].includes(label)) {
-        isStageApproved = ['title1', 'title2', 'title3'].every(k => statuses[k] === 'Approved');
-    } else if (['ch1', 'ch2', 'ch3'].includes(label)) {
-        isStageApproved = ['ch1', 'ch2', 'ch3'].every(k => statuses[k] === 'Approved');
-    } else if (['ch4', 'ch5'].includes(label)) {
-        isStageApproved = ['ch4', 'ch5'].every(k => statuses[k] === 'Approved');
-    }
+
+    if (cKey === 'titles') isStageApproved = ['title1', 'title2', 'title3'].every(k => statuses[k] === 'Approved');
+    else if (cKey === 'pre_oral') isStageApproved = ['ch1', 'ch2', 'ch3'].every(k => statuses[k] === 'Approved');
+    else if (cKey === 'final') isStageApproved = ['ch4', 'ch5'].every(k => statuses[k] === 'Approved');
 
     if (isStageApproved) {
-        btnContainer.style.display = 'block';
-        const btn = btnContainer.querySelector('button');
-
-        if (statuses['SEND_TO_PANEL']) {
+        btnWrap.style.display = 'block';
+        const btn = btnWrap.querySelector('button');
+        if (statuses['SEND_TO_PANEL_' + cKey.toUpperCase()]) {
             btn.disabled = true;
-            btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">check_circle</span> Sent to Panel';
+            btn.innerHTML = '<span class="material-icons-round" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">check_circle</span> Sent to Panel';
             btn.style.background = '#10b981';
             btn.style.cursor = 'default';
         } else {
             btn.disabled = false;
-            btn.innerHTML = 'Send to Panel';
+            btn.innerHTML = '<span class="material-icons-round" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">send</span> Send All to Panel';
             btn.style.background = '#6366f1';
             btn.style.cursor = 'pointer';
         }
     } else {
-        btnContainer.style.display = 'none';
+        btnWrap.style.display = 'none';
     }
 };
 
-window.sendToPanel = async (groupId, label) => {
+window.masterSendToPanel = async (groupId, cKey) => {
     try {
-        const localGroup = allData.find(g => String(g.id) === String(groupId));
-        if (!localGroup) return;
+        const group = allData.find(g => g.id == groupId);
+        if (!group) return;
 
-        const currentStatus = localGroup.adviserStatus || {};
-        currentStatus['SEND_TO_PANEL'] = true;
-
-        const btn = document.querySelector(`#send-to-panel-container-${groupId}-${label} button`);
-        if (btn) {
+        const btnWrap = document.getElementById(`master-send-wrap-${cKey}-${groupId}`);
+        if (btnWrap) {
+            const btn = btnWrap.querySelector('button');
             btn.disabled = true;
-            btn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">hourglass_empty</span> Sending...';
+            btn.innerHTML = '<span class="material-icons-round spin" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">sync</span> Sending...';
         }
+
+        const currentStatus = group.adviserStatus || {};
+        currentStatus['SEND_TO_PANEL_' + cKey.toUpperCase()] = true;
 
         const { error } = await supabaseClient
             .from('student_groups')
@@ -1749,25 +1743,19 @@ window.sendToPanel = async (groupId, label) => {
             .eq('id', groupId);
 
         if (error) throw error;
+        group.adviserStatus = currentStatus;
 
-        localGroup.adviserStatus = currentStatus;
+        if (typeof window.showToast === 'function') {
+            window.showToast('Group sent to panel successfully!', 'success');
+        } else alert('Group sent to panel successfully!');
 
-        window.showToast('Group sent to panel successfully!', 'success');
-
-        // Update all buttons for this group
-        if (['title1', 'title2', 'title3'].includes(label)) {
-            ['title1', 'title2', 'title3'].forEach(k => checkSendToPanelButton(groupId, k));
-        } else if (['ch1', 'ch2', 'ch3'].includes(label)) {
-            ['ch1', 'ch2', 'ch3'].forEach(k => checkSendToPanelButton(groupId, k));
-        } else if (['ch4', 'ch5'].includes(label)) {
-            ['ch4', 'ch5'].forEach(k => checkSendToPanelButton(groupId, k));
-        }
+        checkMasterSendBtn(groupId, cKey);
         renderTable();
 
     } catch (err) {
         console.error('Error sending to panel:', err);
-        showToast('Failed to send to panel: ' + err.message, 'error');
-        checkSendToPanelButton(groupId, label);
+        alert('Failed to send to panel: ' + err.message);
+        checkMasterSendBtn(groupId, cKey);
     }
 };
 
