@@ -377,14 +377,16 @@ function renderTable() {
         if (!typeMatch || !programMatch || !searchMatch || !roleMatch) return false;
 
         // Check if fully approved by adviser before showing to Panels
+        // Check if fully approved by adviser before showing to Panels
         if (currentRole === 'Panel' && g.isPanelist) {
             const advStat = g.adviserStatus || {};
-            let reqKeys = [];
-            if (normCurrentTab.includes('title')) reqKeys = ['title1', 'title2', 'title3'];
-            else if (normCurrentTab.includes('preoral')) reqKeys = ['ch1', 'ch2', 'ch3'];
-            else if (normCurrentTab.includes('final')) reqKeys = ['ch4', 'ch5'];
-            
-            const isApprovedByAdviser = reqKeys.length > 0 && reqKeys.every(k => advStat[k] === 'Approved');
+            let cKey = '';
+
+            if (normCurrentTab.includes('title')) cKey = 'TITLES';
+            else if (normCurrentTab.includes('preoral')) cKey = 'PRE_ORAL';
+            else if (normCurrentTab.includes('final')) cKey = 'FINAL';
+
+            const isApprovedByAdviser = cKey !== '' && advStat['SEND_TO_PANEL_' + cKey] === true;
             if (!isApprovedByAdviser) return false; // Hide from panel account completely
         }
 
@@ -832,13 +834,13 @@ window.openFileModal = (groupId) => {
 
             if (currentRole === 'Panel' && group.isPanelist) {
                 const adviserStatus = group.adviserStatus || {};
-                let requiredKeys = [];
                 const norm = currentTab.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (norm.includes('title')) requiredKeys = ['title1', 'title2', 'title3'];
-                else if (norm.includes('preoral')) requiredKeys = ['ch1', 'ch2', 'ch3'];
-                else if (norm.includes('final')) requiredKeys = ['ch4', 'ch5'];
+                let cKey = '';
+                if (norm.includes('title')) cKey = 'TITLES';
+                else if (norm.includes('preoral')) cKey = 'PRE_ORAL';
+                else if (norm.includes('final')) cKey = 'FINAL';
 
-                const isSentToPanel = requiredKeys.length > 0 && requiredKeys.every(key => adviserStatus[key] === 'Approved');
+                const isSentToPanel = cKey !== '' && adviserStatus['SEND_TO_PANEL_' + cKey] === true;
 
                 if (!isSentToPanel) {
                     interactiveControls = `
