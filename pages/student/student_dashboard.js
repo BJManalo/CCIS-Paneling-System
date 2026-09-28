@@ -470,14 +470,6 @@ function updateSaveButtonState(tabId) {
     if (tabId === 'titles') {
         ['title1', 'title2', 'title3'].forEach(key => {
             const panelStatuses = window.feedbackStatus && window.feedbackStatus['titles'] && window.feedbackStatus['titles'][key] ? window.feedbackStatus['titles'][key] : {};
-            let mayLynnStatus = null;
-            const normalizedTarget = "may lynn farren";
-            Object.keys(panelStatuses).forEach(panelName => {
-                if (panelName.toLowerCase().trim() === normalizedTarget) {
-                    mayLynnStatus = panelStatuses[panelName];
-                }
-            });
-
             let winnerStatus = null;
             const statusCounts = {};
             let totalVotesCount = 0;
@@ -489,23 +481,26 @@ function updateSaveButtonState(tabId) {
                 }
             });
 
+            const normType = 'titledefense';
+            const sched = (window.groupSchedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === normType);
+
+            let requiredApprovals = 5;
+            if (sched) requiredApprovals = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
+
+            let approvedCount = 0;
+            let declinedCount = 0;
+            let revisionCount = 0;
+            Object.keys(statusCounts).forEach(s => {
+                const sLower = s.toLowerCase();
+                if (sLower === 'approved' || sLower === 'completed') approvedCount += statusCounts[s];
+                else if (sLower.includes('revision')) revisionCount += statusCounts[s];
+                else if (['declined', 'redefend', 'reject'].some(r => sLower.includes(r))) declinedCount += statusCounts[s];
+            });
+
             if (totalVotesCount > 0) {
-                let maxCount = 0;
-                Object.keys(statusCounts).forEach(s => {
-                    if (statusCounts[s] > maxCount) {
-                        maxCount = statusCounts[s];
-                        winnerStatus = s;
-                    } else if (statusCounts[s] === maxCount) {
-                        if (mayLynnStatus && mayLynnStatus === s) {
-                            winnerStatus = s;
-                        }
-                    }
-                });
-                if (totalVotesCount === 1 && mayLynnStatus) {
-                    winnerStatus = mayLynnStatus;
-                }
-            } else if (mayLynnStatus) {
-                winnerStatus = mayLynnStatus;
+                if (approvedCount >= requiredApprovals) winnerStatus = "Approved";
+                else if (declinedCount >= requiredApprovals) winnerStatus = "Declined";
+                else if (revisionCount >= requiredApprovals) winnerStatus = "Approved with Revisions";
             }
 
             const isApproved = winnerStatus && (winnerStatus.toLowerCase().trim() === 'approved' || winnerStatus.toLowerCase().trim() === 'approve');
@@ -569,11 +564,6 @@ function updateSaveButtonState(tabId) {
         let currentWinnerStatus = null;
         if (window.feedbackStatus && window.feedbackStatus[tabId] && window.feedbackStatus[tabId][fieldKey]) {
             const fStat = window.feedbackStatus[tabId][fieldKey];
-            let mayLynnStatus = null;
-            Object.keys(fStat).forEach(panelName => {
-                if (panelName.toLowerCase().trim() === "may lynn farren") mayLynnStatus = fStat[panelName];
-            });
-
             const statusCounts = {};
             let totalVotesCount = 0;
             Object.keys(fStat).forEach(name => {
@@ -584,19 +574,25 @@ function updateSaveButtonState(tabId) {
                 }
             });
 
+            const tName = tabId === 'titles' ? 'Title Defense' : (tabId === 'preoral' ? 'Pre-Oral Defense' : 'Final Defense');
+            const nType = tName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const sched = (window.groupSchedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === nType);
+
+            let reqApps = 5;
+            if (sched) reqApps = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
+
+            let aCount = 0, dCount = 0, rCount = 0;
+            Object.keys(statusCounts).forEach(s => {
+                const sLower = s.toLowerCase();
+                if (sLower === 'approved' || sLower === 'completed') aCount += statusCounts[s];
+                else if (sLower.includes('revision')) rCount += statusCounts[s];
+                else if (['declined', 'redefend', 'reject'].some(r => sLower.includes(r))) dCount += statusCounts[s];
+            });
+
             if (totalVotesCount > 0) {
-                let maxCount = 0;
-                Object.keys(statusCounts).forEach(s => {
-                    if (statusCounts[s] > maxCount) {
-                        maxCount = statusCounts[s];
-                        currentWinnerStatus = s;
-                    } else if (statusCounts[s] === maxCount) {
-                        if (mayLynnStatus && mayLynnStatus === s) currentWinnerStatus = s;
-                    }
-                });
-                if (totalVotesCount === 1 && mayLynnStatus) currentWinnerStatus = mayLynnStatus;
-            } else if (mayLynnStatus) {
-                currentWinnerStatus = mayLynnStatus;
+                if (aCount >= reqApps) currentWinnerStatus = "Approved";
+                else if (dCount >= reqApps) currentWinnerStatus = "Declined";
+                else if (rCount >= reqApps) currentWinnerStatus = "Approved with Revisions";
             }
         }
 
@@ -729,14 +725,6 @@ function updateSaveButtonState(tabId) {
                 const fStat = window.feedbackStatus[tabId][fieldKey];
 
                 // Determine winner status by majority vote / May Lynn Farren
-                let mayLynnStatus = null;
-                const normalizedTarget = "may lynn farren";
-                Object.keys(fStat).forEach(panelName => {
-                    if (panelName.toLowerCase().trim() === normalizedTarget) {
-                        mayLynnStatus = fStat[panelName];
-                    }
-                });
-
                 let winnerStatus = null;
                 const statusCounts = {};
                 let totalVotesCount = 0;
@@ -748,23 +736,25 @@ function updateSaveButtonState(tabId) {
                     }
                 });
 
+                const tName = tabId === 'titles' ? 'Title Defense' : (tabId === 'preoral' ? 'Pre-Oral Defense' : 'Final Defense');
+                const nType = tName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const sched = (window.groupSchedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === nType);
+
+                let reqApps = 5;
+                if (sched) reqApps = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
+
+                let aCount = 0, dCount = 0, rCount = 0;
+                Object.keys(statusCounts).forEach(s => {
+                    const sLower = s.toLowerCase();
+                    if (sLower === 'approved' || sLower === 'completed') aCount += statusCounts[s];
+                    else if (sLower.includes('revision')) rCount += statusCounts[s];
+                    else if (['declined', 'redefend', 'reject'].some(r => sLower.includes(r))) dCount += statusCounts[s];
+                });
+
                 if (totalVotesCount > 0) {
-                    let maxCount = 0;
-                    Object.keys(statusCounts).forEach(s => {
-                        if (statusCounts[s] > maxCount) {
-                            maxCount = statusCounts[s];
-                            winnerStatus = s;
-                        } else if (statusCounts[s] === maxCount) {
-                            if (mayLynnStatus && mayLynnStatus === s) {
-                                winnerStatus = s;
-                            }
-                        }
-                    });
-                    if (totalVotesCount === 1 && mayLynnStatus) {
-                        winnerStatus = mayLynnStatus;
-                    }
-                } else if (mayLynnStatus) {
-                    winnerStatus = mayLynnStatus;
+                    if (aCount >= reqApps) winnerStatus = "Approved";
+                    else if (dCount >= reqApps) winnerStatus = "Declined";
+                    else if (rCount >= reqApps) winnerStatus = "Approved with Revisions";
                 }
 
                 isWinnerApproved = winnerStatus && (winnerStatus.toLowerCase().trim() === 'approved' || winnerStatus.toLowerCase().trim() === 'approve');
