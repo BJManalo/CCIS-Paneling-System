@@ -1845,15 +1845,34 @@ window.renderPageComments = async () => {
             return;
         }
 
-        let html = '';
         const userJson = localStorage.getItem('loginUser');
         const currentUser = userJson ? JSON.parse(userJson).name || JSON.parse(userJson).full_name : '';
 
-        data.forEach(c => {
+        const groupObj = allData.find(g => String(g.id) === String(currentViewerGroupId));
+        const adviserName = groupObj ? groupObj.adviser : '';
+
+        // Filter out the adviser's comments from Panel view, unless the viewing user IS the adviser
+        const filteredData = data.filter(c => {
+            if (c.user_name === adviserName && currentUser !== adviserName) {
+                return false;
+            }
+            return true;
+        });
+
+        if (filteredData.length === 0) {
+            list.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 20px;">
+                <span class="material-icons-round" style="font-size: 32px; opacity: 0.5;">forum</span>
+                <p>No comments for Page ${currentViewerPage} yet.</p>
+            </div>`;
+            return;
+        }
+
+        let html = '';
+        filteredData.forEach(c => {
             const isMine = c.user_name === currentUser;
             const dateStr = new Date(c.created_at).toLocaleDateString() + ' ' + new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             html += `
-                <div style="background: ${isMine ? '#eff6ff' : '#f1f5f9'}; padding: 12px; border-radius: 8px; border-left: 3px solid ${isMine ? 'var(--primary-color)' : '#94a3b8'};">
+                <div style="background: ${isMine ? '#eff6ff' : '#f1f5f9'}; padding: 12px; border-radius: 8px; border-left: 3px solid ${isMine ? 'var(--primary-color)' : '#94a3b8'}; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                         <span style="font-weight: 700; font-size: 0.8rem; color: #334155;">${c.user_name}</span>
                         <span style="font-size: 0.7rem; color: #94a3b8;">${dateStr}</span>
