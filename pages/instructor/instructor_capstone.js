@@ -1548,10 +1548,34 @@ window.checkMasterSendBtn = (groupId, cKey) => {
     let fileObj = group.defenses && group.defenses[defKey] ? group.defenses[defKey].files : null;
     if (!fileObj) fileObj = {};
 
-    const requiredKeys = Object.keys(fileObj).filter(k => {
-        if (k.endsWith('_revised')) return false;
-        const val = fileObj[k];
-        if (!val || String(val).trim().toLowerCase() === 'null') return false;
+    let projectTitles = {};
+    if (cKey === 'titles' && group.projectTitle) {
+        if (typeof group.projectTitle === 'object') {
+            projectTitles = group.projectTitle;
+        } else {
+            try {
+                projectTitles = typeof group.projectTitle === 'string' && group.projectTitle.trim().startsWith('{')
+                    ? JSON.parse(group.projectTitle)
+                    : { title1: group.projectTitle };
+            } catch (e) {
+                projectTitles = { title1: group.projectTitle };
+            }
+        }
+    }
+
+    const requiredKeys = Object.keys(fileObj).filter(label => {
+        if (label.endsWith('_revised')) return false;
+        const val = fileObj[label];
+
+        let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        if (cKey === 'titles' && projectTitles[label]) {
+            displayLabel = projectTitles[label];
+        }
+
+        const cleanUrl = val ? String(val).trim() : "";
+        const isNull = !cleanUrl || cleanUrl.toLowerCase() === "null" || (displayLabel && displayLabel.toLowerCase() === "null");
+
+        if (isNull) return false;
         return true;
     });
 
