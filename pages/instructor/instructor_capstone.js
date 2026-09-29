@@ -780,12 +780,13 @@ window.openFileModal = (groupId, defKey) => {
 
             if (canGrade) {
                 const groupAdviserStatus = group.adviser_status || {};
-                let requiredKeys = [];
-                if (categoryKey === 'titles') requiredKeys = ['title1', 'title2', 'title3'];
-                else if (categoryKey === 'pre_oral') requiredKeys = ['ch1', 'ch2', 'ch3'];
-                else if (categoryKey === 'final') requiredKeys = ['ch4', 'ch5'];
 
-                const isSentToPanel = requiredKeys.length > 0 && requiredKeys.every(key => groupAdviserStatus[key] === 'Approved');
+                let sendKey = '';
+                if (categoryKey === 'titles') sendKey = 'SEND_TO_PANEL_TITLES';
+                else if (categoryKey === 'pre_oral') sendKey = 'SEND_TO_PANEL_PRE_ORAL';
+                else if (categoryKey === 'final') sendKey = 'SEND_TO_PANEL_FINAL';
+
+                const isSentToPanel = groupAdviserStatus[sendKey] === true;
 
                 if (currentRole === 'Panel' && !isSentToPanel) {
                     interactiveControls = `
@@ -1544,9 +1545,24 @@ window.checkMasterSendBtn = (groupId, cKey) => {
     const statuses = group.adviser_status || {};
     let isStageApproved = false;
 
-    if (cKey === 'titles') isStageApproved = ['title1', 'title2', 'title3'].every(k => statuses[k] === 'Approved');
-    else if (cKey === 'pre_oral') isStageApproved = ['ch1', 'ch2', 'ch3'].every(k => statuses[k] === 'Approved');
-    else if (cKey === 'final') isStageApproved = ['ch4', 'ch5'].every(k => statuses[k] === 'Approved');
+    let defKey = '';
+    if (cKey === 'titles') defKey = 'titledefense';
+    else if (cKey === 'pre_oral') defKey = 'preoraldefense';
+    else if (cKey === 'final') defKey = 'finaldefense';
+
+    let fileObj = group.defenses && group.defenses[defKey] ? group.defenses[defKey].files : null;
+    if (!fileObj) fileObj = {};
+
+    const requiredKeys = Object.keys(fileObj).filter(k => {
+        if (k.endsWith('_revised')) return false;
+        const val = fileObj[k];
+        if (!val || String(val).trim().toLowerCase() === 'null') return false;
+        return true;
+    });
+
+    if (requiredKeys.length > 0) {
+        isStageApproved = requiredKeys.every(k => statuses[k] === 'Approved');
+    }
 
     if (isStageApproved) {
         btnWrap.style.display = 'block';

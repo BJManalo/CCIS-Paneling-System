@@ -415,17 +415,11 @@ function updateGroupDropdown() {
 
         let missingAdviser = false;
         if (isTitle) {
-            const hasLegacy = adviserStatus['title'] === 'Approved';
-            const hasAllGranular = adviserStatus['title1'] === 'Approved' && adviserStatus['title2'] === 'Approved' && adviserStatus['title3'] === 'Approved';
-            if (!hasLegacy && !hasAllGranular) missingAdviser = true;
+            if (adviserStatus['title'] !== 'Approved' && adviserStatus['SEND_TO_PANEL_TITLES'] !== true) missingAdviser = true;
         } else if (isPreOral) {
-            const hasLegacy = adviserStatus['preoral'] === 'Approved';
-            const hasAllGranular = adviserStatus['ch1'] === 'Approved' && adviserStatus['ch2'] === 'Approved' && adviserStatus['ch3'] === 'Approved';
-            if (!hasLegacy && !hasAllGranular) missingAdviser = true;
+            if (adviserStatus['preoral'] !== 'Approved' && adviserStatus['SEND_TO_PANEL_PRE_ORAL'] !== true) missingAdviser = true;
         } else if (isFinal) {
-            const hasLegacy = adviserStatus['final'] === 'Approved';
-            const hasAllGranular = adviserStatus['ch4'] === 'Approved' && adviserStatus['ch5'] === 'Approved';
-            if (!hasLegacy && !hasAllGranular) missingAdviser = true;
+            if (adviserStatus['final'] !== 'Approved' && adviserStatus['SEND_TO_PANEL_FINAL'] !== true) missingAdviser = true;
         }
 
         const option = document.createElement('option');
@@ -723,16 +717,15 @@ async function saveSchedule(e) {
     }
 
     const adviserStatus = groupData.adviser_status || {};
-    let requiredKeys = [];
     const norm = scheduleData.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (norm.includes('title')) requiredKeys = ['title1', 'title2', 'title3'];
-    else if (norm.includes('preoral')) requiredKeys = ['ch1', 'ch2', 'ch3'];
-    else if (norm.includes('final')) requiredKeys = ['ch4', 'ch5'];
+    let isApproved = false;
 
-    const isApproved = requiredKeys.length > 0 && requiredKeys.every(key => adviserStatus[key] === 'Approved');
+    if (norm.includes('title')) isApproved = adviserStatus['title'] === 'Approved' || adviserStatus['SEND_TO_PANEL_TITLES'] === true;
+    else if (norm.includes('preoral')) isApproved = adviserStatus['preoral'] === 'Approved' || adviserStatus['SEND_TO_PANEL_PRE_ORAL'] === true;
+    else if (norm.includes('final')) isApproved = adviserStatus['final'] === 'Approved' || adviserStatus['SEND_TO_PANEL_FINAL'] === true;
 
     if (!isApproved) {
-        showToast(`Cannot schedule: All ${requiredKeys.length} required documents must be Approved by the Adviser first.`);
+        showToast(`Cannot schedule: Adviser must Send All to Panel first.`);
         return;
     }
 
