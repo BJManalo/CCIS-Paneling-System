@@ -219,11 +219,18 @@ async function loadCapstoneData() {
                     const nB = String(nameB || "").trim().toLowerCase();
                     if (!nA || !nB) return false;
                     if (nA === nB) return true;
-                    if (nA.includes(nB) || nB.includes(nA)) return true;
-                    const wA = nA.split(/\s+/).filter(w => w);
+
+                    if (nA.includes(`(creator: ${nB})`) || nA.includes(`(creator:${nB})`)) return true;
+
+                    const cleanA = nA.replace(/\(creator:.*?\)/g, '').trim();
+                    if (cleanA === nB) return true;
+
+                    const wA = cleanA.split(/\s+/).filter(w => w);
                     const wB = nB.split(/\s+/).filter(w => w);
-                    if (wA.length <= wB.length && wA.length > 0) return wA.every(word => wB.includes(word));
-                    if (wB.length > 0) return wB.every(word => wA.includes(word));
+                    if (wA.length > 0 && wA.length === wB.length) {
+                        if (wA.every(word => wB.includes(word))) return true;
+                    }
+
                     return false;
                 };
 
