@@ -332,6 +332,13 @@ async function fetchGroupsForDropdown() {
         if (paymentsError) throw paymentsError;
         window.allPaymentsGlobal = payments; // Store globally for filtering
 
+        // Fetch evaluations natively too
+        const { data: evaluations, error: evalError } = await supabaseClient
+            .from('individual_evaluations')
+            .select('schedule_id, panelist_name');
+
+        window.allEvaluationsGlobal = evaluations || [];
+
         // 4. Update the dropdown based on current state
         updateGroupDropdown();
 
@@ -393,18 +400,32 @@ function updateGroupDropdown() {
             }
         }
 
-        // Rule 3: Prerequisite Grade Check
-        const checkGraded = (requiredType) => {
-            return group.members.some(m =>
-                m.grades && m.grades.some(g => normalize(g.grade_type) === normalize(requiredType) && g.grade !== null)
-            );
+        // Rule 3: Prerequisite Evaluation Check
+        const checkEvaluated = (requiredType) => {
+            const reqNorm = normalize(requiredType);
+            const prevSched = allSchedules.find(s => s.group_id == group.id && normalize(s.schedule_type) === reqNorm);
+            if (!prevSched) return false;
+
+            // Gather all assigned panels
+            const panels = [prevSched.panel1, prevSched.panel2, prevSched.panel3, prevSched.panel4, prevSched.panel5].filter(p => !!p);
+            if (panels.length === 0) return false;
+
+            // Check if all assigned panels have an entry in individual_evaluations for this sched ID
+            // Using fuzzy matching for panel names just in case of formatting differences
+            const submittedPanelsStr = (window.allEvaluationsGlobal || [])
+                .filter(ev => ev.schedule_id == prevSched.id)
+                .map(ev => normalize(ev.panelist_name))
+                .join(',');
+
+            // True if every normalized panel name string is found inside the submitted strings
+            return panels.every(p => submittedPanelsStr.includes(normalize(p)));
         };
 
         let missingPrereq = false;
         if (normalize(targetType).includes('preoral')) {
-            if (!checkGraded('Title Defense')) missingPrereq = true;
+            if (!checkEvaluated('Title Defense')) missingPrereq = true;
         } else if (normalize(targetType).includes('final')) {
-            if (!checkGraded('Pre-Oral Defense') && !checkGraded('Pre Oral Defense')) missingPrereq = true;
+            if (!checkEvaluated('Pre-Oral Defense') && !checkEvaluated('Pre Oral Defense')) missingPrereq = true;
         }
 
         const option = document.createElement('option');
@@ -413,7 +434,7 @@ function updateGroupDropdown() {
         // If not editing, and there are unmet strictly enforced rules:
         if (!isEditingThis && missingPrereq) {
             let reasons = [];
-            if (missingPrereq) reasons.push("Missing Previous Grade");
+            if (missingPrereq) reasons.push("Panel Evaluation Pending");
 
             option.textContent = `${group.group_name} (${reasons.join(' & ')})`;
             option.disabled = true;
