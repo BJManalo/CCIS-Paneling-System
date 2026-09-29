@@ -824,11 +824,11 @@ window.openFileModal = (groupId, defKey) => {
                             Adviser Approval
                         </div>
                         <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                            <button onclick="updateAdviserStatus(${group.id}, '${label}', 'Approved')" 
+                            <button onclick="updateAdviserStatus(${group.id}, '${label}', 'Approved', '${categoryKey}')" 
                                 style="flex: 1; background: ${currentAdvStatus === 'Approved' ? '#059669' : 'white'}; color: ${currentAdvStatus === 'Approved' ? 'white' : '#059669'}; border: 1px solid #059669; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
                                 <span class="material-icons-round" style="font-size: 16px;">check_circle</span> Approve
                             </button>
-                            <button onclick="updateAdviserStatus(${group.id}, '${label}', 'Declined')" 
+                            <button onclick="updateAdviserStatus(${group.id}, '${label}', 'Declined', '${categoryKey}')" 
                                 style="flex: 1; background: ${currentAdvStatus === 'Declined' ? '#dc2626' : 'white'}; color: ${currentAdvStatus === 'Declined' ? 'white' : '#dc2626'}; border: 1px solid #dc2626; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
                                 <span class="material-icons-round" style="font-size: 16px;">cancel</span> Decline
                             </button>
@@ -1399,7 +1399,7 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
     renderTable();
 });
 
-window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
+window.updateAdviserStatus = async (groupId, fileKey, newStatus, categoryKey) => {
     try {
         // Show remarks box immediately if declining
         const remarksBox = document.getElementById(`adviser-remarks-container-${groupId}-${fileKey}`);
@@ -1414,8 +1414,8 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
 
         // Use more specific selector by finding the button within the modal
         const modalContent = document.getElementById('fileModalContent');
-        const btnApprove = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Approved')"]`);
-        const btnDecline = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Declined')"]`);
+        const btnApprove = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Approved', '${categoryKey}')"]`);
+        const btnDecline = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Declined', '${categoryKey}')"]`);
 
         if (btnApprove) {
             btnApprove.disabled = true;
@@ -1447,12 +1447,7 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus) => {
         currentRemarks[fileKey] = remarksValue;
 
         // Auto Send replaced by Master Button logic
-        const checkStageApproved = (keys) => keys.every(k => currentStatus[k] === 'Approved');
-
-        let cKey = '';
-        if (['title1', 'title2', 'title3'].includes(fileKey)) cKey = 'titles';
-        else if (['ch1', 'ch2', 'ch3'].includes(fileKey)) cKey = 'pre_oral';
-        else if (['ch4', 'ch5'].includes(fileKey)) cKey = 'final';
+        const cKey = categoryKey;
 
         const { error } = await supabaseClient
             .from('student_groups')

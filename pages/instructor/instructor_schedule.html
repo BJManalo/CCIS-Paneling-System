@@ -96,7 +96,8 @@
                     <span class="material-icons-round">inventory_2</span>
                 </a>
             </div>
-            <div style="display: flex; gap: 15px; flex: 1; max-width: 700px; align-items: center; justify-content: flex-end;">
+            <div
+                style="display: flex; gap: 15px; flex: 1; max-width: 700px; align-items: center; justify-content: flex-end;">
                 <div class="custom-select-wrapper" style="width: 200px; position: relative;">
                     <select id="phaseFilter"
                         style="padding: 10px 15px; border-radius: 10px; border: 1px solid #e2e8f0; width: 100%; font-family: inherit; color: #475569; outline: none; appearance: none; background: #f8fafc; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
@@ -286,7 +287,7 @@
         </div>
     </div>
 
-    
+
     <!-- Details Modal -->
     <div id="detailsModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 550px;">
@@ -295,36 +296,45 @@
                     <h2 id="viewGroupHeader" style="margin: 0; color: var(--primary-dark);">Group Name</h2>
                     <span id="viewTypeBadge" class="type-badge">Defense Type</span>
                 </div>
-                <button onclick="closeDetailsModal()" style="background: none; border: none; cursor: pointer; color: #94a3b8;">
+                <button onclick="closeDetailsModal()"
+                    style="background: none; border: none; cursor: pointer; color: #94a3b8;">
                     <span class="material-icons-round">close</span>
                 </button>
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px;">
                 <div>
-                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Date & Time</label>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Date
+                        & Time</label>
                     <div id="viewDateTime" style="font-weight: 600; color: #1e293b;">-</div>
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Venue</label>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Venue</label>
                     <div id="viewVenue" style="font-weight: 600; color: #1e293b;">-</div>
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Program</label>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Program</label>
                     <div id="viewProgram" style="font-weight: 600; color: #1e293b;">-</div>
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Adviser</label>
+                    <label
+                        style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">Adviser</label>
                     <div id="viewAdviser" style="font-weight: 600; color: #1e293b;">-</div>
                 </div>
             </div>
             <div style="margin-bottom: 25px;">
-                <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px;">Panel Members</label>
+                <label
+                    style="display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px;">Panel
+                    Members</label>
                 <div id="viewPanels" class="chips-container" style="gap: 8px;">
                     <!-- Panels -->
                 </div>
             </div>
             <div class="modal-actions" style="justify-content: flex-end;">
-                <button onclick="closeDetailsModal()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; padding: 12px 30px; border-radius: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(239,68,68,0.3);">Close</button>
+                <button onclick="closeDetailsModal()"
+                    style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; padding: 12px 30px; border-radius: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(239,68,68,0.3);">Close</button>
             </div>
         </div>
     </div>
@@ -357,7 +367,7 @@
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="instructor_schedule.js"></script>
+    <script src="instructor_schedule.js?v=2"></script>
 </body>
 
 </html>
