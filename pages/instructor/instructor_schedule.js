@@ -407,6 +407,9 @@ function updateGroupDropdown() {
             if (!checkGraded('Pre-Oral Defense') && !checkGraded('Pre Oral Defense')) missingPrereq = true;
         }
 
+        const option = document.createElement('option');
+        option.value = group.id;
+
         // If not editing, and there are unmet strictly enforced rules:
         if (!isEditingThis && missingPrereq) {
             let reasons = [];
