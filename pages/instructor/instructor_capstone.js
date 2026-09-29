@@ -1540,6 +1540,17 @@ window.checkMasterSendBtn = (groupId, cKey) => {
     const statuses = group.adviser_status || {};
     let isStageApproved = false;
 
+    // Foolproof DOM Check: Find all Approve buttons in this section inside the modal
+    const sectionHeaders = {
+        'titles': 'TITLE DEFENSE',
+        'pre_oral': 'PRE-ORAL DEFENSE',
+        'final': 'FINAL DEFENSE'
+    };
+
+    // Determine how many files are visually rendered in the modal
+    let expectedApprovals = 0;
+    let actualApprovals = 0;
+
     let defKey = '';
     if (cKey === 'titles') defKey = 'titledefense';
     else if (cKey === 'pre_oral') defKey = 'preoraldefense';
@@ -1548,39 +1559,21 @@ window.checkMasterSendBtn = (groupId, cKey) => {
     let fileObj = group.defenses && group.defenses[defKey] ? group.defenses[defKey].files : null;
     if (!fileObj) fileObj = {};
 
-    let projectTitles = {};
-    if (cKey === 'titles' && group.projectTitle) {
-        if (typeof group.projectTitle === 'object') {
-            projectTitles = group.projectTitle;
-        } else {
-            try {
-                projectTitles = typeof group.projectTitle === 'string' && group.projectTitle.trim().startsWith('{')
-                    ? JSON.parse(group.projectTitle)
-                    : { title1: group.projectTitle };
-            } catch (e) {
-                projectTitles = { title1: group.projectTitle };
+    Object.keys(fileObj).forEach(label => {
+        if (!label.endsWith('_revised')) {
+            // Check if the DOM rendered an adviser remarks container for this label
+            const remarksBox = document.getElementById(`adviser-remarks-container-${groupId}-${label}`);
+            if (remarksBox) {
+                expectedApprovals++;
+                if (statuses[label] === 'Approved') {
+                    actualApprovals++;
+                }
             }
         }
-    }
-
-    const requiredKeys = Object.keys(fileObj).filter(label => {
-        if (label.endsWith('_revised')) return false;
-        const val = fileObj[label];
-
-        let displayLabel = label.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        if (cKey === 'titles' && projectTitles[label]) {
-            displayLabel = projectTitles[label];
-        }
-
-        const cleanUrl = val ? String(val).trim() : "";
-        const isNull = !cleanUrl || cleanUrl.toLowerCase() === "null" || (displayLabel && displayLabel.toLowerCase() === "null");
-
-        if (isNull) return false;
-        return true;
     });
 
-    if (requiredKeys.length > 0) {
-        isStageApproved = requiredKeys.every(k => statuses[k] === 'Approved');
+    if (expectedApprovals > 0 && actualApprovals === expectedApprovals) {
+        isStageApproved = true;
     }
 
     if (isStageApproved) {
