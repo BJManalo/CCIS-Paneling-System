@@ -407,29 +407,10 @@ function updateGroupDropdown() {
             if (!checkGraded('Pre-Oral Defense') && !checkGraded('Pre Oral Defense')) missingPrereq = true;
         }
 
-        // Rule 4: Adviser Approval Check
-        const adviserStatus = group.adviser_status || {};
-        const isTitle = normalize(targetType).includes('title');
-        const isPreOral = normalize(targetType).includes('preoral');
-        const isFinal = normalize(targetType).includes('final');
-
-        let missingAdviser = false;
-        if (isTitle) {
-            if (adviserStatus['title'] !== 'Approved' && adviserStatus['SEND_TO_PANEL_TITLES'] !== true) missingAdviser = true;
-        } else if (isPreOral) {
-            if (adviserStatus['preoral'] !== 'Approved' && adviserStatus['SEND_TO_PANEL_PRE_ORAL'] !== true) missingAdviser = true;
-        } else if (isFinal) {
-            if (adviserStatus['final'] !== 'Approved' && adviserStatus['SEND_TO_PANEL_FINAL'] !== true) missingAdviser = true;
-        }
-
-        const option = document.createElement('option');
-        option.value = group.id;
-
         // If not editing, and there are unmet strictly enforced rules:
-        if (!isEditingThis && (missingPrereq || missingAdviser)) {
+        if (!isEditingThis && missingPrereq) {
             let reasons = [];
             if (missingPrereq) reasons.push("Missing Previous Grade");
-            if (missingAdviser) reasons.push("Needs Adviser Approval");
 
             option.textContent = `${group.group_name} (${reasons.join(' & ')})`;
             option.disabled = true;
@@ -704,30 +685,8 @@ async function saveSchedule(e) {
         schedule_venue: document.getElementById('schedVenue').value
     };
 
-    // --- Validate if Sent to Panel (Automated by Adviser Approval) ---
-    const { data: groupData, error: groupErr } = await supabaseClient
-        .from('student_groups')
-        .select('adviser_status')
-        .eq('id', scheduleData.group_id)
-        .single();
-
-    if (groupErr) {
-        showToast('Error validating group status.');
-        return;
-    }
-
-    const adviserStatus = groupData.adviser_status || {};
-    const norm = scheduleData.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '');
-    let isApproved = false;
-
-    if (norm.includes('title')) isApproved = adviserStatus['title'] === 'Approved' || adviserStatus['SEND_TO_PANEL_TITLES'] === true;
-    else if (norm.includes('preoral')) isApproved = adviserStatus['preoral'] === 'Approved' || adviserStatus['SEND_TO_PANEL_PRE_ORAL'] === true;
-    else if (norm.includes('final')) isApproved = adviserStatus['final'] === 'Approved' || adviserStatus['SEND_TO_PANEL_FINAL'] === true;
-
-    if (!isApproved) {
-        showToast(`Cannot schedule: Adviser must Send All to Panel first.`);
-        return;
-    }
+    // Validation of payment is implicitly done because groups without payment
+    // are physically not selectable in the dropdown UI anymore!
 
     // --- Conflict Validation ---
     const newPanels = [

@@ -151,22 +151,28 @@ window.togglePaymentRow = function (id) {
 
 async function fetchGroupDetails(groupId, payments = []) {
     try {
-        // Fetch Group + Students (with Grades) + Schedule
-        const { data, error } = await supabaseClient
-            .from('student_groups')
-            .select(`
-                *,
-                students (
-                    full_name,
-                    grades (grade, grade_type)
-                ),
-                schedules (panel1, panel2, panel3, panel4)
-            `)
-            .eq('id', groupId)
-            .single();
+        const [groupRes, dsRes, cfRes] = await Promise.all([
+            supabaseClient
+                .from('student_groups')
+                .select(`
+                    *,
+                    students (
+                        full_name,
+                        grades (grade, grade_type)
+                    ),
+                    schedules (*)
+                `)
+                .eq('id', groupId)
+                .single(),
+            supabaseClient.from('defense_statuses').select('*').eq('group_id', groupId),
+            supabaseClient.from('capstone_feedback').select('*').eq('group_id', groupId)
+        ]);
 
-        if (error) throw error;
-        currentGroupData = data;
+        if (groupRes.error) throw groupRes.error;
+        currentGroupData = groupRes.data;
+
+        currentGroupData.defense_statuses = dsRes.data || [];
+        currentGroupData.capstone_feedback = cfRes.data || [];
 
         // Check FAB Visibility
         checkFabVisibility(payments, currentGroupData);
@@ -183,6 +189,57 @@ function checkFabVisibility(payments, groupData) {
     // Helper: Normalize string (lowercase, remove hyphens)
     const normalize = (str) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
+    const checkPanelEvaluation = (stageKey) => {
+        if (!groupData) return false;
+        const norm = stageKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const fStat = {};
+
+        // aggregate feedbacks
+        const legacy = (groupData.defense_statuses || []).find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
+        if (legacy && legacy.statuses) {
+            Object.entries(legacy.statuses).forEach(([fKey, fVal]) => {
+                if (!fStat[fKey]) fStat[fKey] = {};
+                Object.assign(fStat[fKey], fVal); // fVal is obj: {panelname: 'Approved'}
+            });
+        }
+
+        (groupData.capstone_feedback || []).filter(cf => cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
+            if (!fStat[cf.file_key]) fStat[cf.file_key] = {};
+            if (cf.status) fStat[cf.file_key][cf.user_name] = cf.status;
+        });
+
+        // check if evaluated
+        let isEvaluated = false;
+        Object.keys(fStat).forEach(key => {
+            const statusCounts = {};
+            let totalVotesCount = 0;
+            Object.keys(fStat[key]).forEach(name => {
+                const s = fStat[key][name];
+                if (s && s !== 'Pending') {
+                    statusCounts[s] = (statusCounts[s] || 0) + 1;
+                    totalVotesCount++;
+                }
+            });
+
+            const sched = (groupData.schedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
+            let reqApps = 5;
+            if (sched) reqApps = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
+
+            let aCount = 0, dCount = 0, rCount = 0;
+            Object.keys(statusCounts).forEach(s => {
+                const sLower = s.toLowerCase();
+                if (sLower === 'approved' || sLower === 'completed') aCount += statusCounts[s];
+                else if (sLower.includes('revision')) rCount += statusCounts[s];
+                else if (['declined', 'redefend', 'reject'].some(r => sLower.includes(r))) dCount += statusCounts[s];
+            });
+
+            if (totalVotesCount > 0 && (aCount >= reqApps || rCount >= reqApps)) {
+                isEvaluated = true; // Fully evaluated by panels
+            }
+        });
+        return isEvaluated;
+    };
+
     // Helper: Check if a specific defense type is Paid and Graded using normalized comparison
     const getStatus = (type) => {
         const normType = normalize(type);
@@ -190,38 +247,34 @@ function checkFabVisibility(payments, groupData) {
         // Find payment (flexible match)
         const payment = payments.find(p => normalize(p.defense_type) === normType);
 
-        let isGraded = false;
+        // Use Panel Evaluation instead of numeric grade for flow checking
+        let isGraded = checkPanelEvaluation(type);
 
-        // Check grade if payment exists
-        if (payment && groupData && groupData.students && groupData.students.length > 0) {
-            // If ANY student has a grade for this type, consider it graded (group grade)
-            isGraded = groupData.students.some(student =>
-                student.grades && student.grades.some(g => normalize(g.grade_type) === normType && g.grade !== null)
-            );
-        }
         return { paid: !!payment, graded: isGraded };
     };
 
     const title = getStatus('Title Defense');
-    const preOral = getStatus('Pre-Oral Defense'); // will match "Pre Oral Defense" too
+    const preOral = getStatus('Pre-Oral Defense');
     const final = getStatus('Final Defense');
 
-    console.log('Payment Status (Normalized Check):', { title, preOral, final });
+    console.log('Payment Status (Normalized Check by Evaluation):', { title, preOral, final });
 
-    // Sequential Logic:
+    // Modified Sequential Logic based on Panel Evaluation:
+    // User can only ADD a payment if the Panel has FINISHED evaluating that logic stage,
+    // AND they haven't paid yet.
 
     // 1. Title Defense Stage
-    if (!title.paid) {
+    if (!title.paid && title.graded) {
         fabBtn.style.display = 'flex';
         return;
     }
     if (title.paid && !title.graded) {
-        fabBtn.style.display = 'none';
+        fabBtn.style.display = 'none'; // Paid, waiting for panels to finish grading it, cannot proceed
         return;
     }
 
     // 2. Pre-Oral Defense Stage
-    if (!preOral.paid) {
+    if (!preOral.paid && preOral.graded) {
         fabBtn.style.display = 'flex';
         return;
     }
@@ -231,12 +284,8 @@ function checkFabVisibility(payments, groupData) {
     }
 
     // 3. Final Defense Stage
-    if (!final.paid) {
+    if (!final.paid && final.graded) {
         fabBtn.style.display = 'flex';
-        return;
-    }
-    if (final.paid && !final.graded) {
-        fabBtn.style.display = 'none';
         return;
     }
 
@@ -292,14 +341,62 @@ async function openAddPaymentModal() {
             typeSelect.innerHTML = '';
             const allTypes = ["Title Defense", "Pre-Oral Defense", "Final Defense"];
 
+            const checkPanelEvaluation = (stageKey) => {
+                if (!currentGroupData) return false;
+                const norm = stageKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const fStat = {};
+                const legacy = (currentGroupData.defense_statuses || []).find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
+                if (legacy && legacy.statuses) {
+                    Object.entries(legacy.statuses).forEach(([fKey, fVal]) => {
+                        if (!fStat[fKey]) fStat[fKey] = {};
+                        Object.assign(fStat[fKey], fVal);
+                    });
+                }
+                (currentGroupData.capstone_feedback || []).filter(cf => cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
+                    if (!fStat[cf.file_key]) fStat[cf.file_key] = {};
+                    if (cf.status) fStat[cf.file_key][cf.user_name] = cf.status;
+                });
+                let isEvaluated = false;
+                Object.keys(fStat).forEach(key => {
+                    const statusCounts = {};
+                    let totalVotesCount = 0;
+                    Object.keys(fStat[key]).forEach(name => {
+                        const s = fStat[key][name];
+                        if (s && s !== 'Pending') { statusCounts[s] = (statusCounts[s] || 0) + 1; totalVotesCount++; }
+                    });
+                    const sched = (currentGroupData.schedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
+                    let reqApps = 5;
+                    if (sched) reqApps = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
+                    let aCount = 0, rCount = 0;
+                    Object.keys(statusCounts).forEach(s => {
+                        const sLower = s.toLowerCase();
+                        if (sLower === 'approved' || sLower === 'completed') aCount += statusCounts[s];
+                        else if (sLower.includes('revision')) rCount += statusCounts[s];
+                    });
+                    if (totalVotesCount > 0 && (aCount >= reqApps || rCount >= reqApps)) {
+                        isEvaluated = true;
+                    }
+                });
+                return isEvaluated;
+            };
+
             allTypes.forEach(type => {
-                if (!paidTypes.includes(normalize(type))) {
+                if (!paidTypes.includes(normalize(type)) && checkPanelEvaluation(type)) {
                     const opt = document.createElement('option');
                     opt.value = type;
                     opt.textContent = type;
                     typeSelect.appendChild(opt);
                 }
             });
+
+            if (typeSelect.options.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = "No valid evaluations await payment";
+                opt.disabled = true;
+                opt.selected = true;
+                typeSelect.appendChild(opt);
+            }
 
             if (typeSelect.options.length === 0) {
                 typeSelect.innerHTML = '<option value="">All phases paid</option>';

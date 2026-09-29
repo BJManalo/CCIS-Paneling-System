@@ -33,15 +33,18 @@
                 margin: 20px 10px;
                 border-radius: 12px;
             }
+
             .fab-btn {
                 top: 15px;
                 right: 15px;
                 width: 40px;
                 height: 40px;
             }
+
             .form-grid {
                 grid-template-columns: 1fr;
             }
+
             .modal-content {
                 max-height: calc(100vh - 140px);
                 margin-bottom: 70px;
@@ -297,8 +300,13 @@
         }
 
         @keyframes scanMove {
-            0% { top: 0%; }
-            100% { top: 100%; }
+            0% {
+                top: 0%;
+            }
+
+            100% {
+                top: 100%;
+            }
         }
 
         .verification-status {
@@ -314,8 +322,15 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Expandable Table Styles */
@@ -526,7 +541,7 @@
                                 onclick="event.stopPropagation(); openLightbox(this.src);" title="Click to enlarge"
                                 style="cursor: zoom-in;">
 
-                             <!-- Overlay -->
+                            <!-- Overlay -->
                             <div class="change-overlay">
                                 <span class="material-icons-round" style="font-size: 16px;">edit</span>
                                 Change Image
@@ -535,8 +550,10 @@
                             <!-- Smart Scan Animation -->
                             <div id="scanOverlay" class="scan-overlay">
                                 <div class="scan-line"></div>
-                                <span class="material-icons-round spin" style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;">document_scanner</span>
-                                <p style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--primary-dark);">Smart Verifying Receipt...</p>
+                                <span class="material-icons-round spin"
+                                    style="font-size: 30px; color: var(--primary-color); margin-bottom: 10px;">document_scanner</span>
+                                <p style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--primary-dark);">
+                                    Smart Verifying Receipt...</p>
                             </div>
                         </div>
 
@@ -602,7 +619,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="../../assets/js/shared.js"></script>
-    <script src="student_payments.js"></script>
+    <script src="student_payments.js?v=8"></script>
     <script>
         function logout() {
             localStorage.removeItem('loginUser');

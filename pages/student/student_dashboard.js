@@ -98,62 +98,15 @@ async function loadSubmissionData() {
             const students = group.students || [];
             const totalStudents = students.length;
 
-            const checkGraded = (keyword) => {
-                if (totalStudents === 0) return false;
-                const lowerKeyword = keyword.toLowerCase();
-                const gradedCount = students.filter(s =>
-                    s.grades && s.grades.some(g => g.grade_type && g.grade_type.toLowerCase().includes(lowerKeyword) && g.grade !== null)
-                ).length;
-                return gradedCount > 0;
-            };
-
-            const isTitleGraded = checkGraded('Title');
-            const isPreOralGraded = checkGraded('Pre');
-
-            const preOralBtn = document.getElementById('btn-preoral');
-            const finalBtn = document.getElementById('btn-final');
-
             window.scheduleStatus = {
                 title: isTitleScheduled,
                 preoral: isPreOralScheduled,
                 final: isFinalScheduled
             };
 
-            if (preOralBtn) {
-                const isLocked = !isTitleGraded;
-                if (isLocked) {
-                    preOralBtn.disabled = true;
-                    preOralBtn.style.opacity = '0.5';
-                    preOralBtn.style.cursor = 'not-allowed';
-                    preOralBtn.title = "Locked: Title Defense grades pending.";
-                    if (!preOralBtn.innerHTML.includes('lock')) preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
-                } else {
-                    preOralBtn.disabled = false;
-                    preOralBtn.style.opacity = '1';
-                    preOralBtn.style.cursor = 'pointer';
-                    preOralBtn.title = "";
-                    const lockIcon = preOralBtn.querySelector('.material-icons-round');
-                    if (lockIcon && lockIcon.innerText === 'lock') lockIcon.remove();
-                }
-            }
+            const preOralBtn = document.getElementById('btn-preoral');
+            const finalBtn = document.getElementById('btn-final');
 
-            if (finalBtn) {
-                const isLocked = !isPreOralGraded;
-                if (isLocked) {
-                    finalBtn.disabled = true;
-                    finalBtn.style.opacity = '0.5';
-                    finalBtn.style.cursor = 'not-allowed';
-                    finalBtn.title = "Locked: Pre-Oral grades pending.";
-                    if (!finalBtn.innerHTML.includes('lock')) finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
-                } else {
-                    finalBtn.disabled = false;
-                    finalBtn.style.opacity = '1';
-                    finalBtn.style.cursor = 'pointer';
-                    finalBtn.title = "";
-                    const lockIcon = finalBtn.querySelector('.material-icons-round');
-                    if (lockIcon && lockIcon.innerText === 'lock') lockIcon.remove();
-                }
-            }
 
             localStorage.setItem('lastGroupData', JSON.stringify(group));
 
@@ -231,6 +184,86 @@ async function loadSubmissionData() {
                 preoral: preOralData.statuses,
                 final: finalData.statuses
             };
+
+            // NEW: Panel-based Unlocking Logic natively
+            const isStageApprovedByAll = (tabId) => {
+                let isApproved = false;
+                const fbMap = window.feedbackStatus[tabId];
+                if (!fbMap) return false;
+
+                // If any of the required keys is fully Approved by all panels, it counts.
+                Object.keys(fbMap).forEach(key => {
+                    const statusCounts = {};
+                    let totalVotesCount = 0;
+                    Object.keys(fbMap[key]).forEach(name => {
+                        const s = fbMap[key][name];
+                        if (s && s !== 'Pending') {
+                            statusCounts[s] = (statusCounts[s] || 0) + 1;
+                            totalVotesCount++;
+                        }
+                    });
+
+                    const tName = tabId === 'titles' ? 'Title Defense' : (tabId === 'preoral' ? 'Pre-Oral Defense' : 'Final Defense');
+                    const nType = tName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const sched = (window.groupSchedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === nType);
+
+                    let reqApps = 5;
+                    if (sched) reqApps = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
+
+                    let aCount = 0, dCount = 0, rCount = 0;
+                    Object.keys(statusCounts).forEach(s => {
+                        const sLower = s.toLowerCase();
+                        if (sLower === 'approved' || sLower === 'completed') aCount += statusCounts[s];
+                        else if (sLower.includes('revision')) rCount += statusCounts[s];
+                        else if (['declined', 'redefend', 'reject'].some(r => sLower.includes(r))) dCount += statusCounts[s];
+                    });
+
+                    // Consider it unlocked if Panels have Fully Approved it OR Approved with Revisions
+                    if (totalVotesCount > 0 && (aCount >= reqApps || rCount >= reqApps)) {
+                        isApproved = true;
+                    }
+                });
+                return isApproved;
+            };
+
+            const isTitleEvaluated = isStageApprovedByAll('titles');
+            const isPreOralEvaluated = isStageApprovedByAll('preoral');
+
+            if (preOralBtn) {
+                const isLocked = !isTitleEvaluated;
+                if (isLocked) {
+                    preOralBtn.disabled = true;
+                    preOralBtn.style.opacity = '0.5';
+                    preOralBtn.style.cursor = 'not-allowed';
+                    preOralBtn.title = "Locked: Title Defense panel evaluation pending.";
+                    if (!preOralBtn.innerHTML.includes('lock')) preOralBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                } else {
+                    preOralBtn.disabled = false;
+                    preOralBtn.style.opacity = '1';
+                    preOralBtn.style.cursor = 'pointer';
+                    preOralBtn.title = "";
+                    const lockIcon = preOralBtn.querySelector('.material-icons-round');
+                    if (lockIcon && lockIcon.innerText === 'lock') lockIcon.remove();
+                }
+            }
+
+            if (finalBtn) {
+                const isLocked = !isPreOralEvaluated;
+                if (isLocked) {
+                    finalBtn.disabled = true;
+                    finalBtn.style.opacity = '0.5';
+                    finalBtn.style.cursor = 'not-allowed';
+                    finalBtn.title = "Locked: Pre-Oral panel evaluation pending.";
+                    if (!finalBtn.innerHTML.includes('lock')) finalBtn.innerHTML += ' <span class="material-icons-round" style="font-size:14px; vertical-align:middle;">lock</span>';
+                } else {
+                    finalBtn.disabled = false;
+                    finalBtn.style.opacity = '1';
+                    finalBtn.style.cursor = 'pointer';
+                    finalBtn.title = "";
+                    const lockIcon = finalBtn.querySelector('.material-icons-round');
+                    if (lockIcon && lockIcon.innerText === 'lock') lockIcon.remove();
+                }
+            }
 
             const renderField = (linkMap, annotationsMap, key, elementId) => {
                 const el = document.getElementById(elementId);
