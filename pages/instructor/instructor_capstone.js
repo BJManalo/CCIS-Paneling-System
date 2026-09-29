@@ -325,7 +325,9 @@ async function loadCapstoneData() {
                 isAdviser: isAdviser,
                 isPanelist: isPanelist,
                 projectTitle: group.project_title,
-                defenses: groupDefenses
+                defenses: groupDefenses,
+                adviser_status: group.adviser_status || {},
+                adviser_remarks: group.adviser_remarks || {}
             });
         });
 
