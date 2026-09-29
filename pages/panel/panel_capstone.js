@@ -443,7 +443,8 @@ function renderTable() {
             }
         }
 
-        return currentStatusFilter === 'FINISHED' ? isFinished : !isFinished;
+        // Always hide finished groups from the list
+        return !isFinished;
     });
 
     // --- Pagination Logic ---
