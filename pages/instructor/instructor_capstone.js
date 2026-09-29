@@ -883,24 +883,8 @@ window.openFileModal = (groupId, defKey) => {
             section.appendChild(itemContainer);
         });
 
-        if (group.isAdviser) {
-            const btnWrap = document.createElement('div');
-            btnWrap.style.marginTop = '15px';
-            btnWrap.id = `master-send-wrap-${categoryKey}-${selectedDefense.id}`;
-            btnWrap.style.display = 'none'; // Hidden by default, shown if all approved
-
-            btnWrap.innerHTML = `
-                <button onclick="masterSendToPanel('${selectedDefense.id}', '${categoryKey}')" 
-                    style="width: 100%; background: #6366f1; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
-                    <span class="material-icons-round" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">send</span>
-                    Send All to Panel
-                </button>
-            `;
-            section.appendChild(btnWrap);
-
-            // Initial check to show the master button
-            setTimeout(() => checkMasterSendBtn(selectedDefense.id, categoryKey), 100);
-        }
+        // The Master Send Button has been fully removed in favor of auto-sending
+        // when all documents perfectly match their expected approvals natively.
 
         fileList.appendChild(section);
     };
@@ -1480,9 +1464,38 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus, categoryKey) =>
             window.showToast(`Status updated to ${newStatus}.`, toastType);
         }
 
+        // Automatic Send to Panel Logic (runs ONLY if changing to Approved)
+        if (newStatus === 'Approved' && cKey) {
+            let expectedApprovals = 0;
+            let actualApprovals = 0;
+            let defKey = '';
+            if (cKey === 'titles') defKey = 'titledefense';
+            else if (cKey === 'pre_oral') defKey = 'preoraldefense';
+            else if (cKey === 'final') defKey = 'finaldefense';
+
+            let fileObj = group.defenses && group.defenses[defKey] ? group.defenses[defKey].files : null;
+            if (!fileObj) fileObj = {};
+
+            Object.keys(fileObj).forEach(label => {
+                if (!label.endsWith('_revised')) {
+                    const remarksBoxCheck = document.getElementById(`adviser-remarks-container-${groupId}-${label}`);
+                    if (remarksBoxCheck) {
+                        expectedApprovals++;
+                        if (currentStatus[label] === 'Approved') {
+                            actualApprovals++;
+                        }
+                    }
+                }
+            });
+
+            if (expectedApprovals > 0 && actualApprovals === expectedApprovals) {
+                // All items are perfectly approved! Auto trigger send to panel
+                await masterSendToPanel(groupId, cKey, true);
+            }
+        }
+
         // Refresh UI
         renderTable();
-        if (cKey) checkMasterSendBtn(groupId, cKey);
 
     } catch (err) {
         console.error('Error updating adviser status:', err);
@@ -1564,85 +1577,16 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
     }
 };
 
-window.checkMasterSendBtn = (groupId, cKey) => {
-    const group = allData.find(g => g.id == groupId);
-    if (!group) return;
-
-    const btnWrap = document.getElementById(`master-send-wrap-${cKey}-${groupId}`);
-    if (!btnWrap) return;
-
-    const statuses = group.adviser_status || {};
-    let isStageApproved = false;
-
-    // Foolproof DOM Check: Find all Approve buttons in this section inside the modal
-    const sectionHeaders = {
-        'titles': 'TITLE DEFENSE',
-        'pre_oral': 'PRE-ORAL DEFENSE',
-        'final': 'FINAL DEFENSE'
-    };
-
-    // Determine how many files are visually rendered in the modal
-    let expectedApprovals = 0;
-    let actualApprovals = 0;
-
-    let defKey = '';
-    if (cKey === 'titles') defKey = 'titledefense';
-    else if (cKey === 'pre_oral') defKey = 'preoraldefense';
-    else if (cKey === 'final') defKey = 'finaldefense';
-
-    let fileObj = group.defenses && group.defenses[defKey] ? group.defenses[defKey].files : null;
-    if (!fileObj) fileObj = {};
-
-    Object.keys(fileObj).forEach(label => {
-        if (!label.endsWith('_revised')) {
-            // Check if the DOM rendered an adviser remarks container for this label
-            const remarksBox = document.getElementById(`adviser-remarks-container-${groupId}-${label}`);
-            if (remarksBox) {
-                expectedApprovals++;
-                if (statuses[label] === 'Approved') {
-                    actualApprovals++;
-                }
-            }
-        }
-    });
-
-    if (expectedApprovals > 0 && actualApprovals === expectedApprovals) {
-        isStageApproved = true;
-    }
-
-    if (isStageApproved) {
-        btnWrap.style.display = 'block';
-        const btn = btnWrap.querySelector('button');
-        if (statuses['SEND_TO_PANEL_' + cKey.toUpperCase()]) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="material-icons-round" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">check_circle</span> Sent to Panel';
-            btn.style.background = '#10b981';
-            btn.style.cursor = 'default';
-        } else {
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-icons-round" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">send</span> Send All to Panel';
-            btn.style.background = '#6366f1';
-            btn.style.cursor = 'pointer';
-        }
-    } else {
-        btnWrap.style.display = 'none';
-    }
-};
-
-window.masterSendToPanel = async (groupId, cKey) => {
+window.masterSendToPanel = async (groupId, cKey, isAuto = false) => {
     try {
         const group = allData.find(g => g.id == groupId);
         if (!group) return;
 
-        const btnWrap = document.getElementById(`master-send-wrap-${cKey}-${groupId}`);
-        if (btnWrap) {
-            const btn = btnWrap.querySelector('button');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="material-icons-round spin" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">sync</span> Sending...';
-        }
-
         const currentStatus = group.adviser_status || {};
-        currentStatus['SEND_TO_PANEL_' + cKey.toUpperCase()] = true; // explicitly trigger panel view
+        // If already sent, do nothing
+        if (currentStatus['SEND_TO_PANEL_' + cKey.toUpperCase()]) return;
+
+        currentStatus['SEND_TO_PANEL_' + cKey.toUpperCase()] = true;
 
         const { error } = await supabaseClient
             .from('student_groups')
@@ -1653,18 +1597,19 @@ window.masterSendToPanel = async (groupId, cKey) => {
         group.adviser_status = currentStatus;
 
         if (typeof window.showToast === 'function') {
-            window.showToast('Group sent to panel successfully!', 'success');
-        } else alert('Group sent to panel successfully!');
+            window.showToast('All documents approved! Sent to panel automatically.', 'success');
+        } else {
+            alert('All documents approved! Sent to panel automatically.');
+        }
 
-        checkMasterSendBtn(groupId, cKey);
-        renderTable(); // Update underlying table display if roles apply
+        renderTable();
 
     } catch (err) {
-        console.error('Error sending to panel:', err);
-        alert('Failed to send to panel: ' + err.message);
-        checkMasterSendBtn(groupId, cKey);
+        console.error('Error auto-sending to panel:', err);
     }
 };
+
+
 
 function logout() {
     localStorage.removeItem('loginUser');
