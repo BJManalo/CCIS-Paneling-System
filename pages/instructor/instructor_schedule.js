@@ -70,12 +70,12 @@ async function fetchPanels() {
             .or('role.ilike.%panel%,role.ilike.%instructor%'); // Match any panel or instructor roles
 
         if (error) throw error;
-        
+
         // Remove duplicates and sort
         const names = [...new Set(data.map(acc => acc.name))].filter(n => n);
         allPanels = names.sort();
         console.log('Dynamic panels loaded:', allPanels);
-        
+
         // Refresh options if modal is open
         if (document.getElementById('scheduleModal').classList.contains('active')) {
             updatePanelOptions();
@@ -366,15 +366,17 @@ function updateGroupDropdown() {
     // Helper to normalize strings for comparison (remove hyphen, lowercase, spaces)
     const normalize = (str) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
-    // Filter Groups
-    const validGroups = fetchedGroups.filter(group => {
+    // Populate Dropdown
+    select.innerHTML = '<option value="">Select Group</option>';
+
+    fetchedGroups.forEach(group => {
         // Rule 1: Must have paid for this specific defense type
         const hasPayment = window.allPaymentsGlobal.some(p =>
             p.group_id == group.id &&
             normalize(p.defense_type) === normalize(targetType)
         );
 
-        if (!hasPayment) return false;
+        if (!hasPayment) return; // Completely hide if they haven't paid yet
 
         // Rule 2: Must NOT have an existing schedule for this defense type
         const existingSchedule = allSchedules.find(s =>
@@ -382,67 +384,65 @@ function updateGroupDropdown() {
             normalize(s.schedule_type) === normalize(targetType)
         );
 
+        let isEditingThis = false;
         if (existingSchedule) {
-            // Exception: If we are editing THIS schedule, allow it.
             if (editingId && existingSchedule.id == editingId) {
-                return true;
+                isEditingThis = true;
+            } else {
+                return; // Hide because they already have an active schedule
             }
-            // Otherwise, hide it because they already have one.
-            return false;
         }
 
-        // Rule 3: Sequential Prerequisite Check (Title -> Pre-Oral -> Final)
-        // Groups must have been GRADED in the previous phase to be scheduled for the next.
+        // Rule 3: Prerequisite Grade Check
         const checkGraded = (requiredType) => {
-            // Check if ANY student in the group has a grade for the required type (Group Grade usually implies all, but lax check matches logic elsewhere)
             return group.members.some(m =>
                 m.grades && m.grades.some(g => normalize(g.grade_type) === normalize(requiredType) && g.grade !== null)
             );
         };
 
+        let missingPrereq = false;
         if (normalize(targetType).includes('preoral')) {
-            // Prerequisite: Title Defense
-            if (!checkGraded('Title Defense')) return false;
+            if (!checkGraded('Title Defense')) missingPrereq = true;
         } else if (normalize(targetType).includes('final')) {
-            // Prerequisite: Pre-Oral Defense
-            if (!checkGraded('Pre-Oral Defense') && !checkGraded('Pre Oral Defense')) return false;
+            if (!checkGraded('Pre-Oral Defense') && !checkGraded('Pre Oral Defense')) missingPrereq = true;
         }
 
         // Rule 4: Adviser Approval Check
-        // Students must have ALL their documents for this stage APPROVED by their adviser before scheduling.
         const adviserStatus = group.adviser_status || {};
         const isTitle = normalize(targetType).includes('title');
         const isPreOral = normalize(targetType).includes('preoral');
         const isFinal = normalize(targetType).includes('final');
 
+        let missingAdviser = false;
         if (isTitle) {
             const hasLegacy = adviserStatus['title'] === 'Approved';
             const hasAllGranular = adviserStatus['title1'] === 'Approved' && adviserStatus['title2'] === 'Approved' && adviserStatus['title3'] === 'Approved';
-            if (!hasLegacy && !hasAllGranular) return false;
+            if (!hasLegacy && !hasAllGranular) missingAdviser = true;
         } else if (isPreOral) {
             const hasLegacy = adviserStatus['preoral'] === 'Approved';
             const hasAllGranular = adviserStatus['ch1'] === 'Approved' && adviserStatus['ch2'] === 'Approved' && adviserStatus['ch3'] === 'Approved';
-            if (!hasLegacy && !hasAllGranular) return false;
+            if (!hasLegacy && !hasAllGranular) missingAdviser = true;
         } else if (isFinal) {
             const hasLegacy = adviserStatus['final'] === 'Approved';
             const hasAllGranular = adviserStatus['ch4'] === 'Approved' && adviserStatus['ch5'] === 'Approved';
-            if (!hasLegacy && !hasAllGranular) return false;
+            if (!hasLegacy && !hasAllGranular) missingAdviser = true;
         }
 
-        return true;
-    });
-
-    // Populate Dropdown
-    select.innerHTML = '<option value="">Select Group</option>';
-
-    // If we are editing and the group got filtered out (e.g. maybe logic skew), force add it back?
-    // Actually, if we are editing, validGroups should capture it via the existingSchedule check above.
-    // However, if the payment was deleted? Unlikely edge case.
-
-    validGroups.forEach(group => {
         const option = document.createElement('option');
         option.value = group.id;
-        option.textContent = group.group_name;
+
+        // If not editing, and there are unmet strictly enforced rules:
+        if (!isEditingThis && (missingPrereq || missingAdviser)) {
+            let reasons = [];
+            if (missingPrereq) reasons.push("Missing Previous Grade");
+            if (missingAdviser) reasons.push("Needs Adviser Approval");
+
+            option.textContent = `${group.group_name} (${reasons.join(' & ')})`;
+            option.disabled = true;
+        } else {
+            option.textContent = group.group_name;
+        }
+
         select.appendChild(option);
     });
 
@@ -716,7 +716,7 @@ async function saveSchedule(e) {
         .select('adviser_status')
         .eq('id', scheduleData.group_id)
         .single();
-        
+
     if (groupErr) {
         showToast('Error validating group status.');
         return;
@@ -879,7 +879,7 @@ function openDetailsModal(sched) {
     );
 
     const timeStr = typeof formatTime12Hour === 'function' && sched.schedule_time ? formatTime12Hour(sched.schedule_time) : (sched.schedule_time || 'TBA');
-    
+
     document.getElementById('viewDateTime').textContent = `${new Date(sched.schedule_date).toLocaleDateString()} at ${timeStr}`;
     document.getElementById('viewVenue').textContent = sched.schedule_venue || 'TBA';
     document.getElementById('viewProgram').textContent = (sched.student_groups?.program || 'N/A').toUpperCase();
