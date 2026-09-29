@@ -262,7 +262,7 @@ async function loadEvaluations() {
                     groupId: group.id,
                     groupName: group.group_name,
                     members: group.students || [],
-                    title: group.title,
+                    title: group.project_title || group.title,
                     program: group.program,
                     adviser: group.adviser,
                     defenses: groupDefenses
