@@ -827,8 +827,33 @@ window.calcSystemTotal = (schedId) => {
 
 window.submitEvaluation = async (schedId) => {
     const loginUser = JSON.parse(localStorage.getItem('loginUser'));
-    const evalItem = loadedEvaluations.find(ev => ev.id === schedId);
-    if (!evalItem || !loginUser) return;
+
+    // Find the actual group and defense based on schedId
+    let targetGroup = null;
+    let targetDefense = null;
+
+    for (const group of loadedEvaluations) {
+        for (const key in group.defenses) {
+            if (group.defenses[key].id === schedId) {
+                targetGroup = group;
+                targetDefense = group.defenses[key];
+                break;
+            }
+        }
+        if (targetDefense) break;
+    }
+
+    if (!targetGroup || !targetDefense || !loginUser) return;
+
+    // Reconstruct the evalItem format expected by the rest of the function
+    const evalItem = {
+        id: targetDefense.id,
+        groupId: targetGroup.groupId,
+        members: targetGroup.members,
+        isSubmitted: targetDefense.isSubmitted,
+        savedScores: targetDefense.savedScores,
+        defenseType: targetDefense.defenseType
+    };
 
     const btn = event.target;
     // Store original text to restore later if needed
