@@ -546,6 +546,24 @@ window.changePage = (newPage) => {
     renderTable();
 };
 
+function updatePaginationUI(totalPages) {
+    let paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) return;
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+
+    paginationContainer.innerHTML = `
+        <button class="page-btn prev" ${currentPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage - 1})"`}>Previous</button>
+        <span class="page-number active">${currentPage}</span>
+        <button class="page-btn next" ${currentPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `onclick="changePage(${currentPage + 1})"`}>Next</button>
+    `;
+}
+
 // Global functions for Modal
 window.openFileModal = (groupId, defKey) => {
     // Prevent event capturing if attached to row, but its attached to button so it's fine
