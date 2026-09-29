@@ -880,24 +880,7 @@ window.openFileModal = (groupId, defKey) => {
             section.appendChild(itemContainer);
         });
 
-        if (currentRole === 'Adviser') {
-            const btnWrap = document.createElement('div');
-            btnWrap.style.marginTop = '15px';
-            btnWrap.id = `master-send-wrap-${categoryKey}-${selectedDefense.id}`;
-            btnWrap.style.display = 'none'; // Hidden by default, shown if all approved
-
-            btnWrap.innerHTML = `
-                <button onclick="masterSendToPanel('${selectedDefense.id}', '${categoryKey}')" 
-                    style="width: 100%; background: #6366f1; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
-                    <span class="material-icons-round" style="font-size: 18px; vertical-align: middle; margin-right: 5px;">send</span>
-                    Send All to Panel
-                </button>
-            `;
-            section.appendChild(btnWrap);
-
-            // Initial check to show the master button
-            setTimeout(() => checkMasterSendBtn(selectedDefense.id, categoryKey), 100);
-        }
+        // Master send button logic removed as it is now auto-assigned when instructor schedules.
 
         fileList.appendChild(section);
     };

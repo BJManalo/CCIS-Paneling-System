@@ -383,18 +383,7 @@ function renderTable() {
         if (!typeMatch || !programMatch || !searchMatch || !roleMatch) return false;
 
         // Check if fully approved by adviser before showing to Panels
-        // Check if fully approved by adviser before showing to Panels
-        if (currentRole === 'Panel' && g.isPanelist) {
-            const advStat = g.adviserStatus || {};
-            let cKey = '';
-
-            if (normCurrentTab.includes('title')) cKey = 'TITLES';
-            else if (normCurrentTab.includes('preoral')) cKey = 'PRE_ORAL';
-            else if (normCurrentTab.includes('final')) cKey = 'FINAL';
-
-            const isApprovedByAdviser = cKey !== '' && advStat['SEND_TO_PANEL_' + cKey] === true;
-            if (!isApprovedByAdviser) return false; // Hide from panel account completely
-        }
+        // Removed SEND_TO_PANEL blocking logic so assigned panels can directly see files
 
         // --- Finished/Unfinished Filter Logic ---
         if (currentStatusFilter === 'ALL') return true;
