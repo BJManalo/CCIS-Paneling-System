@@ -1449,15 +1449,27 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus, categoryKey) =>
         // Auto Send replaced by Master Button logic
         const cKey = categoryKey;
 
-        const { error } = await supabaseClient
-            .from('student_groups')
-            .update({
-                adviser_status: currentStatus,
-                adviser_remarks: currentRemarks
-            })
-            .eq('id', groupId);
+        let updateError = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const { error } = await supabaseClient
+                .from('student_groups')
+                .update({
+                    adviser_status: currentStatus,
+                    adviser_remarks: currentRemarks
+                })
+                .eq('id', groupId);
 
-        if (error) throw error;
+            if (!error) {
+                updateError = null;
+                break; // Success!
+            } else {
+                updateError = error;
+                // Wait briefly before retry
+                await new Promise(r => setTimeout(r, 500 * attempt));
+            }
+        }
+
+        if (updateError) throw updateError;
 
         // Update local state
         group.adviser_status = currentStatus;
@@ -1474,7 +1486,29 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus, categoryKey) =>
 
     } catch (err) {
         console.error('Error updating adviser status:', err);
-        alert('Failed to update status: ' + err.message);
+
+        // Rollback optimistic UI
+        const modalContent = document.getElementById('fileModalContent');
+        const btnApprove = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Approved', '${categoryKey}')"]`);
+        const btnDecline = modalContent?.querySelector(`button[onclick="updateAdviserStatus(${groupId}, '${fileKey}', 'Declined', '${categoryKey}')"]`);
+
+        if (btnApprove) {
+            btnApprove.disabled = false;
+            btnApprove.style.background = 'white';
+            btnApprove.style.color = '#059669';
+        }
+        if (btnDecline) {
+            btnDecline.disabled = false;
+            btnDecline.style.background = 'white';
+            btnDecline.style.color = '#dc2626';
+        }
+
+        // Generic error message for end-users instead of raw trace
+        let msg = err.message || '';
+        if (msg.includes('Failed to fetch')) {
+            msg = 'Network connection interrupted. Please check your internet and try again.';
+        }
+        alert('Failed to update status: ' + msg);
     }
 };
 
