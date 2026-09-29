@@ -883,7 +883,7 @@ window.openFileModal = (groupId, defKey) => {
             section.appendChild(itemContainer);
         });
 
-        if (currentRole === 'Adviser') {
+        if (group.isAdviser) {
             const btnWrap = document.createElement('div');
             btnWrap.style.marginTop = '15px';
             btnWrap.id = `master-send-wrap-${categoryKey}-${selectedDefense.id}`;
