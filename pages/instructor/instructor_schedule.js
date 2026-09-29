@@ -739,7 +739,24 @@ async function saveSchedule(e) {
         : await supabaseClient.from('schedules').upsert(scheduleData, { onConflict: 'group_id, schedule_type' });
 
     if (!error) {
-        showToast(editingId ? 'Schedule updated!' : 'Schedule added!');
+        if (!editingId) {
+            // Once scheduled, Auto-Send to Panel
+            const { data: gData } = await supabaseClient.from('student_groups').select('adviser_status').eq('id', scheduleData.group_id).single();
+            if (gData) {
+                const advStat = gData.adviser_status || {};
+                let cKey = '';
+                if (scheduleData.schedule_type.toLowerCase().includes('title')) cKey = 'TITLES';
+                else if (scheduleData.schedule_type.toLowerCase().includes('pre')) cKey = 'PRE_ORAL';
+                else if (scheduleData.schedule_type.toLowerCase().includes('final')) cKey = 'FINAL';
+
+                if (cKey) {
+                    advStat['SEND_TO_PANEL_' + cKey] = true;
+                    await supabaseClient.from('student_groups').update({ adviser_status: advStat }).eq('id', scheduleData.group_id);
+                }
+            }
+        }
+
+        showToast(editingId ? 'Schedule updated!' : 'Schedule added and documents sent to panels!');
         closeScheduleModal();
         loadSchedules();
     } else {

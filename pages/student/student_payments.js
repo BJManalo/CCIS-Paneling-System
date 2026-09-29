@@ -189,55 +189,14 @@ function checkFabVisibility(payments, groupData) {
     // Helper: Normalize string (lowercase, remove hyphens)
     const normalize = (str) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
-    const checkPanelEvaluation = (stageKey) => {
-        if (!groupData) return false;
+    const checkAdviserApprove = (stageKey) => {
+        if (!groupData || !groupData.adviser_status) return false;
         const norm = stageKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const fStat = {};
-
-        // aggregate feedbacks
-        const legacy = (groupData.defense_statuses || []).find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
-        if (legacy && legacy.statuses) {
-            Object.entries(legacy.statuses).forEach(([fKey, fVal]) => {
-                if (!fStat[fKey]) fStat[fKey] = {};
-                Object.assign(fStat[fKey], fVal); // fVal is obj: {panelname: 'Approved'}
-            });
-        }
-
-        (groupData.capstone_feedback || []).filter(cf => cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
-            if (!fStat[cf.file_key]) fStat[cf.file_key] = {};
-            if (cf.status) fStat[cf.file_key][cf.user_name] = cf.status;
-        });
-
-        // check if evaluated
-        let isEvaluated = false;
-        Object.keys(fStat).forEach(key => {
-            const statusCounts = {};
-            let totalVotesCount = 0;
-            Object.keys(fStat[key]).forEach(name => {
-                const s = fStat[key][name];
-                if (s && s !== 'Pending') {
-                    statusCounts[s] = (statusCounts[s] || 0) + 1;
-                    totalVotesCount++;
-                }
-            });
-
-            const sched = (groupData.schedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
-            let reqApps = 5;
-            if (sched) reqApps = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
-
-            let aCount = 0, dCount = 0, rCount = 0;
-            Object.keys(statusCounts).forEach(s => {
-                const sLower = s.toLowerCase();
-                if (sLower === 'approved' || sLower === 'completed') aCount += statusCounts[s];
-                else if (sLower.includes('revision')) rCount += statusCounts[s];
-                else if (['declined', 'redefend', 'reject'].some(r => sLower.includes(r))) dCount += statusCounts[s];
-            });
-
-            if (totalVotesCount > 0 && (aCount >= reqApps || rCount >= reqApps)) {
-                isEvaluated = true; // Fully evaluated by panels
-            }
-        });
-        return isEvaluated;
+        let key = '';
+        if (norm.includes('title')) key = 'title';
+        else if (norm.includes('preoral')) key = 'preoral';
+        else if (norm.includes('final')) key = 'final';
+        return groupData.adviser_status[key] === 'Approved';
     };
 
     // Helper: Check if a specific defense type is Paid and Graded using normalized comparison
@@ -247,10 +206,10 @@ function checkFabVisibility(payments, groupData) {
         // Find payment (flexible match)
         const payment = payments.find(p => normalize(p.defense_type) === normType);
 
-        // Use Panel Evaluation instead of numeric grade for flow checking
-        let isGraded = checkPanelEvaluation(type);
+        // Allowed to pay if Adviser Approved
+        let canPay = checkAdviserApprove(type);
 
-        return { paid: !!payment, graded: isGraded };
+        return { paid: !!payment, canPay: canPay };
     };
 
     const title = getStatus('Title Defense');
@@ -260,31 +219,31 @@ function checkFabVisibility(payments, groupData) {
     console.log('Payment Status (Normalized Check by Evaluation):', { title, preOral, final });
 
     // Modified Sequential Logic based on Panel Evaluation:
-    // User can only ADD a payment if the Panel has FINISHED evaluating that logic stage,
+    // User can only ADD a payment if the Adviser has Approved that logic stage,
     // AND they haven't paid yet.
 
     // 1. Title Defense Stage
-    if (!title.paid && title.graded) {
+    if (!title.paid && title.canPay) {
         fabBtn.style.display = 'flex';
         return;
     }
-    if (title.paid && !title.graded) {
-        fabBtn.style.display = 'none'; // Paid, waiting for panels to finish grading it, cannot proceed
+    if (title.paid && !title.canPay) {
+        fabBtn.style.display = 'none';
         return;
     }
 
     // 2. Pre-Oral Defense Stage
-    if (!preOral.paid && preOral.graded) {
+    if (!preOral.paid && preOral.canPay) {
         fabBtn.style.display = 'flex';
         return;
     }
-    if (preOral.paid && !preOral.graded) {
+    if (preOral.paid && !preOral.canPay) {
         fabBtn.style.display = 'none';
         return;
     }
 
     // 3. Final Defense Stage
-    if (!final.paid && final.graded) {
+    if (!final.paid && final.canPay) {
         fabBtn.style.display = 'flex';
         return;
     }
@@ -341,47 +300,18 @@ async function openAddPaymentModal() {
             typeSelect.innerHTML = '';
             const allTypes = ["Title Defense", "Pre-Oral Defense", "Final Defense"];
 
-            const checkPanelEvaluation = (stageKey) => {
-                if (!currentGroupData) return false;
+            const checkAdviserApprove = (stageKey) => {
+                if (!currentGroupData || !currentGroupData.adviser_status) return false;
                 const norm = stageKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-                const fStat = {};
-                const legacy = (currentGroupData.defense_statuses || []).find(ds => ds.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
-                if (legacy && legacy.statuses) {
-                    Object.entries(legacy.statuses).forEach(([fKey, fVal]) => {
-                        if (!fStat[fKey]) fStat[fKey] = {};
-                        Object.assign(fStat[fKey], fVal);
-                    });
-                }
-                (currentGroupData.capstone_feedback || []).filter(cf => cf.defense_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm).forEach(cf => {
-                    if (!fStat[cf.file_key]) fStat[cf.file_key] = {};
-                    if (cf.status) fStat[cf.file_key][cf.user_name] = cf.status;
-                });
-                let isEvaluated = false;
-                Object.keys(fStat).forEach(key => {
-                    const statusCounts = {};
-                    let totalVotesCount = 0;
-                    Object.keys(fStat[key]).forEach(name => {
-                        const s = fStat[key][name];
-                        if (s && s !== 'Pending') { statusCounts[s] = (statusCounts[s] || 0) + 1; totalVotesCount++; }
-                    });
-                    const sched = (currentGroupData.schedules || []).find(s => s.schedule_type && s.schedule_type.toLowerCase().replace(/[^a-z0-9]/g, '') === norm);
-                    let reqApps = 5;
-                    if (sched) reqApps = [sched.panel1, sched.panel2, sched.panel3, sched.panel4, sched.panel5].filter(p => !!p).length || 5;
-                    let aCount = 0, rCount = 0;
-                    Object.keys(statusCounts).forEach(s => {
-                        const sLower = s.toLowerCase();
-                        if (sLower === 'approved' || sLower === 'completed') aCount += statusCounts[s];
-                        else if (sLower.includes('revision')) rCount += statusCounts[s];
-                    });
-                    if (totalVotesCount > 0 && (aCount >= reqApps || rCount >= reqApps)) {
-                        isEvaluated = true;
-                    }
-                });
-                return isEvaluated;
+                let key = '';
+                if (norm.includes('title')) key = 'title';
+                else if (norm.includes('preoral')) key = 'preoral';
+                else if (norm.includes('final')) key = 'final';
+                return currentGroupData.adviser_status[key] === 'Approved';
             };
 
             allTypes.forEach(type => {
-                if (!paidTypes.includes(normalize(type)) && checkPanelEvaluation(type)) {
+                if (!paidTypes.includes(normalize(type)) && checkAdviserApprove(type)) {
                     const opt = document.createElement('option');
                     opt.value = type;
                     opt.textContent = type;
@@ -392,7 +322,7 @@ async function openAddPaymentModal() {
             if (typeSelect.options.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = '';
-                opt.textContent = "No valid evaluations await payment";
+                opt.textContent = "No valid approvals await payment";
                 opt.disabled = true;
                 opt.selected = true;
                 typeSelect.appendChild(opt);

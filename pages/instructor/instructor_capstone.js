@@ -1464,35 +1464,8 @@ window.updateAdviserStatus = async (groupId, fileKey, newStatus, categoryKey) =>
             window.showToast(`Status updated to ${newStatus}.`, toastType);
         }
 
-        // Automatic Send to Panel Logic (runs ONLY if changing to Approved)
-        if (newStatus === 'Approved' && cKey) {
-            let expectedApprovals = 0;
-            let actualApprovals = 0;
-            let defKey = '';
-            if (cKey === 'titles') defKey = 'titledefense';
-            else if (cKey === 'pre_oral') defKey = 'preoraldefense';
-            else if (cKey === 'final') defKey = 'finaldefense';
-
-            let fileObj = group.defenses && group.defenses[defKey] ? group.defenses[defKey].files : null;
-            if (!fileObj) fileObj = {};
-
-            Object.keys(fileObj).forEach(label => {
-                if (!label.endsWith('_revised')) {
-                    const remarksBoxCheck = document.getElementById(`adviser-remarks-container-${groupId}-${label}`);
-                    if (remarksBoxCheck) {
-                        expectedApprovals++;
-                        if (currentStatus[label] === 'Approved') {
-                            actualApprovals++;
-                        }
-                    }
-                }
-            });
-
-            if (expectedApprovals > 0 && actualApprovals === expectedApprovals) {
-                // All items are perfectly approved! Auto trigger send to panel
-                await masterSendToPanel(groupId, cKey, true);
-            }
-        }
+        // We no longer trigger masterSendToPanel here!
+        // Files are strictly withheld from panels until the Instructor officially schedules the defense.
 
         // Refresh UI
         renderTable();
@@ -1578,37 +1551,8 @@ window.saveAdviserRemarks = async (groupId, fileKey) => {
 };
 
 window.masterSendToPanel = async (groupId, cKey, isAuto = false) => {
-    try {
-        const group = allData.find(g => g.id == groupId);
-        if (!group) return;
-
-        const currentStatus = group.adviser_status || {};
-        // If already sent, do nothing
-        if (currentStatus['SEND_TO_PANEL_' + cKey.toUpperCase()]) return;
-
-        currentStatus['SEND_TO_PANEL_' + cKey.toUpperCase()] = true;
-
-        const { error } = await supabaseClient
-            .from('student_groups')
-            .update({ adviser_status: currentStatus })
-            .eq('id', groupId);
-
-        if (error) throw error;
-        group.adviser_status = currentStatus;
-
-        if (typeof window.showToast === 'function') {
-            window.showToast('All documents approved! Sent to panel automatically.', 'success');
-        } else {
-            alert('All documents approved! Sent to panel automatically.');
-        }
-
-        renderTable();
-
-    } catch (err) {
-        console.error('Error auto-sending to panel:', err);
-    }
+    // Deprecated: Logic moved to instructor_schedule.js
 };
-
 
 
 function logout() {
