@@ -220,8 +220,6 @@ async function loadCapstoneData() {
                     if (!nA || !nB) return false;
                     if (nA === nB) return true;
 
-                    if (nA.includes(`(creator: ${nB})`) || nA.includes(`(creator:${nB})`)) return true;
-
                     const cleanA = nA.replace(/\(creator:.*?\)/g, '').trim();
                     if (cleanA === nB) return true;
 

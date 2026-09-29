@@ -245,9 +245,6 @@ async function loadCapstoneData() {
                 if (!nA || !nB) return false;
                 if (nA === nB) return true;
 
-                // Match exact email inside the creator pattern if present
-                if (nA.includes(`(creator: ${nB})`) || nA.includes(`(creator:${nB})`)) return true;
-
                 // Strip creator info
                 const cleanA = nA.replace(/\(creator:.*?\)/g, '').trim();
                 if (cleanA === nB) return true;
