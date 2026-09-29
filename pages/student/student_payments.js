@@ -192,11 +192,16 @@ function checkFabVisibility(payments, groupData) {
     const checkAdviserApprove = (stageKey) => {
         if (!groupData || !groupData.adviser_status) return false;
         const norm = stageKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-        let key = '';
-        if (norm.includes('title')) key = 'title';
-        else if (norm.includes('preoral')) key = 'preoral';
-        else if (norm.includes('final')) key = 'final';
-        return groupData.adviser_status[key] === 'Approved';
+        const stat = groupData.adviser_status;
+
+        if (norm.includes('title')) {
+            return stat['title1'] === 'Approved' && stat['title2'] === 'Approved' && stat['title3'] === 'Approved';
+        } else if (norm.includes('preoral')) {
+            return stat['ch1'] === 'Approved' && stat['ch2'] === 'Approved' && stat['ch3'] === 'Approved';
+        } else if (norm.includes('final')) {
+            return stat['ch4'] === 'Approved' && stat['ch5'] === 'Approved';
+        }
+        return false;
     };
 
     // Helper: Check if a specific defense type is Paid and Graded using normalized comparison
@@ -303,11 +308,15 @@ async function openAddPaymentModal() {
             const checkAdviserApprove = (stageKey) => {
                 if (!currentGroupData || !currentGroupData.adviser_status) return false;
                 const norm = stageKey.toLowerCase().replace(/[^a-z0-9]/g, '');
-                let key = '';
-                if (norm.includes('title')) key = 'title';
-                else if (norm.includes('preoral')) key = 'preoral';
-                else if (norm.includes('final')) key = 'final';
-                return currentGroupData.adviser_status[key] === 'Approved';
+                const stat = currentGroupData.adviser_status;
+                if (norm.includes('title')) {
+                    return stat['title1'] === 'Approved' && stat['title2'] === 'Approved' && stat['title3'] === 'Approved';
+                } else if (norm.includes('preoral')) {
+                    return stat['ch1'] === 'Approved' && stat['ch2'] === 'Approved' && stat['ch3'] === 'Approved';
+                } else if (norm.includes('final')) {
+                    return stat['ch4'] === 'Approved' && stat['ch5'] === 'Approved';
+                }
+                return false;
             };
 
             allTypes.forEach(type => {
